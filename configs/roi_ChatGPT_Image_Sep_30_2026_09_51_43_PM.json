@@ -1,0 +1,49 @@
+{
+    "camera_id": "ChatGPT Image Sep 30, 2026, 09_51_43 PM",
+    "description": "Vung via he co dinh (Ho tro Multi-ROI: Via he trai, phai)",
+    "resolution": {
+        "width": 1529,
+        "height": 1028
+    },
+    "total_regions": 1,
+    "total_points": 4,
+    "polygons": [
+        [
+            [
+                839,
+                45
+            ],
+            [
+                1034,
+                1025
+            ],
+            [
+                26,
+                1027
+            ],
+            [
+                580,
+                59
+            ]
+        ]
+    ],
+    "polygon_points": [
+        [
+            839,
+            45
+        ],
+        [
+            1034,
+            1025
+        ],
+        [
+            26,
+            1027
+        ],
+        [
+            580,
+            59
+        ]
+    ],
+    "created_at": "2026-10-07 16:32:29"
+}

@@ -1,0 +1,16 @@
+{
+    "camera_id": "camera_01",
+    "description": "Vung via he co dinh (Sidewalk Region of Interest - ROI)",
+    "resolution": {
+        "width": 720,
+        "height": 1280
+    },
+    "total_points": 4,
+    "polygon_points": [
+        [50, 750],
+        [670, 720],
+        [700, 950],
+        [30, 980]
+    ],
+    "created_at": "2026-09-14 22:30:00"
+}

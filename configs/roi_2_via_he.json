@@ -1,0 +1,25 @@
+{
+    "camera_id": "Duck-ai-image-2026-09-14-09-20 (1)",
+    "description": "Vung via he 2 ben duong (Multi-ROI: Via he trai + Via he phai)",
+    "resolution": {
+        "width": 1672,
+        "height": 941
+    },
+    "total_regions": 2,
+    "total_points": 8,
+    "polygons": [
+        [
+            [704, 261],
+            [1033, 880],
+            [1667, 853],
+            [803, 250]
+        ],
+        [
+            [40, 920],
+            [480, 920],
+            [400, 260],
+            [40, 260]
+        ]
+    ],
+    "created_at": "2026-09-15 18:08:00"
+}

@@ -1,0 +1,12 @@
+names:
+- bien-quang-cao
+nc: 1
+roboflow:
+  license: CC BY 4.0
+  project: sidewalk-signboard-detection-1
+  url: https://universe.roboflow.com/tai-nang-nguyen-duc/sidewalk-signboard-detection-1/dataset/8
+  version: 8
+  workspace: tai-nang-nguyen-duc
+test: ../test/images
+train: ../train/images
+val: ../valid/images

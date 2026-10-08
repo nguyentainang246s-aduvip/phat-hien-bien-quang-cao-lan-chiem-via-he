@@ -1,0 +1,49 @@
+{
+    "camera_id": "Screenshot 2026-09-30 214856",
+    "description": "Vung via he co dinh (Ho tro Multi-ROI: Via he trai, phai)",
+    "resolution": {
+        "width": 1084,
+        "height": 615
+    },
+    "total_regions": 1,
+    "total_points": 4,
+    "polygons": [
+        [
+            [
+                226,
+                14
+            ],
+            [
+                287,
+                11
+            ],
+            [
+                1041,
+                590
+            ],
+            [
+                554,
+                604
+            ]
+        ]
+    ],
+    "polygon_points": [
+        [
+            226,
+            14
+        ],
+        [
+            287,
+            11
+        ],
+        [
+            1041,
+            590
+        ],
+        [
+            554,
+            604
+        ]
+    ],
+    "created_at": "2026-10-07 16:14:31"
+}

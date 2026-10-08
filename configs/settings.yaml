@@ -1,0 +1,54 @@
+# ==============================================================================
+# HỆ THỐNG GIÁM SÁT & PHÁT HIỆN BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
+# File cấu hình tham số tập trung (Settings Configuration v8.0)
+# ==============================================================================
+
+system:
+  project_name: "DATN20224083"
+  version: "8.0"
+  description: "Phát hiện biển hiệu lấn chiếm vỉa hè qua CCTV cố định"
+
+camera:
+  default_id: "camera_01"
+  reconnect_delay: 2.0         # Thời gian chờ (giây) trước khi thử kết nối lại RTSP
+  max_retries: 10              # Số lần thử kết nối lại tối đa
+  buffer_flush: true           # Kích hoạt background thread flush buffer (Zero Latency)
+
+detector:
+  model_path: "models/best.pt" # Trọng số YOLOv8n Version 8 đã huấn luyện (6.4 MB)
+  imgsz: 1280                  # Kích thước ảnh đầu vào của mạng
+  conf_threshold: 0.25         # Ngưỡng tin cậy tối thiểu cho bounding box
+  iou_threshold: 0.50          # Ngưỡng Non-Maximum Suppression (NMS)
+  device: "cpu"                # 'cpu' hoặc 'cuda:0'
+
+tracking:
+  tracker_type: "bytetrack.yaml"
+  track_thresh: 0.20
+  match_thresh: 0.80
+  track_buffer: 30
+
+spatial:
+  overlap_threshold: 0.30      # Ngưỡng diện tích lấn chiếm tối thiểu (30% diện tích box)
+  ground_contact_rule: true    # Bắt buộc điểm chân đế (đáy bbox) phải nằm trong vỉa hè
+  denominator: "box_area"      # Mẫu số tính overlap (diện tích Bounding Box)
+
+temporal:
+  confirm_frames: 15           # Số frames liên tiếp để xác nhận vi phạm (~0.5s ở 30FPS)
+  confirm_seconds: 0.5         # Thời gian vi phạm tối thiểu quy ra giây
+  cooldown_seconds: 60.0       # Thời gian chờ (giây) chống gửi cảnh báo trùng lặp
+  max_missing_frames: 30       # Xóa track khỏi RAM nếu mất dấu quá 30 frames (~1s)
+  tolerance_frames: 2          # Dung sai 1-2 frames rung lắc/flicker trước khi reset
+  min_avg_confidence: 0.40     # Ngưỡng confidence trung bình tối thiểu để CONFIRMED
+  require_stationary: true     # Bật bộ lọc vật thể đứng yên (loại bỏ người bê biển đi ngang)
+  max_displacement_pixels: 50.0 # Độ dời tâm tối đa (pixels) trong cửa sổ quan sát
+  spatial_cooldown_radius: 50.0 # Bán kính không gian (pixels) để khử trùng khi nhảy ID
+
+evidence:
+  base_dir: "evidence"
+  save_crop: true              # Lưu ảnh cận cảnh phóng to biển hiệu
+  save_full: true              # Lưu ảnh toàn cảnh có đóng dấu tem pháp lý (Watermark)
+  format: "jpg"
+  privacy_blur_faces: false    # Khuyến nghị bật trong môi trường triển khai thực tế
+
+database:
+  db_path: "data/surveillance.db"

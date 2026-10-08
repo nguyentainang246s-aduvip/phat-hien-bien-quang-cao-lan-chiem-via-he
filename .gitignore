@@ -1,0 +1,48 @@
+# ==============================================================================
+# ĐỒ ÁN TỐT NGHIỆP - DATN20224083
+# .gitignore — Danh sách file/thư mục KHÔNG đưa vào bộ nộp
+# ==============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Dữ liệu runtime (sinh ra khi chạy, không cần nộp)
+data/surveillance.db
+evidence/records/
+
+# Model trùng lặp (chỉ giữ best.pt)
+models/best (3).pt
+models/best (2).pt
+
+# Dataset Roboflow (tải lại bằng script datasets/download_dataset.py)
+sidewalk-signboard-detection*/
+datasets/raw_images/
+datasets/v8/train/
+datasets/v8/valid/
+datasets/v8/test/
+
+# Log & Temp
+*.log
+*.tmp
+scratch/

@@ -1,0 +1,25 @@
+# ==============================================================================
+# ĐỒ ÁN TỐT NGHIỆP: PHÁT HIỆN BIỂN HIỆU/BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
+# DANH MỤC THƯ VIỆN & PHỤ THUỘC (DEPENDENCIES)
+# ==============================================================================
+
+# 1. Nền tảng Thị giác máy tính & Xử lý ảnh
+opencv-python>=4.8.0
+numpy>=1.24.0,<=2.3.5
+Pillow>=9.5.0
+
+# 2. Học sâu & Phát hiện vật thể (Deep Learning & YOLO)
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.1.0
+
+# 3. Tính toán Hình học không gian & Phán quyết vi phạm
+shapely>=2.0.0
+
+# 4. Thu thập & Quản lý Dataset
+roboflow>=1.1.0
+PyYAML>=6.0
+
+# 5. Giao diện Giám sát & Quản trị Dashboard
+streamlit>=1.30.0
+pandas>=2.0.0

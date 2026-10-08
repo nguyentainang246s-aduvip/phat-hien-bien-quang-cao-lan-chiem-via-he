@@ -1,0 +1,39 @@
+[
+    {
+        "image_path": "data/images/Duck-ai-image-2026-09-14-09-20 (1).jpeg",
+        "config_path": "configs/roi_moi.json",
+        "annotations": [
+            {
+                "description": "Biển hiệu cửa hàng bên phải đặt trên vỉa hè phải",
+                "box": [824.6, 295.6, 931.8, 576.4],
+                "is_violation": true
+            },
+            {
+                "description": "Biển hiệu bên trái đặt trên vỉa hè trái",
+                "box": [275.0, 331.4, 454.0, 606.4],
+                "is_violation": true
+            },
+            {
+                "description": "Biển đứng bên phải trên vỉa hè",
+                "box": [756.9, 250.6, 837.4, 421.3],
+                "is_violation": true
+            },
+            {
+                "description": "Biển treo trên cao tường nhà (không vi phạm tiếp đất)",
+                "box": [914.9, 151.7, 1100.7, 283.0],
+                "is_violation": false
+            }
+        ]
+    },
+    {
+        "image_path": "data/images/Screenshot 2026-09-15 171418.png",
+        "config_path": "configs/roi_moi.json",
+        "annotations": [
+            {
+                "description": "Biển quảng cáo đứng lấn chiếm vỉa hè",
+                "box": [347.6, 3.5, 492.0, 481.4],
+                "is_violation": true
+            }
+        ]
+    }
+]

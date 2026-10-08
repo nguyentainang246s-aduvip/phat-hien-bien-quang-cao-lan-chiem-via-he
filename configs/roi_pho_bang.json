@@ -1,0 +1,29 @@
+{
+    "camera_id": "cctv_pho_bang",
+    "description": "Vung via he duong Pho Bang - Ha Noi (Multi-ROI)",
+    "resolution": {
+        "width": 1280,
+        "height": 720
+    },
+    "total_regions": 1,
+    "total_points": 6,
+    "polygons": [
+        [
+            [50, 715],
+            [1250, 715],
+            [1250, 420],
+            [750, 320],
+            [150, 280],
+            [50, 350]
+        ]
+    ],
+    "polygon_points": [
+        [50, 715],
+        [1250, 715],
+        [1250, 420],
+        [750, 320],
+        [150, 280],
+        [50, 350]
+    ],
+    "created_at": "2026-09-15 23:55:00"
+}
