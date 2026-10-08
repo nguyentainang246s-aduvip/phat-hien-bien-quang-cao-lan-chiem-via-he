@@ -113,21 +113,36 @@ def run_monitor_mode(args):
     roi_manager = ROIManager(config_path)
     total_pts = sum(len(p) for p in roi_manager.polygons)
 
+    # 3. Nạp cấu hình tham số tập trung (settings.yaml)
+    cfg = _load_settings()
+    cfg_temporal = cfg.get("temporal", {})
+    cfg_detector = cfg.get("detector", {})
+    cfg_perf = cfg.get("performance", {})
+
+    model_path = args.model
+    if getattr(args, "onnx", False):
+        if os.path.exists("models/best.onnx"):
+            model_path = "models/best.onnx"
+        elif os.path.exists(cfg_detector.get("onnx_path", "")):
+            model_path = cfg_detector["onnx_path"]
+    elif model_path == "models/best.pt" and cfg_perf.get("use_onnx", False):
+        if os.path.exists("models/best.onnx"):
+            model_path = "models/best.onnx"
+
+    imgsz = args.imgsz if getattr(args, "imgsz", None) is not None else cfg_detector.get("imgsz", 640)
+    frame_skip = args.skip_frames if getattr(args, "skip_frames", None) is not None else cfg_perf.get("frame_skip", 0)
+    engine_name = "ONNX Runtime (CPU AVX2)" if str(model_path).endswith(".onnx") else "PyTorch"
+
     print(f"[*] Nguồn cấp dữ liệu : {source}")
     print(f"[*] Cấu hình Vỉa hè   : {config_path} ({len(roi_manager.polygons)} vùng vỉa hè, {total_pts} đỉnh)")
-    print(f"[*] Model AI Detector : {args.model}")
+    print(f"[*] Model AI Detector : {model_path} (Imgsz: {imgsz})")
+    print(f"[*] Tối ưu hiệu năng  : Engine: {engine_name} | Frame Skip: {frame_skip}")
     print(f"[*] Ngưỡng tin cậy AI : {args.conf * 100:.0f}%")
     print(f"[*] Ngưỡng đè vỉa hè  : {args.overlap * 100:.0f}%")
     print(f"[*] Bộ lọc thời gian  : Xác nhận sau {args.confirm_frames} frames | Cooldown {args.cooldown}s")
     print("-" * 78)
 
-    # 3. Nạp AI Tracker & Các module nghiệp vụ
-    # Nạp settings.yaml để lấy tham số mặc định (có thể bị ghi đè bởi CLI args)
-    cfg = _load_settings()
-    cfg_temporal = cfg.get("temporal", {})
-    cfg_detector = cfg.get("detector", {})
-
-    tracker = ObjectTracker(model_path=args.model, conf_threshold=args.conf)
+    tracker = ObjectTracker(model_path=model_path, conf_threshold=args.conf, imgsz=imgsz)
     checker = ViolationChecker(threshold=args.overlap)
     verifier = TemporalVerifier(
         confirm_frames=args.confirm_frames,
@@ -218,8 +233,12 @@ def run_monitor_mode(args):
     print(">> ĐANG GIÁM SÁT TRỰC TUYẾN 24/7. Nhấn 'q' hoặc 'ESC' để dừng.")
     frame_count = 0
     total_confirmed_events = 0
-
     roi_validated = False
+
+    last_verified_render = []
+    last_confirmed_count = 0
+    last_suspected_count = 0
+    last_object_count = 0
 
     try:
         while True:
@@ -240,78 +259,99 @@ def run_monitor_mode(args):
                 reader.looped = False
                 tracker.reset()
                 verifier.reset()
+                last_verified_render.clear()
+                last_confirmed_count = 0
+                last_suspected_count = 0
+                last_object_count = 0
                 print("[INFO] Video đã tua lại đầu — đã reset Tracker & Verifier.")
 
             frame_count += 1
+            is_infer_frame = (frame_skip <= 0) or (frame_count % (frame_skip + 1) == 1)
 
-            # BƯỚC 1: AI BÁM VẾT BYTETRACK TRÊN KHUNG HÌNH SẠCH NGUYÊN BẢN
-            tracked_objects = tracker.track(frame)
+            if is_infer_frame:
+                # BƯỚC 1: AI BÁM VẾT BYTETRACK TRÊN KHUNG HÌNH SẠCH NGUYÊN BẢN
+                tracked_objects = tracker.track(frame)
 
-            # BƯỚC 1.5: Tạo bản sạch cho evidence trước khi vẽ overlay
-            clean_frame = frame.copy()
+                # BƯỚC 1.5: Tạo bản sạch cho evidence trước khi vẽ overlay
+                clean_frame = frame.copy()
 
-            # BƯỚC 2: VẼ VÙNG VỈA HÈ LÊN FRAME HIỂN THỊ
-            roi_manager.draw_overlay(frame, alpha=0.25)
+                # BƯỚC 2: VẼ VÙNG VỈA HÈ LÊN FRAME HIỂN THỊ
+                roi_manager.draw_overlay(frame, alpha=0.25)
 
-            # BƯỚC 3: BỘ LỌC XÁC MINH THỜI GIAN
-            verified_objects = verifier.process_frame(tracked_objects, checker, roi_manager.polygons)
+                # BƯỚC 3: BỘ LỌC XÁC MINH THỜI GIAN
+                verified_objects = verifier.process_frame(tracked_objects, checker, roi_manager.polygons)
 
-            current_frame_confirmed = 0
-            current_frame_suspected = 0
+                current_frame_confirmed = 0
+                current_frame_suspected = 0
+                last_verified_render = []
 
-            # BƯỚC 4: VẼ KẾT QUẢ VÀ LƯU BẰNG CHỨNG
-            for item in verified_objects:
-                box = item["box"]
-                track_id = item["track_id"]
-                conf = item["conf"]
-                sp = item["spatial_res"]
-                temporal_status = item["temporal_status"]
-                v_count = item["violation_frames"]
-                is_new_alert = item["is_new_alert"]
+                # BƯỚC 4: VẼ KẾT QUẢ VÀ LƯU BẰNG CHỨNG
+                for item in verified_objects:
+                    box = item["box"]
+                    track_id = item["track_id"]
+                    conf = item["conf"]
+                    sp = item["spatial_res"]
+                    temporal_status = item["temporal_status"]
+                    v_count = item["violation_frames"]
+                    is_new_alert = item["is_new_alert"]
 
-                if temporal_status == TrackState.CONFIRMED:
-                    current_frame_confirmed += 1
-                    sw_idx = sp.get("sidewalk_index", 1)
-                    label = f"VI PHAM VH#{sw_idx} ({sp['overlap_pct']}%)"
+                    if temporal_status == TrackState.CONFIRMED:
+                        current_frame_confirmed += 1
+                        sw_idx = sp.get("sidewalk_index", 1)
+                        label = f"VI PHAM VH#{sw_idx} ({sp['overlap_pct']}%)"
 
-                    # Khi phát hiện vi phạm thực sự lần đầu (sau 15 frames)
-                    if is_new_alert:
-                        # ISSUE 09 FIX: Kiểm tra trùng lặp trước khi ghi DB (chống ghi trùng khi restart)
-                        if db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5):
-                            print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi tương tự trong 5 phút gần đây)")
-                        else:
-                            total_confirmed_events += 1
-                            ev_res = evidence_saver.save_evidence(
-                                clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct']
-                            )
-                            rec_id = db.insert_violation(
-                                camera_id=roi_manager.camera_id,
-                                track_id=track_id,
-                                timestamp=ev_res["timestamp"],
-                                confidence=conf,
-                                overlap_pct=sp["overlap_pct"],
-                                full_image_path=ev_res["full_path"],
-                                crop_image_path=ev_res.get("crop_path", ""),
-                                bbox=box,
-                                sidewalk_index=sw_idx
-                            )
-                            print(f"🚨 [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
-                            print(f"   📸 Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
+                        # Khi phát hiện vi phạm thực sự lần đầu (sau 15 frames)
+                        if is_new_alert:
+                            # ISSUE 09 FIX: Kiểm tra trùng lặp trước khi ghi DB (chống ghi trùng khi restart)
+                            if db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5):
+                                print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi tương tự trong 5 phút gần đây)")
+                            else:
+                                total_confirmed_events += 1
+                                ev_res = evidence_saver.save_evidence(
+                                    clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct']
+                                )
+                                rec_id = db.insert_violation(
+                                    camera_id=roi_manager.camera_id,
+                                    track_id=track_id,
+                                    timestamp=ev_res["timestamp"],
+                                    confidence=conf,
+                                    overlap_pct=sp["overlap_pct"],
+                                    full_image_path=ev_res["full_path"],
+                                    crop_image_path=ev_res.get("crop_path", ""),
+                                    bbox=box,
+                                    sidewalk_index=sw_idx
+                                )
+                                print(f"🚨 [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
+                                print(f"   📸 Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
 
-                elif temporal_status == TrackState.SUSPECTED:
-                    current_frame_suspected += 1
-                    label = f"NGHI VAN ({v_count}/{verifier.confirm_frames})"
-                else:
-                    label = f"HOP LE ({sp['overlap_pct']}%)"
+                    elif temporal_status == TrackState.SUSPECTED:
+                        current_frame_suspected += 1
+                        label = f"NGHI VAN ({v_count}/{verifier.confirm_frames})"
+                    else:
+                        label = f"HOP LE ({sp['overlap_pct']}%)"
 
-                draw_detection(frame, box, label, track_id=track_id, status=temporal_status)
+                    draw_detection(frame, box, label, track_id=track_id, status=temporal_status)
+                    last_verified_render.append((box, label, track_id, temporal_status))
+
+                last_confirmed_count = current_frame_confirmed
+                last_suspected_count = current_frame_suspected
+                last_object_count = len(verified_objects)
+
+            else:
+                # FRAME BỎ QUA INFER (Tối ưu CPU): Tái sử dụng kết quả frame trước để render mượt
+                roi_manager.draw_overlay(frame, alpha=0.25)
+                for (box, label, track_id, temporal_status) in last_verified_render:
+                    draw_detection(frame, box, label, track_id=track_id, status=temporal_status)
+                current_frame_confirmed = last_confirmed_count
+                current_frame_suspected = last_suspected_count
 
             # BƯỚC 5: HUD OVERLAY THÔNG SỐ VÀ FPS
             fps_val = fps_tracker.update()
             draw_fps_badge(frame, fps_val, reader.fps)
 
             # Banner cảnh báo trên góc
-            hud_text = f"Bien: {len(verified_objects)} | Nghi van: {current_frame_suspected} | VI PHAM: {current_frame_confirmed}"
+            obj_cnt = len(verified_objects) if is_infer_frame else last_object_count
+            hud_text = f"Bien: {obj_cnt} | Nghi van: {current_frame_suspected} | VI PHAM: {current_frame_confirmed}"
             hud_color = (0, 0, 255) if current_frame_confirmed > 0 else ((0, 165, 255) if current_frame_suspected > 0 else (0, 255, 0))
             cv2.putText(frame, hud_text, (max(10, reader.width - 480), 32),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.65, hud_color, 2, cv2.LINE_AA)
@@ -430,6 +470,12 @@ Ví dụ sử dụng:
                         help="Đường dẫn tệp cơ sở dữ liệu SQLite (mặc định: data/surveillance.db)")
     parser.add_argument("--port", type=int, default=8501,
                         help="Cổng mở Web Dashboard (mặc định: 8501)")
+    parser.add_argument("--onnx", action="store_true",
+                        help="Kích hoạt ONNX Runtime Engine CPU (tự động dùng models/best.onnx)")
+    parser.add_argument("--imgsz", type=int, default=None,
+                        help="Kích thước cạnh ảnh chuẩn khi suy luận (mặc định: 640)")
+    parser.add_argument("--skip-frames", type=int, default=None,
+                        help="Số frames bỏ qua giữa các lần infer (mặc định: 0, gợi ý: 1 hoặc 2)")
     parser.add_argument("--headless", action="store_true",
                         help="Chạy ở chế độ không mở cửa sổ giao diện OpenCV (cho server)")
 

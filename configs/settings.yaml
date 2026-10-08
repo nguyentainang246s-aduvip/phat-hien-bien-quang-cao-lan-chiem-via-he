@@ -16,10 +16,15 @@ camera:
 
 detector:
   model_path: "models/best.pt" # Trọng số YOLOv8n Version 8 đã huấn luyện (6.4 MB)
-  imgsz: 1280                  # Kích thước ảnh đầu vào của mạng
+  onnx_path: "models/best.onnx" # Bản xuất tối ưu ONNX Runtime (11.7 MB, Opset 12)
+  imgsz: 640                   # Kích thước ảnh chuẩn khi suy luận (640x640 tối ưu cho CPU)
   conf_threshold: 0.25         # Ngưỡng tin cậy tối thiểu cho bounding box
   iou_threshold: 0.50          # Ngưỡng Non-Maximum Suppression (NMS)
   device: "cpu"                # 'cpu' hoặc 'cuda:0'
+
+performance:
+  frame_skip: 0                # Số frames bỏ qua giữa các lần infer (0: tắt, 1: chạy 1 bỏ 1, 2: chạy 1 bỏ 2)
+  use_onnx: false              # Tự động ưu tiên ONNX Runtime khi có sẵn
 
 tracking:
   tracker_type: "bytetrack.yaml"

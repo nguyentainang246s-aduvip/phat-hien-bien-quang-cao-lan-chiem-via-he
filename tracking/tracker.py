@@ -18,23 +18,25 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.20, tracker_type: str = "bytetrack.yaml"):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.20, tracker_type: str = "bytetrack.yaml", imgsz: int = 640):
         """
         Khởi tạo ObjectTracker.
         
         Args:
-            model_path: Đường dẫn file trọng số YOLO (vd: 'models/best.pt' hoặc 'yolov8n.pt')
+            model_path: Đường dẫn file trọng số YOLO (vd: 'models/best.pt', 'models/best.onnx')
             conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.20 = 20%)
             tracker_type: File cấu hình tracker ('bytetrack.yaml' hoặc 'botsort.yaml')
+            imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
         self.tracker_type = tracker_type
+        self.imgsz = imgsz
         
         if not os.path.exists(model_path) and not model_path.endswith("yolov8n.pt"):
             raise FileNotFoundError(f"Không tìm thấy file trọng số mô hình: {model_path}")
             
-        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {tracker_type} (Conf: {conf_threshold})")
+        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {tracker_type} (Conf: {conf_threshold}, Imgsz: {imgsz})")
         self.model = YOLO(model_path)
         self.class_names = self.model.names
 
@@ -64,6 +66,7 @@ class ObjectTracker:
             persist=True,
             tracker=self.tracker_type,
             conf=self.conf_threshold,
+            imgsz=self.imgsz,
             verbose=False
         )
 
