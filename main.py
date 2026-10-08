@@ -162,12 +162,20 @@ def run_monitor_mode(args):
 
     tracker = ObjectTracker(model_path=model_path, conf_threshold=args.conf, imgsz=imgsz)
     checker = ViolationChecker(threshold=args.overlap)
+    allow_moving = getattr(args, "allow_moving", False)
+    require_stationary = False if allow_moving else cfg_temporal.get("require_stationary", True)
+    max_disp = args.max_displacement if getattr(args, "max_displacement", None) is not None else float(cfg_temporal.get("max_displacement_pixels", 50.0))
+    min_avg_conf = args.min_avg_conf if getattr(args, "min_avg_conf", None) is not None else float(cfg_temporal.get("min_avg_confidence", 0.40))
+
     verifier = TemporalVerifier(
         confirm_frames=args.confirm_frames,
         confirm_seconds=cfg_temporal.get("confirm_seconds", 0.5),
         cooldown_seconds=args.cooldown,
         max_missing_frames=cfg_temporal.get("max_missing_frames", 30),
         tolerance_frames=cfg_temporal.get("tolerance_frames", 2),
+        min_avg_confidence=min_avg_conf,
+        require_stationary=require_stationary,
+        max_displacement_pixels=max_disp,
     )
     evidence_saver = EvidenceSaver(base_dir=args.evidence_dir)
     db = ViolationDatabase(db_path=args.db)
@@ -349,7 +357,11 @@ def run_monitor_mode(args):
 
                     elif temporal_status == TrackState.SUSPECTED:
                         current_frame_suspected += 1
-                        label = f"NGHI VAN ({v_count}/{verifier.confirm_frames})"
+                        reason = item.get("suspect_reason", "")
+                        if reason:
+                            label = f"NGHI VAN [{reason}] ({v_count}/{verifier.confirm_frames})"
+                        else:
+                            label = f"NGHI VAN ({v_count}/{verifier.confirm_frames})"
                     else:
                         label = f"HOP LE ({sp['overlap_pct']}%)"
 
@@ -517,6 +529,12 @@ Ví dụ sử dụng:
                         help="Tắt khóa nhịp FPS để chạy hết công suất phần cứng (Benchmark mode)")
     parser.add_argument("--target-fps", type=float, default=None,
                         help="Tốc độ FPS mục tiêu cho thiết bị biên (mặc định: 24.0)")
+    parser.add_argument("--allow-moving", action="store_true",
+                        help="Tắt bộ lọc đứng yên (cho phép bắt vi phạm ngay cả khi camera rung lắc/quay di động)")
+    parser.add_argument("--max-displacement", type=float, default=None,
+                        help="Độ dời tâm tối đa (pixels) để coi là đứng yên (mặc định: 50.0, video quay tay có thể đặt 120-150)")
+    parser.add_argument("--min-avg-conf", type=float, default=None,
+                        help="Ngưỡng tin cậy trung bình tối thiểu để CONFIRMED (mặc định: 0.40)")
     parser.add_argument("--headless", action="store_true",
                         help="Chạy ở chế độ không mở cửa sổ giao diện OpenCV (cho server)")
 

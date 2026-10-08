@@ -53,6 +53,9 @@ class TemporalVerifier:
         max_missing_frames: int = 30,
         tolerance_frames: int = 2,
         source_fps: float = None,
+        min_avg_confidence: float = 0.40,
+        require_stationary: bool = True,
+        max_displacement_pixels: float = 50.0,
     ):
         """
         Args:
@@ -65,6 +68,9 @@ class TemporalVerifier:
             tolerance_frames: Dung sai frame rung lắc/flicker trước khi reset bộ đếm.
             source_fps:       FPS của nguồn video (dùng để quy đổi giây↔frame).
                               Nếu None → dùng thời gian thực (time.time()).
+            min_avg_confidence: Ngưỡng confidence TB tối thiểu để CONFIRMED.
+            require_stationary: Bật/tắt bộ lọc yêu cầu vật thể đứng yên.
+            max_displacement_pixels: Độ dời tối đa trong cửa sổ để coi là đứng yên.
         """
         self.confirm_frames = confirm_frames
         self.confirm_seconds = confirm_seconds
@@ -73,11 +79,11 @@ class TemporalVerifier:
         self.tolerance_frames = tolerance_frames
         self.source_fps = source_fps  # Có thể cập nhật sau khi StreamReader khởi xong
 
-        self.min_avg_confidence = 0.40  # Ngưỡng confidence TB tối thiểu để CONFIRMED
+        self.min_avg_confidence = min_avg_confidence  # Ngưỡng confidence TB tối thiểu để CONFIRMED
 
         # --- Stationary check (sliding window) ---
-        self.require_stationary = True
-        self.max_displacement_pixels = 50.0     # Độ dời tối đa trong cửa sổ để coi là đứng yên
+        self.require_stationary = require_stationary
+        self.max_displacement_pixels = max_displacement_pixels     # Độ dời tối đa trong cửa sổ để coi là đứng yên
         self.stationary_window_seconds = 1.0    # Kích thước cửa sổ trượt kiểm tra đứng yên (giây)
 
         # Spatial deduplication khi track_id bị đổi
@@ -228,6 +234,8 @@ class TemporalVerifier:
             # 3. Cập nhật bộ đếm thời gian
             is_new_alert = False
 
+            suspect_reason = ""
+
             if is_spatial_viol:
                 record["count"] += 1
                 record["non_viol_streak"] = 0
@@ -247,11 +255,14 @@ class TemporalVerifier:
                     if not is_stationary:
                         # Đang di chuyển → người bê biển đi ngang, giữ SUSPECTED
                         record["status"] = TrackState.SUSPECTED
+                        suspect_reason = "DI CHUYEN"
                     elif avg_conf < self.min_avg_confidence:
                         # Confidence TB quá thấp → giữ SUSPECTED
                         record["status"] = TrackState.SUSPECTED
+                        suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
                     else:
                         record["status"] = TrackState.CONFIRMED
+                        suspect_reason = ""
 
                     # Spatial & temporal deduplication
                     if record["status"] == TrackState.CONFIRMED:
@@ -278,6 +289,7 @@ class TemporalVerifier:
                             ]
                 else:
                     record["status"] = TrackState.SUSPECTED
+                    suspect_reason = ""
 
             else:
                 # Không vi phạm ở frame này
@@ -301,6 +313,7 @@ class TemporalVerifier:
                 "conf": conf,
                 "spatial_res": spatial_res,
                 "temporal_status": record["status"],
+                "suspect_reason": suspect_reason,
                 "violation_frames": record["count"],
                 "violation_seconds": round(self._elapsed_viol_seconds(record, current_timestamp), 2),
                 "is_new_alert": is_new_alert,
