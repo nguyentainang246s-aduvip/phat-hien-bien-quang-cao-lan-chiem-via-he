@@ -17,6 +17,19 @@ import argparse
 import time
 import cv2
 
+try:
+    import yaml as _yaml
+    def _load_settings(path: str = "configs/settings.yaml") -> dict:
+        """Nạp cấu hình từ settings.yaml. Trả về dict rỗng nếu file không tồn tại."""
+        if not os.path.exists(path):
+            return {}
+        with open(path, encoding="utf-8") as f:
+            return _yaml.safe_load(f) or {}
+except ImportError:
+    def _load_settings(path: str = "configs/settings.yaml") -> dict:
+        print("[WARN] PyYAML chưa cài. Cài bằng: pip install pyyaml")
+        return {}
+
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if hasattr(sys.stderr, 'reconfigure'):
@@ -81,14 +94,21 @@ def run_monitor_mode(args):
     is_image = isinstance(source, str) and source.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.webp'))
 
     # 2. Quản lý cấu hình ROI vỉa hè
+    # FIX: Không tự động chọn roi_moi.json cho mọi nguồn (lỗi cũ báo cáo bởi reviewer).
+    # Thứ tự ưu tiên: --config arg > khớp tên file > roi_camera1.json mặc định.
     config_path = args.config
     if config_path is None:
-        if os.path.exists("configs/roi_moi.json"):
-            config_path = "configs/roi_moi.json"
-        elif "Duck-ai-image" in str(source) and os.path.exists("configs/roi_duck_image.json"):
-            config_path = "configs/roi_duck_image.json"
-        else:
+        source_name = os.path.basename(str(source)).lower()
+        # Thử tìm file roi khớp theo tên source
+        candidate = os.path.join("configs", f"roi_{source_name.rsplit('.', 1)[0]}.json")
+        if os.path.exists(candidate):
+            config_path = candidate
+        elif os.path.exists("configs/roi_camera1.json"):
             config_path = "configs/roi_camera1.json"
+        else:
+            # Fallback cuối cùng: lấy file roi đầu tiên tìm thấy trong configs/
+            roi_files = sorted(f for f in os.listdir("configs") if f.startswith("roi_") and f.endswith(".json"))
+            config_path = os.path.join("configs", roi_files[0]) if roi_files else "configs/roi_camera1.json"
 
     roi_manager = ROIManager(config_path)
     total_pts = sum(len(p) for p in roi_manager.polygons)
@@ -102,9 +122,20 @@ def run_monitor_mode(args):
     print("-" * 78)
 
     # 3. Nạp AI Tracker & Các module nghiệp vụ
+    # Nạp settings.yaml để lấy tham số mặc định (có thể bị ghi đè bởi CLI args)
+    cfg = _load_settings()
+    cfg_temporal = cfg.get("temporal", {})
+    cfg_detector = cfg.get("detector", {})
+
     tracker = ObjectTracker(model_path=args.model, conf_threshold=args.conf)
     checker = ViolationChecker(threshold=args.overlap)
-    verifier = TemporalVerifier(confirm_frames=args.confirm_frames, cooldown_seconds=args.cooldown, max_missing_frames=30)
+    verifier = TemporalVerifier(
+        confirm_frames=args.confirm_frames,
+        confirm_seconds=cfg_temporal.get("confirm_seconds", 0.5),
+        cooldown_seconds=args.cooldown,
+        max_missing_frames=cfg_temporal.get("max_missing_frames", 30),
+        tolerance_frames=cfg_temporal.get("tolerance_frames", 2),
+    )
     evidence_saver = EvidenceSaver(base_dir=args.evidence_dir)
     db = ViolationDatabase(db_path=args.db)
 
@@ -175,6 +206,8 @@ def run_monitor_mode(args):
 
     # 5. XỬ LÝ LUỒNG VIDEO / RTSP / WEBCAM LIÊN TỤC
     reader = StreamReader(source=source)
+    # Truyền FPS nguồn để TemporalVerifier tính giây chính xác
+    verifier.source_fps = reader.fps if hasattr(reader, 'fps') and reader.fps > 0 else None
     fps_tracker = FPSTracker(alpha=0.15)
     window_name = "CCTV Sidewalk Surveillance 2.0 (ByteTrack + Temporal Verifier)"
 

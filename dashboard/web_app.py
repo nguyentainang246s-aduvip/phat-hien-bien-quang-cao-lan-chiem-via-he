@@ -464,8 +464,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(records).encode("utf-8"))
 
         elif path.startswith("/evidence/") or path.startswith("/data/"):
-            file_path = path.lstrip("/")
-            if os.path.exists(file_path):
+            # FIX (bảo mật): Chặn path traversal (../) bằng cách resolve đường dẫn tuyệt đối
+            # và kiểm tra nằm trong các thư mục được phép.
+            base_dir = os.path.abspath(".")
+            allowed_prefixes = (
+                os.path.abspath("evidence"),
+                os.path.abspath(os.path.join("data", "surveillance.db")).rstrip("surveillance.db"),
+            )
+            raw_path = path.lstrip("/")
+            file_path = os.path.normpath(os.path.join(base_dir, raw_path))
+            is_allowed = any(file_path.startswith(prefix) for prefix in allowed_prefixes)
+
+            if not is_allowed:
+                self.send_response(403)
+                self.end_headers()
+                self.wfile.write(b"403 Forbidden: Access outside allowed directories")
+            elif os.path.isfile(file_path):
                 self.send_response(200)
                 mime, _ = mimetypes.guess_type(file_path)
                 self.send_header("Content-Type", mime or "application/octet-stream")
@@ -488,6 +502,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         import re
         match = re.match(r'/api/violations/(\d+)/status', path)
         if match:
+            # Kiểm tra cơ bản: chỉ chấp nhận từ localhost
+            client_host = self.client_address[0] if self.client_address else ""
+            if client_host not in ("127.0.0.1", "::1", "localhost"):
+                self.send_response(403)
+                self.end_headers()
+                self.wfile.write(b"403 Forbidden: Status updates require local access")
+                return
+
             violation_id = int(match.group(1))
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length).decode('utf-8')
