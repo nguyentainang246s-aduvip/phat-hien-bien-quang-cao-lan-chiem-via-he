@@ -30,6 +30,7 @@ desktop.ini
 # Dữ liệu runtime (sinh ra khi chạy, không cần nộp)
 data/surveillance.db
 evidence/records/
+evidence/crops/
 
 # Model trùng lặp (chỉ giữ best.pt)
 models/best (3).pt

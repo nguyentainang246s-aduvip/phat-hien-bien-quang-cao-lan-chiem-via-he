@@ -1,0 +1,57 @@
+{
+    "camera_id": "videotesst2",
+    "description": "Vung via he co dinh (Ho tro Multi-ROI: Via he trai, phai)",
+    "resolution": {
+        "width": 1280,
+        "height": 720
+    },
+    "total_regions": 1,
+    "total_points": 5,
+    "polygons": [
+        [
+            [
+                293,
+                51
+            ],
+            [
+                645,
+                713
+            ],
+            [
+                1215,
+                716
+            ],
+            [
+                1126,
+                530
+            ],
+            [
+                402,
+                50
+            ]
+        ]
+    ],
+    "polygon_points": [
+        [
+            293,
+            51
+        ],
+        [
+            645,
+            713
+        ],
+        [
+            1215,
+            716
+        ],
+        [
+            1126,
+            530
+        ],
+        [
+            402,
+            50
+        ]
+    ],
+    "created_at": "2026-10-08 16:21:57"
+}

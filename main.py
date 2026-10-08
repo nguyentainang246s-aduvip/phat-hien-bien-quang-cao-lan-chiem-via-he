@@ -177,7 +177,11 @@ def run_monitor_mode(args):
         require_stationary=require_stationary,
         max_displacement_pixels=max_disp,
     )
-    evidence_saver = EvidenceSaver(base_dir=args.evidence_dir)
+    cfg_evidence = cfg.get("evidence", {})
+    evidence_saver = EvidenceSaver(
+        base_dir=args.evidence_dir,
+        blur_faces=cfg_evidence.get("privacy_blur_faces", False)
+    )
     db = ViolationDatabase(db_path=args.db)
 
     # 4. XỬ LÝ ẢNH TĨNH

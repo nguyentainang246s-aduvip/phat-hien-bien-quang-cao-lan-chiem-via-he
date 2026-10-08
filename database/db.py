@@ -22,9 +22,14 @@ class ViolationDatabase:
         self.init_tables()
 
     def get_connection(self):
-        """Tạo kết nối SQLite với Row Factory để truy vấn dạng dict."""
+        """Tạo kết nối SQLite với Row Factory để truy vấn dạng dict và kích hoạt WAL Mode."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+        except Exception:
+            pass
         return conn
 
     def init_tables(self):
@@ -65,7 +70,10 @@ class ViolationDatabase:
                 ("bbox_x2", "INTEGER"),
                 ("bbox_y2", "INTEGER"),
                 ("sidewalk_index", "INTEGER DEFAULT 1"),
-                ("status", "TEXT DEFAULT 'pending'")
+                ("status", "TEXT DEFAULT 'pending'"),
+                ("reviewed_by", "TEXT DEFAULT NULL"),
+                ("dismiss_reason", "TEXT DEFAULT NULL"),
+                ("reviewed_at", "DATETIME DEFAULT NULL")
             ]
             
             for col_name, col_type in new_columns:
@@ -146,9 +154,9 @@ class ViolationDatabase:
         finally:
             conn.close()
 
-    def update_violation_status(self, violation_id: int, new_status: str) -> bool:
+    def update_violation_status(self, violation_id: int, new_status: str, reviewed_by: str = None, dismiss_reason: str = None) -> bool:
         """
-        ISSUE 15 FIX: Cập nhật trạng thái xử lý vi phạm.
+        Cập nhật trạng thái xử lý vi phạm kèm thông tin cán bộ duyệt và lý do bác bỏ (Human-in-the-Loop).
         Trạng thái hợp lệ: 'pending', 'confirmed', 'dismissed', 'resolved'
         """
         valid_statuses = {'pending', 'confirmed', 'dismissed', 'resolved'}
@@ -159,18 +167,26 @@ class ViolationDatabase:
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
+            reviewed_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute(
-                "UPDATE violations SET status = ? WHERE id = ?",
-                (new_status, violation_id)
+                """
+                UPDATE violations 
+                SET status = ?, 
+                    reviewed_by = COALESCE(?, reviewed_by), 
+                    dismiss_reason = ?, 
+                    reviewed_at = ?
+                WHERE id = ?
+                """,
+                (new_status, reviewed_by, dismiss_reason, reviewed_at, violation_id)
             )
             conn.commit()
             return cursor.rowcount > 0
         finally:
             conn.close()
 
-    def get_violations(self, camera_id: str = None, date_str: str = None, limit: int = 50) -> list:
+    def get_violations(self, camera_id: str = None, date_str: str = None, status: str = None, limit: int = 100) -> list:
         """
-        Truy vấn danh sách vi phạm có lọc theo camera hoặc ngày (YYYY-MM-DD).
+        Truy vấn danh sách vi phạm có lọc theo camera, ngày hoặc trạng thái.
         """
         query = "SELECT * FROM violations WHERE 1=1"
         params = []
@@ -182,6 +198,10 @@ class ViolationDatabase:
         if date_str:
             query += " AND DATE(timestamp) = DATE(?)"
             params.append(date_str)
+
+        if status and status != "all":
+            query += " AND status = ?"
+            params.append(status)
 
         query += " ORDER BY id DESC LIMIT ?"
         params.append(limit)
@@ -215,10 +235,15 @@ class ViolationDatabase:
             cursor.execute("SELECT camera_id, COUNT(*) as count FROM violations GROUP BY camera_id")
             by_cam = {row["camera_id"]: row["count"] for row in cursor.fetchall()}
 
+            # Thống kê theo trạng thái (Pending, Confirmed, Dismissed, Resolved)
+            cursor.execute("SELECT status, COUNT(*) as count FROM violations GROUP BY status")
+            by_status = {row["status"]: row["count"] for row in cursor.fetchall()}
+
             return {
                 "total_violations": total,
                 "today_violations": today,
-                "violations_by_camera": by_cam
+                "violations_by_camera": by_cam,
+                "violations_by_status": by_status
             }
         finally:
             conn.close()

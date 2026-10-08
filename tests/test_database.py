@@ -63,13 +63,35 @@ def test_violation_database():
     assert stats["violations_by_camera"]["camera_01"] == 1
     assert stats["violations_by_camera"]["camera_02"] == 1
 
+    # 4. Kiểm tra cập nhật trạng thái (Human-in-the-Loop)
+    ok_conf = db.update_violation_status(id1, "confirmed", reviewed_by="Đ/c Nguyễn Văn A")
+    assert ok_conf is True
+
+    ok_dism = db.update_violation_status(id2, "dismissed", reviewed_by="Đ/c Trần Thị B", dismiss_reason="Biển có giấy phép hợp lệ")
+    assert ok_dism is True
+
+    # Kiểm tra truy vấn theo trạng thái
+    pending_list = db.get_violations(status="pending")
+    confirmed_list = db.get_violations(status="confirmed")
+    dismissed_list = db.get_violations(status="dismissed")
+
+    assert len(pending_list) == 0
+    assert len(confirmed_list) == 1
+    assert confirmed_list[0]["reviewed_by"] == "Đ/c Nguyễn Văn A"
+    assert len(dismissed_list) == 1
+    assert dismissed_list[0]["dismiss_reason"] == "Biển có giấy phép hợp lệ"
+
+    # Kiểm tra thống kê theo trạng thái
+    stats2 = db.get_statistics()
+    assert stats2["violations_by_status"]["confirmed"] == 1
+    assert stats2["violations_by_status"]["dismissed"] == 1
+
     # Dọn dẹp file test db
     if os.path.exists(test_db_file):
         os.remove(test_db_file)
 
     print("\n[OK] 100% CSDL SQLITE HOẠT ĐỘNG HOÀN HẢO THEO CHUẨN ĐỒ ÁN!")
     print("=" * 65)
-    return True
 
 
 if __name__ == "__main__":

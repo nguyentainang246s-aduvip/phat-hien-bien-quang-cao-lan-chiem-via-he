@@ -66,10 +66,11 @@ class ViolationChecker:
         base_point = pt_center
 
         pts_array = np.array(polygon_points, dtype=np.int32)
-        # cv2.pointPolygonTest: >= 0 là nằm trong hoặc trên mép vỉa hè
-        left_inside = cv2.pointPolygonTest(pts_array, pt_left, measureDist=False) >= 0
-        center_inside = cv2.pointPolygonTest(pts_array, pt_center, measureDist=False) >= 0
-        right_inside = cv2.pointPolygonTest(pts_array, pt_right, measureDist=False) >= 0
+        # Dung sai tiếp đất: cho phép lệch tối đa 15px (do người dùng click mép dưới cùng màn hình thường hụt 2-6px)
+        base_margin = 15.0
+        left_inside = cv2.pointPolygonTest(pts_array, pt_left, measureDist=True) >= -base_margin
+        center_inside = cv2.pointPolygonTest(pts_array, pt_center, measureDist=True) >= -base_margin
+        right_inside = cv2.pointPolygonTest(pts_array, pt_right, measureDist=True) >= -base_margin
 
         # Thỏa mãn nếu BẤT KỲ điểm nào trong 3 điểm (Chân trái / Giữa / Chân phải) tiếp đất trên vỉa hè
         is_base_inside = left_inside or center_inside or right_inside

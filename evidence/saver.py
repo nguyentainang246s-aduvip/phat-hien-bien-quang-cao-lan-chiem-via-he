@@ -21,12 +21,22 @@ class EvidenceSaver:
       1. Ảnh Toàn Cảnh (Full Frame): Có đóng dấu thời gian, mã camera, tọa độ vỉa hè làm căn cứ pháp lý.
       2. Ảnh Cận Cảnh (Cropped Image): Phóng to riêng tấm biển hiệu để đọc rõ nội dung chữ và SĐT.
     """
-    def __init__(self, base_dir: str = "evidence"):
+    def __init__(self, base_dir: str = "evidence", blur_faces: bool = False):
         """
         Args:
             base_dir: Thư mục gốc lưu trữ bằng chứng (mặc định 'evidence')
+            blur_faces: Bật/tắt tự động làm mờ khuôn mặt người đi đường (Privacy Protection)
         """
         self.base_dir = base_dir
+        self.blur_faces = blur_faces
+        self._face_cascade = None
+        if self.blur_faces:
+            try:
+                cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+                if os.path.exists(cascade_path):
+                    self._face_cascade = cv2.CascadeClassifier(cascade_path)
+            except Exception:
+                pass
         os.makedirs(self.base_dir, exist_ok=True)
 
     def save_evidence(self, frame: np.ndarray, box: tuple, track_id: int, 
@@ -66,6 +76,24 @@ class EvidenceSaver:
         # 2. Xử lý ảnh toàn cảnh (Full Frame with Watermark Stamp)
         stamped_frame = frame.copy()
         h, w = stamped_frame.shape[:2]
+
+        # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
+        if self._face_cascade is not None:
+            try:
+                gray = cv2.cvtColor(stamped_frame, cv2.COLOR_BGR2GRAY)
+                faces = self._face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=4, minSize=(30, 30))
+                bx1, by1, bx2, by2 = box
+                for (fx, fy, fw_box, fh_box) in faces:
+                    # Không làm mờ nếu khuôn mặt nằm bên trong biển hiệu (hình vẽ người mẫu trên biển)
+                    is_inside_sign = (fx >= bx1 and fx + fw_box <= bx2 and fy >= by1 and fy + fh_box <= by2)
+                    if not is_inside_sign:
+                        f_roi = stamped_frame[fy:fy+fh_box, fx:fx+fw_box]
+                        if f_roi.size > 0:
+                            k_w = max(15, (fw_box // 2) * 2 + 1)
+                            k_h = max(15, (fh_box // 2) * 2 + 1)
+                            stamped_frame[fy:fy+fh_box, fx:fx+fw_box] = cv2.GaussianBlur(f_roi, (k_w, k_h), 20)
+            except Exception:
+                pass
 
         # Đóng dấu tem pháp lý (Legal Stamp) ở góc dưới khung hình
         stamp_text = f"BANG CHUNG CCTV | Cam: {camera_id} | ID: #{track_id} | Lan chiem: {overlap_pct:.1f}% | {iso_timestamp}"

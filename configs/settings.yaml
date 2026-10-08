@@ -40,8 +40,8 @@ spatial:
   denominator: "box_area"      # Mẫu số tính overlap (diện tích Bounding Box)
 
 temporal:
-  confirm_frames: 15           # Số frames liên tiếp để xác nhận vi phạm (~0.5s ở 30FPS)
-  confirm_seconds: 0.5         # Thời gian vi phạm tối thiểu quy ra giây
+  confirm_frames: 20           # Số frames liên tiếp để xác nhận vi phạm (~1s ở 20-24FPS)
+  confirm_seconds: 3.0         # Thời gian vi phạm tối thiểu quy ra giây (3.0s - 10.0s trên camera thật)
   cooldown_seconds: 60.0       # Thời gian chờ (giây) chống gửi cảnh báo trùng lặp
   max_missing_frames: 30       # Xóa track khỏi RAM nếu mất dấu quá 30 frames (~1s)
   tolerance_frames: 2          # Dung sai 1-2 frames rung lắc/flicker trước khi reset
@@ -55,7 +55,7 @@ evidence:
   save_crop: true              # Lưu ảnh cận cảnh phóng to biển hiệu
   save_full: true              # Lưu ảnh toàn cảnh có đóng dấu tem pháp lý (Watermark)
   format: "jpg"
-  privacy_blur_faces: false    # Khuyến nghị bật trong môi trường triển khai thực tế
+  privacy_blur_faces: true     # Tự động làm mờ khuôn mặt người đi đường (Bảo vệ quyền riêng tư)
 
 database:
   db_path: "data/surveillance.db"
