@@ -363,7 +363,7 @@ elif menu == "⚙️ Quản Lý Vùng Vỉa Hè (ROI)":
 
     st.markdown("---")
     st.subheader("💡 Cách Vẽ Thêm Vỉa Hè Mới:")
-    st.code(".\.venv\Scripts\python.exe roi_drawer.py <đường_dẫn_ảnh_hoặc_video> configs/roi_ten_moi.json", language="powershell")
+    st.code(r".\.venv\Scripts\python.exe roi_drawer.py <đường_dẫn_ảnh_hoặc_video> configs/roi_ten_moi.json", language="powershell")
     st.markdown("""
     1. Click chuột trái để chấm các đỉnh vỉa hè.
     2. Nhấn phím **`n`** nếu muốn vẽ thêm vỉa hè bên kia đường (Multi-ROI).

@@ -49,12 +49,19 @@ DATN20224083/
 ├── models/             # Trọng số mô hình đã huấn luyện (best.pt)
 ├── reports/            # Biểu đồ training, báo cáo sweep threshold, benchmark
 ├── roi/                # Quản lý vùng vỉa hè (Multi-ROI, auto-scale resolution)
+├── scripts/            # Script tiện ích, kiểm tra môi trường & bản demo thực nghiệm
+│   ├── check_env.py    # Kiểm tra cấu hình môi trường thực thi (Task 01)
+│   ├── create_sample_video.py # Sinh video giả lập CCTV phục vụ test
+│   ├── detect_only.py  # Nhận diện biển hiệu thuần YOLO không qua ROI
+│   ├── train_colab.py  # Script huấn luyện YOLOv8n trên Google Colab GPU T4
+│   └── demos/          # Mã nguồn các bài thực nghiệm theo roadmap (Task 02 – Task 21)
 ├── tests/              # Bộ unit test tự động cho toàn bộ các module
 ├── tracking/           # ByteTrack tracker và Temporal Verifier
 ├── utils/              # Bộ đếm FPS và vẽ đồ họa trực quan
-├── main.py             # Điểm khởi chạy thống nhất của toàn hệ thống (Unified Entry Point)
+├── test_on_image.py    # Công cụ kiểm thử trực quan trên ảnh tĩnh kèm kiểm tra 3 điểm chân đế
 ├── roi_drawer.py       # Công cụ giao diện đồ họa vẽ vùng vỉa hè bằng chuột
-└── requirements.txt    # Danh mục thư viện phụ thuộc
+├── requirements.txt    # Danh mục thư viện phụ thuộc
+└── main.py             # Điểm khởi chạy thống nhất của toàn hệ thống (Unified Entry Point)
 ```
 
 ---
