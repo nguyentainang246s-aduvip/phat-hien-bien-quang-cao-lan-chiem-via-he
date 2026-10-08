@@ -98,4 +98,17 @@ class ObjectTracker:
         """Reset bộ nhớ trạng thái tracker (khi chuyển luồng camera hoặc tua lại video)"""
         # Khởi tạo lại tracker state trong model
         if hasattr(self.model, 'predictor') and self.model.predictor is not None:
-            self.model.predictor.trackers = None
+            pred = self.model.predictor
+            if hasattr(pred, 'trackers') and pred.trackers is not None:
+                for trk in pred.trackers:
+                    if hasattr(trk, 'reset'):
+                        try:
+                            trk.reset()
+                        except Exception:
+                            pass
+            else:
+                if hasattr(pred, 'trackers'):
+                    try:
+                        del pred.trackers
+                    except Exception:
+                        pass

@@ -237,6 +237,7 @@ def run_monitor_mode(args):
 
             # Khi video file tua lại đầu: reset tracker & verifier để tránh duplicate violations
             if hasattr(reader, 'looped') and reader.looped:
+                reader.looped = False
                 tracker.reset()
                 verifier.reset()
                 print("[INFO] Video đã tua lại đầu — đã reset Tracker & Verifier.")
@@ -363,8 +364,8 @@ def run_roi_mode(args):
         source = os.path.join(video_dir, files[0]) if files else "data/videos/sample_cctv.mp4"
 
     cfg = args.config if args.config else "configs/roi_camera1.json"
-    cmd = f'"{sys.executable}" roi_drawer.py "{source}" "{cfg}"'
-    os.system(cmd)
+    from roi_drawer import run_roi_tool
+    run_roi_tool(source, cfg)
 
 
 def run_benchmark_mode(args):
