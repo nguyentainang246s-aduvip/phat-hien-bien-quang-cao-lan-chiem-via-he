@@ -119,24 +119,42 @@ def run_monitor_mode(args):
     cfg_detector = cfg.get("detector", {})
     cfg_perf = cfg.get("performance", {})
 
+    is_edge_mode = getattr(args, "edge", False)
+
     model_path = args.model
-    if getattr(args, "onnx", False):
+    if getattr(args, "onnx", False) or is_edge_mode or (model_path == "models/best.pt" and cfg_perf.get("use_onnx", False)):
         if os.path.exists("models/best.onnx"):
             model_path = "models/best.onnx"
         elif os.path.exists(cfg_detector.get("onnx_path", "")):
             model_path = cfg_detector["onnx_path"]
-    elif model_path == "models/best.pt" and cfg_perf.get("use_onnx", False):
-        if os.path.exists("models/best.onnx"):
-            model_path = "models/best.onnx"
 
     imgsz = args.imgsz if getattr(args, "imgsz", None) is not None else cfg_detector.get("imgsz", 640)
-    frame_skip = args.skip_frames if getattr(args, "skip_frames", None) is not None else cfg_perf.get("frame_skip", 0)
+    
+    if is_edge_mode:
+        frame_skip = args.skip_frames if getattr(args, "skip_frames", None) is not None else 2
+    else:
+        frame_skip = args.skip_frames if getattr(args, "skip_frames", None) is not None else cfg_perf.get("frame_skip", 2)
+
+    # Đồng bộ nhịp phát Real-time FPS (Khóa nhịp thời gian thực tránh tua nhanh trên Edge)
+    sync_playback = True
+    if getattr(args, "no_sync", False):
+        sync_playback = False
+    elif getattr(args, "sync_fps", False) or is_edge_mode:
+        sync_playback = True
+    elif "sync_playback" in cfg_perf:
+        sync_playback = bool(cfg_perf["sync_playback"])
+    
+    if is_stream:
+        sync_playback = False
+
+    target_fps = args.target_fps if getattr(args, "target_fps", None) is not None else float(cfg_perf.get("target_fps", 24.0))
     engine_name = "ONNX Runtime (CPU AVX2)" if str(model_path).endswith(".onnx") else "PyTorch"
+    sync_str = f"Realtime {target_fps:.0f} FPS (1.0x)" if sync_playback else "Unlocked (Max Compute)"
 
     print(f"[*] Nguồn cấp dữ liệu : {source}")
     print(f"[*] Cấu hình Vỉa hè   : {config_path} ({len(roi_manager.polygons)} vùng vỉa hè, {total_pts} đỉnh)")
     print(f"[*] Model AI Detector : {model_path} (Imgsz: {imgsz})")
-    print(f"[*] Tối ưu hiệu năng  : Engine: {engine_name} | Frame Skip: {frame_skip}")
+    print(f"[*] Cấu hình Edge AI  : Engine: {engine_name} | Frame Skip: {frame_skip} | Playback: {sync_str}")
     print(f"[*] Ngưỡng tin cậy AI : {args.conf * 100:.0f}%")
     print(f"[*] Ngưỡng đè vỉa hè  : {args.overlap * 100:.0f}%")
     print(f"[*] Bộ lọc thời gian  : Xác nhận sau {args.confirm_frames} frames | Cooldown {args.cooldown}s")
@@ -240,13 +258,18 @@ def run_monitor_mode(args):
     last_suspected_count = 0
     last_object_count = 0
 
+    target_frame_interval = 1.0 / target_fps if target_fps > 0 else 0.04167
+
     try:
         while True:
+            loop_start_time = time.perf_counter()
             ret, frame = reader.read()
             if not ret or frame is None:
                 # StreamReader đã tự động retry hoặc tua lại video, nếu vẫn None thì tạm nghỉ
                 time.sleep(0.01)
                 continue
+
+            fps_val = fps_tracker.update()
 
             # ISSUE 01 FIX: Validate & auto-scale ROI trên frame đầu tiên
             if not roi_validated:
@@ -346,7 +369,6 @@ def run_monitor_mode(args):
                 current_frame_suspected = last_suspected_count
 
             # BƯỚC 5: HUD OVERLAY THÔNG SỐ VÀ FPS
-            fps_val = fps_tracker.update()
             draw_fps_badge(frame, fps_val, reader.fps)
 
             # Banner cảnh báo trên góc
@@ -360,11 +382,22 @@ def run_monitor_mode(args):
                 print(f"[INFO] Đã đạt giới hạn {args.max_frames} frames chỉ định. Dừng giám sát.")
                 break
 
+            # Đồng bộ nhịp thời gian thực chuẩn cho Thiết bị biên (Edge Sleep & Power Saving)
+            proc_elapsed = time.perf_counter() - loop_start_time
+            remaining_sleep = target_frame_interval - proc_elapsed
+
             if not args.headless:
                 cv2.imshow(window_name, frame)
-                key = cv2.waitKey(1) & 0xFF
+                if sync_playback and remaining_sleep > 0.001:
+                    wait_ms = max(1, int(remaining_sleep * 1000))
+                else:
+                    wait_ms = 1
+                key = cv2.waitKey(wait_ms) & 0xFF
                 if key == ord('q') or key == 27:
                     break
+            else:
+                if sync_playback and remaining_sleep > 0.001:
+                    time.sleep(remaining_sleep)
 
     finally:
         reader.release()
@@ -470,12 +503,20 @@ Ví dụ sử dụng:
                         help="Đường dẫn tệp cơ sở dữ liệu SQLite (mặc định: data/surveillance.db)")
     parser.add_argument("--port", type=int, default=8501,
                         help="Cổng mở Web Dashboard (mặc định: 8501)")
+    parser.add_argument("--edge", action="store_true",
+                        help="Kích hoạt hồ sơ tối ưu toàn diện cho Thiết bị biên (Edge Profile: ONNX + 640px + Skip 2 + Sync 24FPS)")
     parser.add_argument("--onnx", action="store_true",
                         help="Kích hoạt ONNX Runtime Engine CPU (tự động dùng models/best.onnx)")
     parser.add_argument("--imgsz", type=int, default=None,
                         help="Kích thước cạnh ảnh chuẩn khi suy luận (mặc định: 640)")
     parser.add_argument("--skip-frames", type=int, default=None,
-                        help="Số frames bỏ qua giữa các lần infer (mặc định: 0, gợi ý: 1 hoặc 2)")
+                        help="Số frames bỏ qua giữa các lần infer (mặc định: 2, gợi ý: 1 hoặc 2)")
+    parser.add_argument("--sync-fps", action="store_true",
+                        help="Khóa nhịp FPS thời gian thực chuẩn 1.0x (tiết kiệm CPU, mặc định bật cho video)")
+    parser.add_argument("--no-sync", action="store_true",
+                        help="Tắt khóa nhịp FPS để chạy hết công suất phần cứng (Benchmark mode)")
+    parser.add_argument("--target-fps", type=float, default=None,
+                        help="Tốc độ FPS mục tiêu cho thiết bị biên (mặc định: 24.0)")
     parser.add_argument("--headless", action="store_true",
                         help="Chạy ở chế độ không mở cửa sổ giao diện OpenCV (cho server)")
 

@@ -23,8 +23,10 @@ detector:
   device: "cpu"                # 'cpu' hoặc 'cuda:0'
 
 performance:
-  frame_skip: 0                # Số frames bỏ qua giữa các lần infer (0: tắt, 1: chạy 1 bỏ 1, 2: chạy 1 bỏ 2)
-  use_onnx: false              # Tự động ưu tiên ONNX Runtime khi có sẵn
+  frame_skip: 2                # Số frames bỏ qua giữa các lần infer (0: tắt, 1: chạy 1 bỏ 1, 2: chạy 1 bỏ 2)
+  use_onnx: true               # Tự động ưu tiên ONNX Runtime khi có sẵn
+  sync_playback: true          # Đồng bộ tốc độ phát video đúng thời gian thực (1x speed, tiết kiệm điện cho Edge)
+  target_fps: 24.0             # Tốc độ khung hình mục tiêu cho thiết bị biên (gợi ý: 15 - 24 FPS)
 
 tracking:
   tracker_type: "bytetrack.yaml"
