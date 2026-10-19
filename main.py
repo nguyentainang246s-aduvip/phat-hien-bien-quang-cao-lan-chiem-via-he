@@ -4,10 +4,11 @@
 Chủ đề: Unified Surveillance Platform (Version 2.0)
 TASK: 28 - ĐIỂM VÀO ĐIỀU HÀNH HỆ THỐNG TRUNG TÂM (UNIFIED ENTRY POINT - main.py)
 ==============================================================================
-Hỗ trợ 3 chế độ hoạt động chính:
+Hỗ trợ 4 chế độ hoạt động chính:
   1. --mode monitor   : Chạy pipeline giám sát thời gian thực (CCTV RTSP / Video / Webcam)
   2. --mode dashboard : Khởi chạy Web Dashboard trực quan quản lý vi phạm & phạt nguội
   3. --mode roi       : Mở công cụ tương tác vẽ & hiệu chỉnh vỉa hè đa vùng (Multi-ROI)
+  4. --mode benchmark : Thực nghiệm & đo đạc chỉ số Latency/Throughput
 ==============================================================================
 """
 
@@ -35,8 +36,6 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-# Module imports được nạp động theo từng mode hoạt động tương ứng để tối ưu tốc độ khởi động
-
 
 BANNER = r"""
 ==============================================================================
@@ -59,7 +58,7 @@ def run_monitor_mode(args):
       - StreamReader: Auto-reconnect cho RTSP & looping video
       - ROIManager: Đa giác vỉa hè đa vùng
       - ObjectTracker: ByteTrack gán track_id ổn định
-      - TemporalVerifier: Bộ lọc xác nhận 15 frames & Cooldown 60s
+      - TemporalVerifier: Bộ lọc xác nhận 3.0s & Cooldown 60s
       - EvidenceSaver: Đóng dấu mộc tư pháp & lưu ảnh bằng chứng
       - ViolationDatabase: SQLite ghi nhận lịch sử vi phạm
     """
@@ -95,8 +94,6 @@ def run_monitor_mode(args):
     is_image = isinstance(source, str) and source.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.webp'))
 
     # 2. Quản lý cấu hình ROI vỉa hè
-    # FIX: Không tự động chọn roi_moi.json cho mọi nguồn (lỗi cũ báo cáo bởi reviewer).
-    # Thứ tự ưu tiên: --config arg > khớp tên file > roi_camera1.json mặc định.
     config_path = args.config
     if config_path is None:
         source_name = os.path.basename(str(source)).lower()
@@ -111,7 +108,6 @@ def run_monitor_mode(args):
         elif os.path.exists("configs/roi_camera1.json"):
             config_path = "configs/roi_camera1.json"
         else:
-            # Fallback cuối cùng: lấy file roi đầu tiên tìm thấy trong configs/
             roi_files = sorted(f for f in os.listdir("configs") if f.startswith("roi_") and f.endswith(".json"))
             config_path = os.path.join("configs", roi_files[0]) if roi_files else "configs/roi_camera1.json"
 
@@ -122,6 +118,7 @@ def run_monitor_mode(args):
     cfg = _load_settings()
     cfg_temporal = cfg.get("temporal", {})
     cfg_detector = cfg.get("detector", {})
+    cfg_spatial = cfg.get("spatial", {})
     cfg_perf = cfg.get("performance", {})
 
     is_edge_mode = getattr(args, "edge", False)
@@ -134,13 +131,12 @@ def run_monitor_mode(args):
             model_path = cfg_detector["onnx_path"]
 
     imgsz = args.imgsz if getattr(args, "imgsz", None) is not None else cfg_detector.get("imgsz", 640)
-    
+
     if is_edge_mode:
         frame_skip = args.skip_frames if getattr(args, "skip_frames", None) is not None else 2
     else:
         frame_skip = args.skip_frames if getattr(args, "skip_frames", None) is not None else cfg_perf.get("frame_skip", 2)
 
-    # Đồng bộ nhịp phát Real-time FPS (Khóa nhịp thời gian thực tránh tua nhanh trên Edge)
     sync_playback = True
     if getattr(args, "no_sync", False):
         sync_playback = False
@@ -148,7 +144,7 @@ def run_monitor_mode(args):
         sync_playback = True
     elif "sync_playback" in cfg_perf:
         sync_playback = bool(cfg_perf["sync_playback"])
-    
+
     if is_stream:
         sync_playback = False
 
@@ -156,31 +152,40 @@ def run_monitor_mode(args):
     engine_name = "ONNX Runtime (CPU AVX2)" if str(model_path).endswith(".onnx") else "PyTorch"
     sync_str = f"Realtime {target_fps:.0f} FPS (1.0x)" if sync_playback else "Unlocked (Max Compute)"
 
+    # Đồng bộ tham số giữa CLI và settings.yaml
+    conf_thres = args.conf if args.conf is not None else float(cfg_detector.get("conf_threshold", 0.25))
+    overlap_thres = args.overlap if args.overlap is not None else float(cfg_spatial.get("overlap_threshold", 0.30))
+    confirm_frames = args.confirm_frames if args.confirm_frames is not None else int(cfg_temporal.get("confirm_frames", 20))
+    confirm_seconds = float(cfg_temporal.get("confirm_seconds", 3.0))
+    cooldown_sec = args.cooldown if args.cooldown is not None else float(cfg_temporal.get("cooldown_seconds", 60.0))
+    spatial_cooldown_rad = float(cfg_temporal.get("spatial_cooldown_radius", 50.0))
+
     print(f"[*] Nguồn cấp dữ liệu : {source}")
     print(f"[*] Cấu hình Vỉa hè   : {config_path} ({len(roi_manager.polygons)} vùng vỉa hè, {total_pts} đỉnh)")
     print(f"[*] Model AI Detector : {model_path} (Imgsz: {imgsz})")
     print(f"[*] Cấu hình Edge AI  : Engine: {engine_name} | Frame Skip: {frame_skip} | Playback: {sync_str}")
-    print(f"[*] Ngưỡng tin cậy AI : {args.conf * 100:.0f}%")
-    print(f"[*] Ngưỡng đè vỉa hè  : {args.overlap * 100:.0f}%")
-    print(f"[*] Bộ lọc thời gian  : Xác nhận sau {args.confirm_frames} frames | Cooldown {args.cooldown}s")
+    print(f"[*] Ngưỡng tin cậy AI : {conf_thres * 100:.0f}%")
+    print(f"[*] Ngưỡng đè vỉa hè  : {overlap_thres * 100:.0f}%")
+    print(f"[*] Bộ lọc thời gian  : Xác nhận sau {confirm_seconds}s ({confirm_frames} frames) | Cooldown {cooldown_sec}s")
     print("-" * 78)
 
-    tracker = ObjectTracker(model_path=model_path, conf_threshold=args.conf, imgsz=imgsz)
-    checker = ViolationChecker(threshold=args.overlap)
+    tracker = ObjectTracker(model_path=model_path, conf_threshold=conf_thres, imgsz=imgsz)
+    checker = ViolationChecker(threshold=overlap_thres)
     allow_moving = getattr(args, "allow_moving", False)
     require_stationary = False if allow_moving else cfg_temporal.get("require_stationary", True)
     max_disp = args.max_displacement if getattr(args, "max_displacement", None) is not None else float(cfg_temporal.get("max_displacement_pixels", 50.0))
     min_avg_conf = args.min_avg_conf if getattr(args, "min_avg_conf", None) is not None else float(cfg_temporal.get("min_avg_confidence", 0.40))
 
     verifier = TemporalVerifier(
-        confirm_frames=args.confirm_frames,
-        confirm_seconds=cfg_temporal.get("confirm_seconds", 0.5),
-        cooldown_seconds=args.cooldown,
+        confirm_frames=confirm_frames,
+        confirm_seconds=confirm_seconds,
+        cooldown_seconds=cooldown_sec,
         max_missing_frames=cfg_temporal.get("max_missing_frames", 30),
         tolerance_frames=cfg_temporal.get("tolerance_frames", 2),
         min_avg_confidence=min_avg_conf,
         require_stationary=require_stationary,
         max_displacement_pixels=max_disp,
+        spatial_cooldown_radius=spatial_cooldown_rad,
     )
     cfg_evidence = cfg.get("evidence", {})
     evidence_saver = EvidenceSaver(
@@ -197,18 +202,13 @@ def run_monitor_mode(args):
             print(f"[LỖI] Không thể đọc tệp ảnh: {source}")
             return False
 
-        # ISSUE 01 FIX: Validate & auto-scale ROI theo resolution thực tế
         fh, fw = frame.shape[:2]
         roi_manager.validate_resolution(fw, fh)
 
-        # AI Detect trên ảnh sạch nguyên bản
         tracked_objs = tracker.track(frame)
-
-        # Lưu bản sạch trước khi vẽ overlay (dùng cho evidence)
         clean_frame = frame.copy()
         roi_manager.draw_overlay(frame, alpha=0.25)
 
-        # ISSUE 10 FIX: Ảnh tĩnh dùng nhãn SUSPECTED thay vì CONFIRMED
         confirmed_count = 0
         for obj in tracked_objs:
             box = obj["box"]
@@ -256,7 +256,6 @@ def run_monitor_mode(args):
 
     # 5. XỬ LÝ LUỒNG VIDEO / RTSP / WEBCAM LIÊN TỤC
     reader = StreamReader(source=source)
-    # Truyền FPS nguồn để TemporalVerifier tính giây chính xác
     verifier.source_fps = reader.fps if hasattr(reader, 'fps') and reader.fps > 0 else None
     fps_tracker = FPSTracker(alpha=0.15)
     window_name = "CCTV Sidewalk Surveillance 2.0 (ByteTrack + Temporal Verifier)"
@@ -282,19 +281,16 @@ def run_monitor_mode(args):
             loop_start_time = time.perf_counter()
             ret, frame = reader.read()
             if not ret or frame is None:
-                # StreamReader đã tự động retry hoặc tua lại video, nếu vẫn None thì tạm nghỉ
                 time.sleep(0.01)
                 continue
 
             fps_val = fps_tracker.update()
 
-            # ISSUE 01 FIX: Validate & auto-scale ROI trên frame đầu tiên
             if not roi_validated:
                 fh, fw = frame.shape[:2]
                 roi_manager.validate_resolution(fw, fh)
                 roi_validated = True
 
-            # Khi video file tua lại đầu: reset tracker & verifier để tránh duplicate violations
             if hasattr(reader, 'looped') and reader.looped:
                 reader.looped = False
                 tracker.reset()
@@ -309,23 +305,15 @@ def run_monitor_mode(args):
             is_infer_frame = (frame_skip <= 0) or (frame_count % (frame_skip + 1) == 1)
 
             if is_infer_frame:
-                # BƯỚC 1: AI BÁM VẾT BYTETRACK TRÊN KHUNG HÌNH SẠCH NGUYÊN BẢN
                 tracked_objects = tracker.track(frame)
-
-                # BƯỚC 1.5: Tạo bản sạch cho evidence trước khi vẽ overlay
                 clean_frame = frame.copy()
-
-                # BƯỚC 2: VẼ VÙNG VỈA HÈ LÊN FRAME HIỂN THỊ
                 roi_manager.draw_overlay(frame, alpha=0.25)
-
-                # BƯỚC 3: BỘ LỌC XÁC MINH THỜI GIAN
                 verified_objects = verifier.process_frame(tracked_objects, checker, roi_manager.polygons)
 
                 current_frame_confirmed = 0
                 current_frame_suspected = 0
                 last_verified_render = []
 
-                # BƯỚC 4: VẼ KẾT QUẢ VÀ LƯU BẰNG CHỨNG
                 for item in verified_objects:
                     box = item["box"]
                     track_id = item["track_id"]
@@ -340,9 +328,7 @@ def run_monitor_mode(args):
                         sw_idx = sp.get("sidewalk_index", 1)
                         label = f"VI PHAM VH#{sw_idx} ({sp['overlap_pct']}%)"
 
-                        # Khi phát hiện vi phạm thực sự lần đầu (sau 15 frames)
                         if is_new_alert:
-                            # ISSUE 09 FIX: Kiểm tra trùng lặp trước khi ghi DB (chống ghi trùng khi restart)
                             if db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5):
                                 print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi tương tự trong 5 phút gần đây)")
                             else:
@@ -382,17 +368,14 @@ def run_monitor_mode(args):
                 last_object_count = len(verified_objects)
 
             else:
-                # FRAME BỎ QUA INFER (Tối ưu CPU): Tái sử dụng kết quả frame trước để render mượt
                 roi_manager.draw_overlay(frame, alpha=0.25)
                 for (box, label, track_id, temporal_status) in last_verified_render:
                     draw_detection(frame, box, label, track_id=track_id, status=temporal_status)
                 current_frame_confirmed = last_confirmed_count
                 current_frame_suspected = last_suspected_count
 
-            # BƯỚC 5: HUD OVERLAY THÔNG SỐ VÀ FPS
             draw_fps_badge(frame, fps_val, reader.fps)
 
-            # Banner cảnh báo trên góc
             obj_cnt = len(verified_objects) if is_infer_frame else last_object_count
             hud_text = f"Bien: {obj_cnt} | Nghi van: {current_frame_suspected} | VI PHAM: {current_frame_confirmed}"
             hud_color = (0, 0, 255) if current_frame_confirmed > 0 else ((0, 165, 255) if current_frame_suspected > 0 else (0, 255, 0))
@@ -403,7 +386,6 @@ def run_monitor_mode(args):
                 print(f"[INFO] Đã đạt giới hạn {args.max_frames} frames chỉ định. Dừng giám sát.")
                 break
 
-            # Đồng bộ nhịp thời gian thực chuẩn cho Thiết bị biên (Edge Sleep & Power Saving)
             proc_elapsed = time.perf_counter() - loop_start_time
             remaining_sleep = target_frame_interval - proc_elapsed
 
@@ -436,9 +418,7 @@ def run_monitor_mode(args):
 
 
 def run_dashboard_mode(args):
-    """
-    Chế độ 2: Khởi chạy Web Dashboard.
-    """
+    """Chế độ 2: Khởi chạy Web Dashboard."""
     print(BANNER)
     print(">> ĐANG KHỞI ĐỘNG WEB DASHBOARD TRỰC QUAN...")
     from dashboard.web_app import run_dashboard
@@ -446,11 +426,7 @@ def run_dashboard_mode(args):
 
 
 def run_roi_mode(args):
-    """
-    Chế độ 3: Khởi chạy công cụ vẽ & cấu hình vỉa hè đa vùng (Multi-ROI).
-    Mặc định: Khởi chạy Web ROI Studio trực quan trong Dashboard (quản lý & chuyển đổi mọi video).
-    --opencv: Sử dụng công cụ cửa sổ OpenCV truyền thống cho 1 video.
-    """
+    """Chế độ 3: Khởi chạy công cụ vẽ & cấu hình vỉa hè đa vùng (Multi-ROI)."""
     print(BANNER)
     if getattr(args, "opencv", False):
         print(">> ĐANG KHỞI ĐỘNG CÔNG CỤ OPENCV VẼ VÙNG VỈA HÈ...")
@@ -477,10 +453,7 @@ def run_roi_mode(args):
 
 
 def run_benchmark_mode(args):
-    """
-    Chế độ 4: Thực nghiệm & Đo đạc chỉ số (Benchmark & Latency Breakdown).
-    Tự động xuất báo cáo Markdown chuẩn cho Chương 7 Luận văn.
-    """
+    """Chế độ 4: Thực nghiệm & Đo đạc chỉ số (Benchmark & Latency Breakdown)."""
     print(BANNER)
     from evaluation import SystemBenchmark
     bench = SystemBenchmark(
@@ -520,14 +493,14 @@ Ví dụ sử dụng:
                         help="Đường dẫn tệp cấu hình tọa độ vỉa hè JSON (Mặc định tự động chọn)")
     parser.add_argument("--model", type=str, default="models/best.pt",
                         help="Đường dẫn trọng số mô hình YOLO (mặc định: models/best.pt)")
-    parser.add_argument("--conf", type=float, default=0.20,
-                        help="Ngưỡng tin cậy phát hiện biển hiệu (mặc định: 0.20)")
-    parser.add_argument("--overlap", type=float, default=0.30,
-                        help="Ngưỡng diện tích đè vỉa hè để kết luận vi phạm (mặc định: 0.30 = 30%%)")
-    parser.add_argument("--confirm-frames", type=int, default=15,
-                        help="Số frames liên tiếp vi phạm để xác nhận (mặc định: 15)")
-    parser.add_argument("--cooldown", type=float, default=60.0,
-                        help="Thời gian cooldown cảnh báo lại cùng 1 vật thể (giây, mặc định: 60)")
+    parser.add_argument("--conf", type=float, default=None,
+                        help="Ngưỡng tin cậy phát hiện biển hiệu (mặc định đọc từ settings.yaml: 0.25)")
+    parser.add_argument("--overlap", type=float, default=None,
+                        help="Ngưỡng diện tích đè vỉa hè để kết luận vi phạm (mặc định đọc từ settings.yaml: 0.30)")
+    parser.add_argument("--confirm-frames", type=int, default=None,
+                        help="Số frames liên tiếp vi phạm để xác nhận (mặc định đọc từ settings.yaml: 20)")
+    parser.add_argument("--cooldown", type=float, default=None,
+                        help="Thời gian cooldown cảnh báo lại cùng 1 vật thể (mặc định đọc từ settings.yaml: 60.0)")
     parser.add_argument("--max-frames", type=int, default=None,
                         help="Giới hạn số frames chạy (dùng cho đo đạc hiệu năng benchmark hoặc test)")
     parser.add_argument("--report", type=str, default="reports/benchmark_report.md",

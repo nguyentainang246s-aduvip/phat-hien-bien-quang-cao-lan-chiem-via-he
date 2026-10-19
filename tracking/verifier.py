@@ -4,13 +4,13 @@
 Chủ đề: Temporal Reasoning & False Positive Elimination
 TASK: 22 - Xây dựng Module tracking/verifier.py (Bộ lọc xác nhận theo thời gian)
 
-v2.1 – Sửa lỗi stationary logic:
-  - Chuyển từ displacement-from-origin sang cửa sổ trượt (sliding window)
+v2.2 – Nâng cấp hoàn thiện bảo vệ ĐATN:
+  - Chuyển từ displacement-from-origin sang cửa sổ trượt (sliding window 1.0s)
     để không từ chối biển được đặt xuống rồi đứng yên.
-  - Tính thời gian vi phạm bằng giây thực (time.time()) thay vì số frame,
-    tránh sai lệch khi FPS thay đổi (RTSP trả cùng frame nhiều lần).
-  - confirm_seconds là ngưỡng chính; confirm_frames chỉ còn tác dụng fallback
-    nếu không lấy được FPS nguồn.
+  - Bổ sung cơ chế Perspective-Adaptive Stationary Check (chuẩn hóa ngưỡng dịch
+    chuyển theo kích thước đường chéo hộp giới hạn kết hợp trần max_displacement_pixels).
+  - Tính thời gian vi phạm bằng giây thực (time.time() / simulated_ts) thay vì
+    số frame, bất biến với frame_skip và biến thiên FPS.
 ==============================================================================
 """
 
@@ -34,15 +34,8 @@ class TemporalVerifier:
 
     Cơ chế sàng lọc:
       - Người đi bộ bê biển đi ngang qua vỉa hè (sliding window displacement).
-      - Xe cộ vô tình che khuất chớp nhoáng (Flickering) với tolerance_seconds.
-      - Cảnh báo trùng lặp (Spam Alert) nhờ cơ chế Cooldown Timer.
-
-    v2.1 – Sliding window stationary check:
-      Thay vì so sánh tâm hiện tại với tâm lúc XUẤT HIỆN (lỗi cũ: biển đặt
-      xuống rồi đứng yên 60 frame không bao giờ CONFIRMED), bộ kiểm tra
-      nay so sánh độ dời trong cửa sổ trượt 1 giây gần nhất.
-      Biển thực sự cố định → doire < max_displacement; người bê biển đi →
-      dời liên tục nên ít nhất một lần vượt ngưỡng.
+      - Xe cộ vô tình che khuất chớp nhoáng (Flickering) với tolerance_frames.
+      - Cảnh báo trùng lặp (Spam Alert) nhờ cơ chế Cooldown Timer & Spatial Radius.
     """
 
     def __init__(
@@ -56,51 +49,44 @@ class TemporalVerifier:
         min_avg_confidence: float = 0.40,
         require_stationary: bool = True,
         max_displacement_pixels: float = 50.0,
+        stationary_window_seconds: float = 1.0,
+        spatial_cooldown_radius: float = 50.0,
+        adaptive_perspective_scale: bool = True,
     ):
         """
         Args:
-            confirm_frames:   Số frames liên tiếp vi phạm tối thiểu (fallback khi
-                              không rõ FPS; với 30 FPS → 15 frame ≈ 0.5 giây).
-            confirm_seconds:  Thời gian vi phạm liên tiếp tối thiểu (giây) — ưu tiên
-                              hơn confirm_frames khi source_fps được cung cấp.
-            cooldown_seconds: Thời gian chờ (giây) chống gửi cảnh báo trùng lặp.
-            max_missing_frames: Xóa track khỏi RAM nếu mất dấu quá số frame này.
-            tolerance_frames: Dung sai frame rung lắc/flicker trước khi reset bộ đếm.
-            source_fps:       FPS của nguồn video (dùng để quy đổi giây↔frame).
-                              Nếu None → dùng thời gian thực (time.time()).
-            min_avg_confidence: Ngưỡng confidence TB tối thiểu để CONFIRMED.
-            require_stationary: Bật/tắt bộ lọc yêu cầu vật thể đứng yên.
-            max_displacement_pixels: Độ dời tối đa trong cửa sổ để coi là đứng yên.
+            confirm_frames:            Số frames liên tiếp vi phạm tối thiểu (fallback).
+            confirm_seconds:           Thời gian vi phạm liên tiếp tối thiểu (giây).
+            cooldown_seconds:          Thời gian chờ (giây) chống gửi cảnh báo trùng lặp.
+            max_missing_frames:        Xóa track khỏi RAM nếu mất dấu quá số frame này.
+            tolerance_frames:          Dung sai frame rung lắc/flicker trước khi reset bộ đếm.
+            source_fps:                FPS của nguồn video (dùng để quy đổi giây <-> frame).
+            min_avg_confidence:        Ngưỡng confidence TB tối thiểu để CONFIRMED.
+            require_stationary:        Bật/tắt bộ lọc yêu cầu vật thể đứng yên.
+            max_displacement_pixels:   Độ dời tối đa (trần) trong cửa sổ để coi là đứng yên.
+            stationary_window_seconds: Độ rộng cửa sổ trượt kiểm tra đứng yên (mặc định 1.0s).
+            spatial_cooldown_radius:   Bán kính không gian (pixels) khử trùng lặp khi nhảy ID.
+            adaptive_perspective_scale: Tự động co ngưỡng dịch chuyển theo kích thước BBox ở xa.
         """
         self.confirm_frames = confirm_frames
         self.confirm_seconds = confirm_seconds
         self.cooldown_seconds = cooldown_seconds
         self.max_missing_frames = max_missing_frames
         self.tolerance_frames = tolerance_frames
-        self.source_fps = source_fps  # Có thể cập nhật sau khi StreamReader khởi xong
+        self.source_fps = source_fps
 
-        self.min_avg_confidence = min_avg_confidence  # Ngưỡng confidence TB tối thiểu để CONFIRMED
+        self.min_avg_confidence = min_avg_confidence
 
-        # --- Stationary check (sliding window) ---
+        # --- Stationary check (sliding window + perspective-adaptive) ---
         self.require_stationary = require_stationary
-        self.max_displacement_pixels = max_displacement_pixels     # Độ dời tối đa trong cửa sổ để coi là đứng yên
-        self.stationary_window_seconds = 1.0    # Kích thước cửa sổ trượt kiểm tra đứng yên (giây)
+        self.max_displacement_pixels = max_displacement_pixels
+        self.stationary_window_seconds = stationary_window_seconds
+        self.adaptive_perspective_scale = adaptive_perspective_scale
 
         # Spatial deduplication khi track_id bị đổi
-        self.spatial_cooldown_radius = 50.0
+        self.spatial_cooldown_radius = spatial_cooldown_radius
         self.confirmed_locations: list = []     # [{cx, cy, time, track_id}, ...]
 
-        # Lưu trạng thái mỗi track_id:
-        # {
-        #   "count":            int   – số frames vi phạm liên tiếp (fallback)
-        #   "viol_start_time":  float – thời điểm bắt đầu chuỗi vi phạm (time.time())
-        #   "status":           str   – NORMAL / SUSPECTED / CONFIRMED
-        #   "last_seen":        int   – frame index lần cuối nhìn thấy
-        #   "last_alert_time":  float – thời điểm gửi cảnh báo lần cuối
-        #   "non_viol_streak":  int   – số frames liên tiếp không vi phạm
-        #   "conf_sum":         float – tổng confidence để tính trung bình
-        #   "pos_window":       deque – hàng đợi [(timestamp, cx, cy), ...] (sliding window)
-        # }
         self.track_records: dict = {}
         self.current_frame_index = 0
 
@@ -120,18 +106,20 @@ class TemporalVerifier:
     def _is_stationary(self, record: dict, now: float) -> bool:
         """
         Kiểm tra cửa sổ trượt: lấy tất cả vị trí trong `stationary_window_seconds`
-        gần nhất, tính khoảng cách giữa vị trí sớm nhất và muộn nhất trong cửa sổ.
-        Nếu khoảng cách < max_displacement_pixels → đứng yên.
+        gần nhất, tính khoảng cách cực đại giữa các vị trí trong cửa sổ.
+        Nếu bật `adaptive_perspective_scale`, ngưỡng dịch chuyển tối đa được chuẩn hóa
+        theo đường chéo trung bình của Bounding Box (50% đường chéo, tối thiểu 15px,
+        tối đa `max_displacement_pixels`), giúp chống sai lệch phối cảnh ở cự ly xa.
         """
         if not self.require_stationary:
             return True
 
         window = record.get("pos_window")
         if window is None or len(window) < 2:
-            return True  # Không đủ dữ liệu → giả định đứng yên
+            return True  # Không đủ dữ liệu -> giả định đứng yên
 
         cutoff = now - self.stationary_window_seconds
-        recent = [(t, cx, cy) for (t, cx, cy) in window if t >= cutoff]
+        recent = [item for item in window if item[0] >= cutoff]
         if len(recent) < 2:
             return True
 
@@ -142,7 +130,17 @@ class TemporalVerifier:
             for i in range(len(recent))
             for j in range(i + 1, len(recent))
         )
-        return max_d <= self.max_displacement_pixels
+
+        effective_threshold = self.max_displacement_pixels
+        if self.adaptive_perspective_scale and len(recent[-1]) >= 4:
+            avg_diag = sum(p[3] for p in recent) / len(recent)
+            if avg_diag > 0:
+                effective_threshold = min(
+                    self.max_displacement_pixels,
+                    max(15.0, avg_diag * 0.50)
+                )
+
+        return max_d <= effective_threshold
 
     def _confirm_threshold_reached(self, record: dict, now: float) -> bool:
         """
@@ -170,10 +168,10 @@ class TemporalVerifier:
         Phân tích chuỗi thời gian cho danh sách đối tượng trong khung hình hiện tại.
 
         Args:
-            tracked_objects:    Danh sách đối tượng từ ObjectTracker (box, conf, track_id)
-            checker:            ViolationChecker để kiểm tra hình học không gian
-            polygons:           Danh sách đa giác vỉa hè (Multi-ROI)
-            current_timestamp:  Mốc thời gian thực (time.time()); mặc định lấy từ hệ thống
+            tracked_objects:     Danh sách đối tượng từ ObjectTracker (box, conf, track_id)
+            checker:             ViolationChecker để kiểm tra hình học không gian
+            polygons:            Danh sách đa giác vỉa hè (Multi-ROI)
+            current_timestamp:   Mốc thời gian thực (time.time()); mặc định lấy từ hệ thống
             precomputed_spatial: Kết quả spatial đã tính trước (tránh tính 2 lần trong benchmark)
         """
         if current_timestamp is None:
@@ -195,9 +193,10 @@ class TemporalVerifier:
                 spatial_res = checker.check_multi(box, polygons)
             is_spatial_viol = spatial_res["is_violation"]
 
-            # Tính tọa độ tâm
+            # Tính tọa độ tâm và đường chéo hộp giới hạn
             cx = (box[0] + box[2]) / 2.0
             cy = (box[1] + box[3]) / 2.0
+            box_diag = ((box[2] - box[0]) ** 2 + (box[3] - box[1]) ** 2) ** 0.5
 
             # Vật thể chưa có track_id hợp lệ (frame đầu tiên xuất hiện)
             if track_id <= 0:
@@ -225,14 +224,14 @@ class TemporalVerifier:
                     "last_alert_time": 0.0,
                     "non_viol_streak": 0,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
-                    "pos_window": deque(maxlen=200),   # ~6.7 giây ở 30 FPS
+                    "pos_window": deque(maxlen=200),   # deque lưu (timestamp, cx, cy, box_diag)
                 }
 
             record = self.track_records[track_id]
             record["last_seen"] = self.current_frame_index
 
-            # Cập nhật sliding window vị trí
-            record["pos_window"].append((current_timestamp, cx, cy))
+            # Cập nhật sliding window vị trí kèm đường chéo BBox
+            record["pos_window"].append((current_timestamp, cx, cy, box_diag))
 
             # 3. Cập nhật bộ đếm thời gian
             is_new_alert = False
@@ -268,11 +267,11 @@ class TemporalVerifier:
                     is_stationary = self._is_stationary(record, current_timestamp)
 
                     if not is_stationary:
-                        # Đang di chuyển → người bê biển đi ngang, giữ SUSPECTED
+                        # Đang di chuyển -> người bê biển đi ngang, giữ SUSPECTED
                         record["status"] = TrackState.SUSPECTED
                         suspect_reason = "DI CHUYEN"
                     elif avg_conf < self.min_avg_confidence:
-                        # Confidence TB quá thấp → giữ SUSPECTED
+                        # Confidence TB quá thấp -> giữ SUSPECTED
                         record["status"] = TrackState.SUSPECTED
                         suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
                     else:
@@ -311,14 +310,14 @@ class TemporalVerifier:
                 # Không vi phạm ở frame này
                 record["non_viol_streak"] += 1
                 if record["non_viol_streak"] > self.tolerance_frames:
-                    # Vượt ngưỡng dung sai → reset hoàn toàn
+                    # Vượt ngưỡng dung sai -> reset hoàn toàn
                     record["count"] = 0
                     record["viol_confs"].clear()
                     record["viol_start_time"] = None
                     record["last_viol_timestamp"] = None
                     record["status"] = TrackState.NORMAL
                 else:
-                    # Trong ngưỡng dung sai (1–2 frame flicker): trừ conf tương ứng khi decay
+                    # Trong ngưỡng dung sai (1-2 frame flicker): trừ conf tương ứng khi decay
                     if record["viol_confs"]:
                         record["viol_confs"].popleft()
                     record["count"] = len(record["viol_confs"])

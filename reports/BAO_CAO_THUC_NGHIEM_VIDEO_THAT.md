@@ -1,6 +1,6 @@
 # BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG TRÊN VIDEO THỰC TẾ (SYSTEM-LEVEL METRICS)
 
-> **Thời gian chạy kiểm thử:** 2026-10-14 16:10:49  
+> **Thời gian chạy kiểm thử:** 2026-10-19 22:59:54  
 > **Người thực hiện:** Nguyễn Đức Tài Năng (ĐATN 20224083)  
 > **Cơ chế đo đạc:** Chạy tự động từ `evaluation/evaluate_videos.py`, đối chiếu với `configs/video_ground_truth.json` và trích xuất `reports/system_eval_results.json`.
 
@@ -14,7 +14,7 @@
 | **Engine suy luận AI** | ONNX Runtime 1.30 (CPU AVX2 ExecutionProvider) | `models/best.onnx` (FP32, Imgsz: 640x640) |
 | **Thuật toán bám vết** | ByteTrack (`bytetrack.yaml`) | Gán mã định danh ổn định theo thời gian |
 | **Quy tắc hình học không gian** | Overlap $\ge 30\%$ + Tiếp đất chân đế 3 điểm | Loại trừ biển treo trên cao |
-| **Bộ lọc chuỗi thời gian** | `confirm_seconds = 3.0s` (cửa sổ trượt $\le 50\text{px}$) | Loại trừ người bê biển đi ngang & rung lắc |
+| **Bộ lọc chuỗi thời gian** | `confirm_seconds = 3.0s` (cửa sổ trượt 1.0s $\le 50\text{px}$) | Loại trừ người bê biển đi ngang & rung lắc |
 | **Số video thực nghiệm** | **3 video clip CCTV đường phố Hà Nội (720 frames, 30.0s)** | Dữ liệu video thực tế ngoài đời |
 
 ---
@@ -22,8 +22,8 @@
 ## 2. Kết Quả Chi Tiết Từng Video Thực Địa
 
 ### Video: `data/videos/video test.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **39.5 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 39.55 ms (p50: 38.86 ms, p95: 45.38 ms); Verifier Mean = 1.70 ms; Tổng khung hình infer = 44.86 ms (Frame khởi động: 1986.97 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **37.3 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 39.02 ms (p50: 37.65 ms, p95: 45.49 ms); Verifier Mean = 1.35 ms; Tổng khung hình infer = 44.51 ms (Frame khởi động: 2334.25 ms)
 * **Kết quả:** **4 Vi phạm (Confirmed)** | **0 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -37,8 +37,8 @@
 ---
 
 ### Video: `data/videos/videotesst2.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **56.9 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 39.56 ms (p50: 37.39 ms, p95: 42.94 ms); Verifier Mean = 1.10 ms; Tổng khung hình infer = 44.38 ms (Frame khởi động: 170.9 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **55.8 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 41.34 ms (p50: 38.85 ms, p95: 55.68 ms); Verifier Mean = 1.11 ms; Tổng khung hình infer = 46.00 ms (Frame khởi động: 141.66 ms)
 * **Kết quả:** **3 Vi phạm (Confirmed)** | **2 Nghi vấn (Suspected)** | **0 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -52,8 +52,8 @@
 ---
 
 ### Video: `data/videos/video test3.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **56.6 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 39.40 ms (p50: 38.45 ms, p95: 44.53 ms); Verifier Mean = 1.14 ms; Tổng khung hình infer = 44.76 ms (Frame khởi động: 147.91 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **53.2 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 42.94 ms (p50: 39.91 ms, p95: 53.97 ms); Verifier Mean = 1.15 ms; Tổng khung hình infer = 47.89 ms (Frame khởi động: 215.77 ms)
 * **Kết quả:** **4 Vi phạm (Confirmed)** | **2 Nghi vấn (Suspected)** | **0 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -79,14 +79,14 @@
 | **Video 2** | **GT #1** | **Track #1** | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | `direct_id` | 75 | 81.6% | 100.0% | `CONFIRMED` | Biển hộp đèn lớn cắm chân cố định trên mặt vỉa hè trước cửa hàng, cản trở lối đi bộ. | **True Positive (TP)** |
 | **Video 2** | **GT #2** | **Track #2** | Biển quảng cáo di động chân bánh xe | `direct_id` | 80 | 68.4% | 73.0% | `CONFIRMED` | Biển quảng cáo di động chân bánh xe đặt trên vỉa hè trước cửa hàng, chiếm dụng lối lưu thông. | **True Positive (TP)** |
 | **Video 2** | **GT #3** | **Track #3** | Biển bạt nhỏ kê trước bậc thềm | `direct_id` | 68 | 48.7% | 98.5% | `CONFIRMED` | Biển bạt nhỏ kê trước bậc thềm chiếm dụng mặt cắt vỉa hè công cộng. | **True Positive (TP)** |
-| **Video 2** | **GT #7** | **Track #4** | Biển hiệu dạng khung sắt tầm thấp ven đường | `IoU: 0.00 (Conf: 0.40)` | 56 | 35.9% | 100.0% | `SUSPECTED` | Biển hiệu dạng khung sắt tầm thấp cắm chân trên vỉa hè ven đường trước cửa hàng. | **False Negative (FN)** |
+| **Video 2** | **GT #7** | **Track #4** | Biển hiệu dạng khung sắt tầm thấp ven đường | `IoU: 0.00 (Conf: 0.49)` | 56 | 35.9% | 100.0% | `SUSPECTED` | Biển hiệu dạng khung sắt tầm thấp cắm chân trên vỉa hè ven đường trước cửa hàng. | **False Negative (FN)** |
 | **Video 2** | **GT #8** | **Track #8** | Biển hiệu cửa hàng ở góc phải khung hình | `direct_id` | 23 | 60.2% | 95.6% | `SUSPECTED` | Biển hiệu đặt trên vỉa hè xuất hiện ở phần cuối đoạn video, chiếm dụng lối đi bộ. | **False Negative (FN)** |
 | **Video 3** | **GT #1** | **Track #1** | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | `direct_id` | 79 | 87.5% | 65.3% | `CONFIRMED` | Biển quảng cáo pano lớn đặt chiếm dụng phần lớn bề rộng vỉa hè trước cửa hàng. | **True Positive (TP)** |
 | **Video 3** | **GT #2** | **Track #2** | Biển hộp đèn đứng góc trái | `direct_id` | 80 | 90.7% | 100.0% | `CONFIRMED` | Biển hộp đèn đứng đặt trên vỉa hè chiếm dụng lối đi bộ. | **True Positive (TP)** |
 | **Video 3** | **GT #3** | **Track #3** | Biển vẫy thấp đặt cạnh gốc cây | `direct_id` | 80 | 91.3% | 100.0% | `CONFIRMED` | Biển vẫy thấp đặt cạnh gốc cây trên vỉa hè chiếm dụng lối đi bộ. | **True Positive (TP)** |
-| **Video 3** | **GT #4** | **Track #8** | Biển bạt chữ nhật kê ngoài thềm | `IoU: 0.19 (Conf: 0.87)` | 42 | 55.7% | 100.0% | `CONFIRMED` | Biển bạt chữ nhật kê ngoài thềm chiếm dụng vỉa hè công cộng. | **True Positive (TP)** |
-| **Video 3** | **GT #11** | **Track #13** | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | `IoU: 0.00 (Conf: 0.29)` | 28 | 38.8% | 98.6% | `SUSPECTED` | Biển hiệu nhỏ ở cự ly xa đặt trên vỉa hè trước cửa hàng. | **False Negative (FN)** |
-| **Video 3** | **GT #14** | **Track #15** | Biển gắn tường tầng thấp phía bên phải | `IoU: 0.00 (Conf: 0.00)` | 5 | 51.0% | 98.4% | `SUSPECTED` | Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè. | **True Negative (TN)** |
+| **Video 3** | **GT #4** | **Track #8** | Biển bạt chữ nhật kê ngoài thềm | `IoU: 0.28 (Conf: 0.91)` | 42 | 55.7% | 100.0% | `CONFIRMED` | Biển bạt chữ nhật kê ngoài thềm chiếm dụng vỉa hè công cộng. | **True Positive (TP)** |
+| **Video 3** | **GT #11** | **Track #13** | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | `IoU: 0.00 (Conf: 0.43)` | 28 | 38.8% | 98.6% | `SUSPECTED` | Biển hiệu nhỏ ở cự ly xa đặt trên vỉa hè trước cửa hàng. | **False Negative (FN)** |
+| **Video 3** | **GT #14** | **Track #15** | Biển gắn tường tầng thấp phía bên phải | `IoU: 0.00 (Conf: 0.11)` | 5 | 51.0% | 98.4% | `SUSPECTED` | Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè. | **True Negative (TN)** |
 
 ### Giải Trình Khoa Học Về Trường Hợp Biển Standee #3 (Video 1):
 * **Trong thử nghiệm sơ khai (Version A):** Vùng ROI ban đầu được vẽ hẹp ở mép trong (`configs/roi_video_test_version_a.json`). Khi đó biển Standee #3 có độ đè trung bình là 66.0%, nhưng điểm chân đế tiếp đất rơi ra ngoài đa giác ROI (`base_in_roi = False`) nên hệ thống kết luận `NORMAL`. Đối chiếu với Ground Truth thực tế (VIOLATION), đây là một trường hợp bỏ sót (False Negative - FN), khiến Recall của Version A đạt 71.43% (10/14).
@@ -109,14 +109,14 @@
 | **True Positives (TP)** | Bắt đúng vi phạm | 10 vụ | **11 vụ** | Bắt chính xác các biển lấn chiếm |
 | **False Positives (FP)** | Báo sai | 0 vụ | **0 vụ** | Không có cảnh báo sai từ người/xe |
 | **False Negatives (FN)** | Bỏ sót / Chưa đạt ngưỡng | 4 vụ | **3 vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |
-| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Track #5 ngoài hè, Track #14 biển gắn tường |
+| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Track #5 ngoài hè, Track #15 biển gắn tường |
 | **System Precision** | $\frac{TP}{TP + FP}$ | 100.00% | **100.00%** | **74.1% – 100.0%** (Wilson 95% CI) |
 | **System Recall** | $\frac{TP}{TP + FN}$ | 71.43% (10/14) | **78.57%** (11/14) | **52.4% – 92.4%** (Wilson 95% CI) |
 | **System F1-Score** | $2 \cdot \frac{P \cdot R}{P + R}$ | 83.33% | **88.00%** | Cân bằng điều hòa tối ưu |
 | **Cảnh báo sai trong mẫu** | FP / 30s | 0 cảnh báo sai | **0 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
-| **Thông lượng Pipeline** | Throughput | 39.5 – 56.9 FPS | **39.5 – 56.9 FPS** | Ổn định: 58.3 – 59.1 FPS |
-| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~13.2 – 19.0 Hz | **~13.2 – 19.0 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
-| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 39.5 ms | **39.5 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 39.5 ms; loại trừ frame khởi động) |
+| **Thông lượng Pipeline** | Throughput | 37.3 – 55.8 FPS | **37.3 – 55.8 FPS** | Ổn định: 55.6 – 58.2 FPS |
+| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~12.4 – 18.6 Hz | **~12.4 – 18.6 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
+| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 41.3 ms | **41.3 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 41.1 ms; loại trừ frame khởi động) |
 
 ---
 
@@ -151,7 +151,7 @@ Nhằm trả lời chất vấn của Hội đồng về tính ổn định và 
 
 * **Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency):** **100.0% (16/16 đối tượng)**
 * **Tính ổn định của chỉ số đánh giá (System Metrics Consistency):** Cả 3 lần chạy đều đạt đồng nhất **11 TP, 0 FP, 3 FN, 2 TN** (Recall: 78.57%, Precision: 100.00%).
-* **Độ ổn định thông lượng xử lý:** Trial 1: 39.5–56.9 FPS (Ổn định 58.3–59.1 FPS), Trial 2: 57.9–62.7 FPS (Ổn định 59.9–65.0 FPS), Trial 3: 56.6–59.8 FPS (Ổn định 58.4–61.8 FPS).
+* **Độ ổn định thông lượng xử lý:** Trial 1: 37.3–55.8 FPS (Ổn định 55.6–58.2 FPS), Trial 2: 54.9–56.9 FPS (Ổn định 56.6–59.0 FPS), Trial 3: 50.0–52.8 FPS (Ổn định 51.7–54.9 FPS).
 
 ---
 

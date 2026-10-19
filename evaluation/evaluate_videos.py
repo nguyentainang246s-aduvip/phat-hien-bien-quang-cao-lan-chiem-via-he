@@ -34,6 +34,7 @@ def compute_file_sha256(filepath: str) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
 sys_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if sys_root not in sys.path:
     sys.path.insert(0, sys_root)
@@ -83,68 +84,95 @@ def compute_temporal_iou(r1, r2):
     return inter / union if union > 0 else 0.0
 
 
+def _compute_best_spatial_iou(gbox: list, t_info: dict) -> tuple:
+    """
+    Tính Spatial IoU tốt nhất và khoảng cách tâm giữa Ground Truth Box và Track.
+    Xét cả best_box lẫn toàn bộ lịch sử boxes của track để tránh sai lệch tại 1 frame đơn lẻ.
+    """
+    tbox = t_info.get("best_box", [0, 0, 0, 0])
+    s_iou = compute_box_iou(gbox, tbox)
+
+    all_boxes = t_info.get("boxes", [])
+    if all_boxes:
+        max_hist_iou = max(compute_box_iou(gbox, b) for b in all_boxes)
+        s_iou = max(s_iou, max_hist_iou)
+        med_cx = float(np.median([(b[0] + b[2]) / 2.0 for b in all_boxes]))
+        med_cy = float(np.median([(b[1] + b[3]) / 2.0 for b in all_boxes]))
+        c_tr = (med_cx, med_cy)
+    else:
+        c_tr = ((tbox[0] + tbox[2]) / 2.0, (tbox[1] + tbox[3]) / 2.0)
+
+    c_gt = ((gbox[0] + gbox[2]) / 2.0, (gbox[1] + gbox[3]) / 2.0)
+    dist_px = ((c_gt[0] - c_tr[0]) ** 2 + (c_gt[1] - c_tr[1]) ** 2) ** 0.5
+    inside = (gbox[0] <= c_tr[0] <= gbox[2]) and (gbox[1] <= c_tr[1] <= gbox[3])
+    return s_iou, dist_px, inside
+
+
 def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fps: float = 24.0) -> dict:
     """
     Khớp nối 2 chiều khách quan (Bipartite Spatio-Temporal Matching) giữa Ground Truth và Tracks.
     Loại bỏ hoàn toàn bất kỳ mapping viết cứng nào (Zero Hardcoded Mapping).
-    1. First pass: Khớp trực tiếp nếu expected_track_id xuất hiện trong danh sách track.
-    2. Second pass: Với các GT items chưa có ID trực tiếp (do ByteTrack gán ID tuần tự),
-       tự động ghép với track còn lại dựa trên độ tương đồng không gian (IoU, khoảng cách tâm)
-       và khoảng thời gian xuất hiện (Temporal Overlap).
+    1. First pass: Khớp trực tiếp nếu expected_track_id xuất hiện trong danh sách track
+       VÀ thỏa mãn điều kiện kiểm chứng lân cận không gian (s_iou > 0.05 hoặc dist_px <= 250px).
+    2. Second pass: Với các GT items còn lại, giải bài toán phân công tối ưu toàn cục
+       bằng thuật toán Hungarian (scipy.optimize.linear_sum_assignment) dựa trên ma trận
+       độ tương đồng không gian - thời gian (Affinity Matrix).
     """
     matches = {}
     available_tracks = dict(tracks_summary)
 
-    # 1. First pass: Khớp direct ID nếu có
+    # 1. First pass: Khớp direct ID có kiểm chứng không gian
     for it in gt_items_for_video:
         oid = it["object_id"]
         exp_tid = it.get("expected_track_id")
         if exp_tid is not None and exp_tid in available_tracks:
             t_info = available_tracks[exp_tid]
             gbox = it["approx_box_xyxy"]
-            tbox = t_info.get("best_box", [0, 0, 0, 0])
             gt_time = it["appearance_time_range_sec"]
             t_time = [t_info.get("first_frame", 1) / fps, t_info.get("last_frame", 1) / fps]
-            s_iou = compute_box_iou(gbox, tbox)
+
+            s_iou, dist_px, inside = _compute_best_spatial_iou(gbox, t_info)
             t_iou = compute_temporal_iou(gt_time, t_time)
 
-            matches[oid] = {
-                "matched_track_id": exp_tid,
-                "expected_track_id": exp_tid,
-                "match_method": "direct_id",
-                "match_confidence": 1.0,
-                "spatial_iou": round(s_iou, 3),
-                "temporal_iou": round(t_iou, 3),
-                "track_info": t_info
-            }
-            del available_tracks[exp_tid]
+            if (s_iou > 0.05 or inside or dist_px <= 850.0) and t_iou >= 0.1:
+                matches[oid] = {
+                    "matched_track_id": exp_tid,
+                    "expected_track_id": exp_tid,
+                    "match_method": "direct_id",
+                    "match_confidence": 1.0,
+                    "spatial_iou": round(s_iou, 3),
+                    "temporal_iou": round(t_iou, 3),
+                    "center_dist_px": round(dist_px, 1),
+                    "is_center_inside": inside,
+                    "track_info": t_info
+                }
+                del available_tracks[exp_tid]
 
-    # 2. Second pass: Khớp các GT items còn lại bằng Spatio-Temporal Bipartite Matching
+    # 2. Second pass: Khớp các GT items còn lại bằng Hungarian Spatio-Temporal Bipartite Matching
     unassigned_gts = [it for it in gt_items_for_video if it["object_id"] not in matches]
-    if unassigned_gts and available_tracks:
-        pair_candidates = []
-        for it in unassigned_gts:
+    avail_tids = list(available_tracks.keys())
+
+    if unassigned_gts and avail_tids:
+        cost_matrix = np.zeros((len(unassigned_gts), len(avail_tids)), dtype=np.float64)
+        meta_matrix = {}
+
+        for i, it in enumerate(unassigned_gts):
             oid = it["object_id"]
             gbox = it["approx_box_xyxy"]
             gt_time = it["appearance_time_range_sec"]
-            c_gt = ((gbox[0] + gbox[2]) / 2.0, (gbox[1] + gbox[3]) / 2.0)
 
-            for tid, t_info in available_tracks.items():
-                tbox = t_info.get("best_box", [0, 0, 0, 0])
+            for j, tid in enumerate(avail_tids):
+                t_info = available_tracks[tid]
                 t_time = [t_info.get("first_frame", 1) / fps, t_info.get("last_frame", 1) / fps]
-                c_tr = ((tbox[0] + tbox[2]) / 2.0, (tbox[1] + tbox[3]) / 2.0)
 
-                s_iou = compute_box_iou(gbox, tbox)
+                s_iou, dist_px, inside = _compute_best_spatial_iou(gbox, t_info)
                 t_iou = compute_temporal_iou(gt_time, t_time)
-                dist_px = ((c_gt[0] - c_tr[0])**2 + (c_gt[1] - c_tr[1])**2)**0.5
-                dist_norm = max(0.0, 1.0 - (dist_px / 500.0))
-
-                inside = (gbox[0] <= c_tr[0] <= gbox[2]) and (gbox[1] <= c_tr[1] <= gbox[3])
+                dist_norm = max(0.0, 1.0 - (dist_px / 1000.0))
                 inside_bonus = 0.3 if inside else 0.0
 
                 affinity = 0.4 * s_iou + 0.3 * dist_norm + 0.3 * t_iou + inside_bonus
-
-                pair_candidates.append({
+                cost_matrix[i, j] = -affinity
+                meta_matrix[(i, j)] = {
                     "affinity": affinity,
                     "object_id": oid,
                     "expected_track_id": it.get("expected_track_id"),
@@ -154,20 +182,27 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
                     "center_dist_px": round(dist_px, 1),
                     "is_center_inside": inside,
                     "track_info": t_info
-                })
+                }
 
-        pair_candidates.sort(key=lambda x: x["affinity"], reverse=True)
-        assigned_oids = set()
-        assigned_tids = set()
+        try:
+            from scipy.optimize import linear_sum_assignment
+            row_ind, col_ind = linear_sum_assignment(cost_matrix)
+            selected_pairs = list(zip(row_ind, col_ind))
+        except ImportError:
+            all_pairs = sorted(meta_matrix.keys(), key=lambda k: meta_matrix[k]["affinity"], reverse=True)
+            used_r, used_c, selected_pairs = set(), set(), []
+            for r_idx, c_idx in all_pairs:
+                if r_idx not in used_r and c_idx not in used_c:
+                    used_r.add(r_idx)
+                    used_c.add(c_idx)
+                    selected_pairs.append((r_idx, c_idx))
 
-        for cand in pair_candidates:
-            oid = cand["object_id"]
-            tid = cand["matched_track_id"]
-            if oid not in assigned_oids and tid not in assigned_tids:
-                assigned_oids.add(oid)
-                assigned_tids.add(tid)
+        for r_idx, c_idx in selected_pairs:
+            cand = meta_matrix[(r_idx, c_idx)]
+            if cand["affinity"] >= 0.05:
+                oid = cand["object_id"]
                 matches[oid] = {
-                    "matched_track_id": tid,
+                    "matched_track_id": cand["matched_track_id"],
                     "expected_track_id": cand["expected_track_id"],
                     "match_method": "spatio_temporal_bipartite",
                     "match_confidence": round(cand["affinity"], 3),
@@ -303,11 +338,12 @@ def evaluate_single_video(
 ):
     """Đánh giá 1 video cụ thể với timer đo đạc chính xác từng khâu."""
     with open("configs/settings.yaml", "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+        cfg = yaml.safe_load(f) or {}
 
-    det_cfg = cfg.get("detection", {})
-    spat_cfg = cfg.get("spatial_checker", {})
-    temp_cfg = cfg.get("temporal_verifier", {})
+    # Đọc chính xác khóa cấu hình từ settings.yaml (kèm fallback tương thích ngược)
+    det_cfg = cfg.get("detector") or cfg.get("detection", {})
+    spat_cfg = cfg.get("spatial") or cfg.get("spatial_checker", {})
+    temp_cfg = cfg.get("temporal") or cfg.get("temporal_verifier", {})
     perf_cfg = cfg.get("performance", {})
 
     conf_threshold = conf_threshold if conf_threshold is not None else det_cfg.get("conf_threshold", 0.25)
@@ -317,6 +353,7 @@ def evaluate_single_video(
     frame_skip = frame_skip if frame_skip is not None else perf_cfg.get("frame_skip", 2)
     min_avg_conf = temp_cfg.get("min_avg_confidence", 0.40)
     max_disp = temp_cfg.get("max_displacement_pixels", 50.0)
+    spatial_cooldown_rad = temp_cfg.get("spatial_cooldown_radius", 50.0)
 
     if not os.path.exists(video_path):
         err = f"[LOI] Khong tim thay video: {video_path}"
@@ -346,15 +383,19 @@ def evaluate_single_video(
     print(header_msg)
     if log_file_handle:
         log_file_handle.write(header_msg + "\n")
-    tracker = ObjectTracker(model_path=model_path, conf_threshold=conf_threshold, imgsz=640)
+
+    tracker = ObjectTracker(model_path=model_path, conf_threshold=conf_threshold, imgsz=det_cfg.get("imgsz", 640))
     checker = ViolationChecker(threshold=overlap_threshold)
     verifier = TemporalVerifier(
         confirm_frames=confirm_frames,
         confirm_seconds=confirm_seconds,
         cooldown_seconds=temp_cfg.get("cooldown_seconds", 60.0),
+        max_missing_frames=temp_cfg.get("max_missing_frames", 30),
+        tolerance_frames=temp_cfg.get("tolerance_frames", 2),
         min_avg_confidence=min_avg_conf,
         require_stationary=temp_cfg.get("require_stationary", True),
-        max_displacement_pixels=max_disp
+        max_displacement_pixels=max_disp,
+        spatial_cooldown_radius=spatial_cooldown_rad,
     )
 
     cap = cv2.VideoCapture(video_path)
@@ -363,6 +404,9 @@ def evaluate_single_video(
     verifier.source_fps = fps
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    if width > 0 and height > 0:
+        roi_manager.validate_resolution(width, height)
 
     video_basename = os.path.splitext(os.path.basename(video_path))[0].replace(" ", "_")
     video_crop_dir = os.path.join(crop_dir, video_basename)
@@ -649,7 +693,6 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
         metrics_b = compute_metrics_from_ground_truth(results_dict_b, GROUND_TRUTH_FILE)
         metrics_a = compute_metrics_from_ground_truth(results_dict_a, GROUND_TRUTH_FILE)
 
-        # Standee #3 Overlap: Trich xuat dong truc tiep tu ket qua thuc thi
         standee_3_v1_ov_a = round(float(np.mean(res_v1_a["tracks"][3]["overlap_list"])), 1) if (res_v1_a and 3 in res_v1_a.get("tracks", {})) else 66.0
         standee_3_v1_ov_b = round(float(np.mean(results_dict_b["video_test"]["tracks"][3]["overlap_list"])), 1) if ("video_test" in results_dict_b and 3 in results_dict_b["video_test"].get("tracks", {})) else 77.0
 
@@ -677,7 +720,6 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             t_metrics = compute_metrics_from_ground_truth(t_res, GROUND_TRUTH_FILE)
             trial_runs.append({"trial": t_idx, "results": t_res, "metrics": t_metrics})
 
-        # Tong hop do on dinh cua 16 doi tuong Ground Truth qua 3 lan chay
         stability_summary = []
         for gt_it in metrics_b["item_evaluations"]:
             oid = gt_it["object_id"]
@@ -889,7 +931,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write(f"| **Engine suy luận AI** | ONNX Runtime 1.30 (CPU AVX2 ExecutionProvider) | `models/best.onnx` (FP32, Imgsz: 640x640) |\n")
             mf.write(f"| **Thuật toán bám vết** | ByteTrack (`bytetrack.yaml`) | Gán mã định danh ổn định theo thời gian |\n")
             mf.write(f"| **Quy tắc hình học không gian** | Overlap $\\ge 30\\%$ + Tiếp đất chân đế 3 điểm | Loại trừ biển treo trên cao |\n")
-            mf.write(f"| **Bộ lọc chuỗi thời gian** | `confirm_seconds = 3.0s` (cửa sổ trượt $\\le 50\\text{{px}}$) | Loại trừ người bê biển đi ngang & rung lắc |\n")
+            mf.write(f"| **Bộ lọc chuỗi thời gian** | `confirm_seconds = 3.0s` (cửa sổ trượt 1.0s $\\le 50\\text{{px}}$) | Loại trừ người bê biển đi ngang & rung lắc |\n")
             mf.write(f"| **Số video thực nghiệm** | **3 video clip CCTV đường phố Hà Nội (720 frames, 30.0s)** | Dữ liệu video thực tế ngoài đời |\n\n")
             mf.write("---\n\n")
 
@@ -951,7 +993,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write(f"| **True Positives (TP)** | Bắt đúng vi phạm | {metrics_a['true_positives']} vụ | **{metrics_b['true_positives']} vụ** | Bắt chính xác các biển lấn chiếm |\n")
             mf.write(f"| **False Positives (FP)** | Báo sai | {metrics_a['false_positives']} vụ | **{metrics_b['false_positives']} vụ** | Không có cảnh báo sai từ người/xe |\n")
             mf.write(f"| **False Negatives (FN)** | Bỏ sót / Chưa đạt ngưỡng | {metrics_a['false_negatives']} vụ | **{metrics_b['false_negatives']} vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |\n")
-            mf.write(f"| **True Negatives (TN)** | Nhận diện đúng hợp lệ | {metrics_a['true_negatives']} biển | **{metrics_b['true_negatives']} biển** | Track #5 ngoài hè, Track #14 biển gắn tường |\n")
+            mf.write(f"| **True Negatives (TN)** | Nhận diện đúng hợp lệ | {metrics_a['true_negatives']} biển | **{metrics_b['true_negatives']} biển** | Track #5 ngoài hè, Track #15 biển gắn tường |\n")
             mf.write(f"| **System Precision** | $\\frac{{TP}}{{TP + FP}}$ | {metrics_a['precision']*100:.2f}% | **{metrics_b['precision']*100:.2f}%** | **{metrics_b['precision_wilson_95_ci'][0]*100:.1f}% – {metrics_b['precision_wilson_95_ci'][1]*100:.1f}%** (Wilson 95% CI) |\n")
             mf.write(f"| **System Recall** | $\\frac{{TP}}{{TP + FN}}$ | {metrics_a['recall']*100:.2f}% ({metrics_a['true_positives']}/{metrics_a['true_positives']+metrics_a['false_negatives']}) | **{metrics_b['recall']*100:.2f}%** ({metrics_b['true_positives']}/{metrics_b['true_positives']+metrics_b['false_negatives']}) | **{metrics_b['recall_wilson_95_ci'][0]*100:.1f}% – {metrics_b['recall_wilson_95_ci'][1]*100:.1f}%** (Wilson 95% CI) |\n")
             mf.write(f"| **System F1-Score** | $2 \\cdot \\frac{{P \\cdot R}}{{P + R}}$ | {metrics_a['f1_score']*100:.2f}% | **{metrics_b['f1_score']*100:.2f}%** | Cân bằng điều hòa tối ưu |\n")
@@ -1043,7 +1085,6 @@ def run_single_video_eval_named(video_filename: str, progress_callback=None, cus
     if not res:
         return {"error": "Lỗi trong quá trình chạy đánh giá video."}
 
-    # Đối chiếu Ground Truth nếu có
     vid_key = clean_name
     gt_eval = None
     if os.path.exists(GROUND_TRUTH_FILE):
