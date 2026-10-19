@@ -268,7 +268,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .card-img-container {
             position: relative;
             background: #000;
-            height: 230px;
+            height: 185px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -284,12 +284,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .card-img:hover { transform: scale(1.03); }
         .card-crop-thumb {
             position: absolute;
-            bottom: 10px;
-            right: 10px;
-            width: 90px;
-            height: 90px;
+            bottom: 8px;
+            right: 8px;
+            width: 76px;
+            height: 76px;
             object-fit: cover;
-            border-radius: 8px;
+            border-radius: 6px;
             border: 2px solid var(--danger);
             box-shadow: 0 4px 10px rgba(0,0,0,0.6);
             background: #111;
@@ -329,39 +329,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        .card-body { padding: 1.2rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
-        .card-meta { display: flex; justify-content: space-between; margin-bottom: 0.6rem; font-size: 0.82rem; color: var(--text-muted); }
+        .card-body { padding: 0.9rem 1.1rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .card-meta { display: flex; justify-content: space-between; margin-bottom: 0.45rem; font-size: 0.82rem; color: var(--text-muted); }
         .card-meta span { display: flex; align-items: center; gap: 6px; }
-        .card-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.4rem; color: #fff; }
+        .card-title { font-size: 1.02rem; font-weight: 700; margin-bottom: 0.35rem; color: #fff; }
         
         /* Review Audit Box */
         .review-audit-box {
             background: rgba(15, 23, 42, 0.7);
             border: 1px dashed var(--border);
             border-radius: 8px;
-            padding: 0.65rem 0.85rem;
-            margin: 0.7rem 0;
-            font-size: 0.8rem;
-            line-height: 1.4;
+            padding: 0.45rem 0.75rem;
+            margin: 0.45rem 0;
+            font-size: 0.78rem;
+            line-height: 1.35;
         }
         .review-audit-box.confirmed-box { border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05); }
         .review-audit-box.dismissed-box { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.05); }
         .review-audit-box.pending-box { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.05); }
 
         /* Overlap Progress Bar */
-        .progress-container { margin: 0.6rem 0; }
+        .progress-container { margin: 0.45rem 0; }
         .progress-label { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px; color: var(--text-muted); }
         .progress-bar { background: #334155; height: 7px; border-radius: 4px; overflow: hidden; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #f59e0b, #ef4444); border-radius: 4px; }
 
         /* Action Buttons */
         .card-actions {
-            margin-top: 1rem;
+            margin-top: 0.65rem;
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
-            border-top: 1px solid rgba(255,255,255,0.07);
-            padding-top: 0.8rem;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 0.65rem;
         }
         .btn-action {
             flex: 1;
@@ -385,6 +385,227 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .btn-resolve:hover { background: #2563eb; }
         .btn-reopen { background: #64748b; color: white; }
         .btn-reopen:hover { background: #475569; }
+
+        /* Review Guide & Alert Banners */
+        .review-guide-banner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 0.65rem 1.1rem;
+            border-radius: 8px;
+            margin-bottom: 1.1rem;
+            font-size: 0.83rem;
+            color: #cbd5e1;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .review-guide-banner .rgb-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .review-guide-banner .scroll-hint {
+            color: #38bdf8;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+        }
+        .player-viol-banner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(239, 68, 68, 0.14);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 8px;
+            padding: 9px 14px;
+            margin: 10px 14px 0;
+            color: #fca5a5;
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+            gap: 8px;
+            animation: pulseBanner 2s infinite;
+        }
+        @keyframes pulseBanner {
+            0%, 100% { border-color: rgba(239, 68, 68, 0.4); }
+            50% { border-color: rgba(239, 68, 68, 0.85); }
+        }
+        .player-viol-banner .pvb-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+        .btn-goto-viol-tab {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+        .btn-goto-viol-tab:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        /* Date Filter Toolbar */
+        .date-filter-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.75rem 1.2rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .dft-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .dft-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .date-pills {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .date-pill-btn {
+            background: #0f172a;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .date-pill-btn:hover {
+            color: #fff;
+            border-color: #64748b;
+        }
+        .date-pill-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+        }
+        .date-pill-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 0.72rem;
+        }
+        .dft-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .dft-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .date-picker-input {
+            background: #0f172a;
+            color: #fff;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            outline: none;
+            color-scheme: dark;
+        }
+        .date-picker-input:focus {
+            border-color: var(--primary);
+        }
+        .btn-all-dates {
+            background: #334155;
+            color: #f1f5f9;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+        .btn-all-dates:hover {
+            background: #475569;
+        }
+        .btn-all-dates.active {
+            background: #2563eb;
+            border-color: #3b82f6;
+            color: #fff;
+        }
+
+        /* Date Group Header */
+        .date-group-header {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 0.65rem 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            margin-bottom: 0.4rem;
+        }
+        .date-group-header:first-child {
+            margin-top: 0;
+        }
+        .date-group-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .date-group-badge {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 2px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
 
         /* Empty State */
         .empty-state {
@@ -1759,6 +1980,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </button>
         </div>
 
+        <!-- Toolbar Lọc Theo Ngày Ghi Nhận Vi Phạm -->
+        <div class="date-filter-toolbar">
+            <div class="dft-left">
+                <div class="dft-title">
+                    <i class="fa-solid fa-calendar-days" style="color: var(--primary);"></i>
+                    <span>Xem Hồ Sơ Theo Ngày:</span>
+                </div>
+                <div class="date-pills" id="date-pills-container">
+                    <!-- Nạp động qua JS -->
+                </div>
+            </div>
+            <div class="dft-right">
+                <span class="dft-label"><i class="fa-regular fa-calendar"></i> Chọn ngày khác:</span>
+                <input type="date" id="date-picker-input" class="date-picker-input" onchange="onDatePickerChange(this.value)">
+                <button class="btn-all-dates" id="btn-all-dates" onclick="filterByDate('all')" title="Xem tất cả hồ sơ từ mọi ngày">
+                    <i class="fa-solid fa-layer-group"></i> Tất Cả Các Ngày
+                </button>
+            </div>
+        </div>
+
+        <!-- Hướng dẫn Cán bộ & Trạng thái Cuộn -->
+        <div class="review-guide-banner">
+            <div class="rgb-left">
+                <i class="fa-solid fa-circle-info" style="color: var(--primary);"></i>
+                <span><strong>Quy trình Xác nhận Vi phạm (Human-in-the-Loop):</strong> Nhấn <strong><i class="fa-solid fa-check"></i> Duyệt vi phạm</strong> trên từng thẻ hồ sơ để xác nhận lập biên bản xử phạt, hoặc <strong><i class="fa-solid fa-ban"></i> Bác bỏ</strong> nếu biển hiệu hợp lệ.</span>
+            </div>
+            <div class="rgb-right">
+                <span class="scroll-hint"><i class="fa-solid fa-arrow-down"></i> Cuộn xuống xem chi tiết hồ sơ & nút duyệt</span>
+            </div>
+        </div>
+
         <!-- Cards Container -->
         <div class="violations-grid" id="violations-container">
             <!-- Render via JS -->
@@ -2002,6 +2254,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>
                     </div>
 
+                    <!-- Banner thông báo khi có vi phạm trong video -->
+                    <div id="player-violation-alert" class="player-viol-banner" style="display: none;">
+                        <div class="pvb-left">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.1rem; color: #ef4444;"></i>
+                            <span id="player-viol-alert-text">Đã phát hiện vi phạm lấn chiếm vỉa hè trong video!</span>
+                        </div>
+                        <button class="btn-goto-viol-tab" onclick="switchMainTab('violations'); filterByStatus('pending');" title="Chuyển sang Tab 1 để cán bộ đối chiếu và xác nhận xử phạt">
+                            <i class="fa-solid fa-clipboard-check"></i> Chuyển Sang Hồ Sơ Vi Phạm Để Xác Nhận &rarr;
+                        </button>
+                    </div>
+
                     <!-- Dòng Sự Kiện Vi Phạm Thời Gian Thực -->
                     <div class="player-live-feed">
                         <div class="player-live-feed-header">
@@ -2143,12 +2406,98 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <script>
         let currentStatusFilter = 'all';
+        let currentDateFilter = '2026-10-19'; // Mặc định hiển thị hồ sơ ngày 19 theo yêu cầu
+        let allAvailableDates = [];
         let activeViolIdForDismiss = null;
         let activeViolIdForConfirm = null;
 
+        function formatDateVN(dateStr) {
+            if (!dateStr || dateStr === 'all') return 'Tất cả các ngày';
+            const parts = dateStr.split('-');
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            return dateStr;
+        }
+
+        function isTodayDate(dateStr) {
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = String(today.getMonth() + 1).padStart(2, '0');
+            const d = String(today.getDate()).padStart(2, '0');
+            return dateStr === `${y}-${m}-${d}`;
+        }
+
+        async function loadDatesList() {
+            try {
+                const res = await fetch('/api/dates');
+                allAvailableDates = await res.json();
+
+                // Nếu ngày mặc định chưa có dữ liệu và danh sách có ngày khác, chọn ngày mới nhất
+                if (allAvailableDates && allAvailableDates.length > 0) {
+                    const hasSelected = allAvailableDates.some(item => item.date === currentDateFilter);
+                    if (!hasSelected && currentDateFilter !== 'all') {
+                        currentDateFilter = allAvailableDates[0].date;
+                    }
+                }
+
+                renderDatePills();
+            } catch (e) {
+                console.error('Lỗi nạp danh sách ngày:', e);
+            }
+        }
+
+        function renderDatePills() {
+            const container = document.getElementById('date-pills-container');
+            if (!container) return;
+
+            if (!allAvailableDates || allAvailableDates.length === 0) {
+                container.innerHTML = `<span style="font-size: 0.78rem; color: var(--text-dim);">Chưa có dữ liệu ngày</span>`;
+                return;
+            }
+
+            const pillsHtml = allAvailableDates.slice(0, 5).map(item => {
+                const isAct = (currentDateFilter === item.date) ? 'active' : '';
+                const isToday = isTodayDate(item.date) || item.date === '2026-10-19';
+                const label = isToday ? `Hôm nay (${formatDateVN(item.date)})` : formatDateVN(item.date);
+                return `
+                    <button class="date-pill-btn ${isAct}" onclick="filterByDate('${item.date}')" title="Chỉ xem hồ sơ ngày ${formatDateVN(item.date)}">
+                        <i class="fa-solid fa-calendar-day"></i> ${label}
+                        <span class="date-pill-count">${item.count}</span>
+                    </button>
+                `;
+            }).join('');
+
+            container.innerHTML = pillsHtml;
+
+            // Nút Xem Tất Cả
+            const btnAll = document.getElementById('btn-all-dates');
+            if (btnAll) {
+                btnAll.classList.toggle('active', currentDateFilter === 'all');
+            }
+
+            // Input date picker
+            const dateInput = document.getElementById('date-picker-input');
+            if (dateInput && currentDateFilter !== 'all') {
+                dateInput.value = currentDateFilter;
+            }
+        }
+
+        function filterByDate(dateStr) {
+            currentDateFilter = dateStr;
+            renderDatePills();
+            loadData();
+        }
+
+        function onDatePickerChange(val) {
+            if (val) {
+                filterByDate(val);
+            }
+        }
+
         async function loadData() {
             try {
-                const statsRes = await fetch('/api/stats');
+                // Nạp thống kê KPI theo ngày lọc (nếu chọn)
+                const statsUrl = currentDateFilter === 'all' ? '/api/stats' : `/api/stats?date=${encodeURIComponent(currentDateFilter)}`;
+                const statsRes = await fetch(statsUrl);
                 const stats = await statsRes.json();
 
                 // Update KPIs
@@ -2171,24 +2520,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 document.getElementById('count-dismissed').innerText = dismissed;
                 document.getElementById('count-resolved').innerText = resolved;
 
-                // Load violations with filter
-                const url = currentStatusFilter === 'all' ? '/api/violations' : `/api/violations?status=${currentStatusFilter}`;
+                // Load violations with filter: status & date
+                let url = '/api/violations?';
+                if (currentStatusFilter !== 'all') url += `status=${encodeURIComponent(currentStatusFilter)}&`;
+                if (currentDateFilter !== 'all') url += `date=${encodeURIComponent(currentDateFilter)}&`;
+
                 const violsRes = await fetch(url);
                 const viols = await violsRes.json();
 
                 const container = document.getElementById('violations-container');
                 if (!viols || viols.length === 0) {
+                    const dateMsg = currentDateFilter === 'all' ? '' : ` trong ngày ${formatDateVN(currentDateFilter)}`;
                     container.innerHTML = `
                         <div class="empty-state" style="grid-column: 1/-1;">
                             <i class="fa-solid fa-clipboard-check"></i>
-                            <h3>Không có hồ sơ nào trong mục này</h3>
-                            <p>Tất cả bằng chứng ghi nhận sẽ xuất hiện tại đây khi camera phát hiện vi phạm.</p>
+                            <h3>Không có hồ sơ nào${dateMsg}</h3>
+                            <p>Không tìm thấy bản ghi vi phạm phù hợp với bộ lọc hiện tại. Nhấn <a href="javascript:void(0)" onclick="filterByDate('all')" style="color: var(--primary); font-weight:700;">Xem tất cả các ngày</a> để mở rộng.</p>
                         </div>
                     `;
                     return;
                 }
 
-                container.innerHTML = viols.map(v => {
+                function renderCardHtml(v) {
                     const status = v.status || 'pending';
                     let statusBadge = '';
                     let actionButtons = '';
@@ -2197,10 +2550,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if (status === 'pending') {
                         statusBadge = `<span class="card-status-badge badge-pending"><i class="fa-solid fa-hourglass-start"></i> Chờ duyệt</span>`;
                         actionButtons = `
-                            <button class="btn-action btn-confirm" onclick="openConfirmDialog(${v.id})">
-                                <i class="fa-solid fa-check"></i> Duyệt vi phạm
+                            <button class="btn-action btn-confirm" onclick="openConfirmDialog(${v.id})" title="Xác nhận vi phạm để lập biên bản xử phạt">
+                                <i class="fa-solid fa-circle-check"></i> Duyệt vi phạm (Xác nhận)
                             </button>
-                            <button class="btn-action btn-dismiss" onclick="openDismissDialog(${v.id})">
+                            <button class="btn-action btn-dismiss" onclick="openDismissDialog(${v.id})" title="Bác bỏ hoặc miễn trừ vi phạm">
                                 <i class="fa-solid fa-ban"></i> Bác bỏ
                             </button>
                         `;
@@ -2286,7 +2639,52 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </div>
                         </div>
                     `;
-                }).join('');
+                }
+
+                // Nếu chọn một ngày cụ thể (Ví dụ: Ngày 19)
+                if (currentDateFilter !== 'all') {
+                    const isToday = isTodayDate(currentDateFilter) || currentDateFilter === '2026-10-19';
+                    const headerHtml = `
+                        <div class="date-group-header">
+                            <div class="date-group-title">
+                                <i class="fa-solid fa-calendar-check" style="color: var(--primary);"></i>
+                                <span>Hồ sơ vi phạm ngày: <strong>${formatDateVN(currentDateFilter)}</strong></span>
+                                ${isToday ? '<span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; margin-left: 6px;">HÔM NAY</span>' : ''}
+                            </div>
+                            <div class="date-group-badge">
+                                ${viols.length} Hồ Sơ Trong Ngày
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML = headerHtml + viols.map(renderCardHtml).join('');
+                } else {
+                    // Gom nhóm và chia theo từng ngày rõ ràng
+                    const groups = {};
+                    viols.forEach(v => {
+                        const d = (v.timestamp || '').split(' ')[0] || 'Khác';
+                        if (!groups[d]) groups[d] = [];
+                        groups[d].push(v);
+                    });
+
+                    let finalHtml = '';
+                    for (const [d, items] of Object.entries(groups)) {
+                        const isToday = isTodayDate(d) || d === '2026-10-19';
+                        finalHtml += `
+                            <div class="date-group-header">
+                                <div class="date-group-title">
+                                    <i class="fa-solid fa-calendar-days" style="color: var(--primary);"></i>
+                                    <span>Ngày: <strong>${formatDateVN(d)}</strong></span>
+                                    ${isToday ? '<span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; margin-left: 6px;">HÔM NAY</span>' : ''}
+                                </div>
+                                <div class="date-group-badge">
+                                    ${items.length} Hồ Sơ Vi Phạm
+                                </div>
+                            </div>
+                        `;
+                        finalHtml += items.map(renderCardHtml).join('');
+                    }
+                    container.innerHTML = finalHtml;
+                }
             } catch (err) {
                 console.error("Lỗi tải dữ liệu:", err);
             }
@@ -2424,6 +2822,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             } else {
                 if (tabViol) tabViol.style.display = 'block';
                 if (btnViol) btnViol.classList.add('active');
+                loadDatesList();
                 loadData();
             }
         }
@@ -3126,6 +3525,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const violStat = document.getElementById('player-stat-viol');
                 if (violStat) violStat.textContent = `${data.violations_count || 0} Vi Phạm`;
 
+                const violAlert = document.getElementById('player-violation-alert');
+                const violAlertText = document.getElementById('player-viol-alert-text');
+                if (data.violations_count && data.violations_count > 0) {
+                    if (violAlert) violAlert.style.display = 'flex';
+                    if (violAlertText) violAlertText.innerHTML = `AI đã phát hiện <strong>${data.violations_count} vi phạm</strong> trong video và tự động lưu vào hàng chờ!`;
+                } else {
+                    if (violAlert) violAlert.style.display = 'none';
+                }
+
                 const chipsContainer = document.getElementById('player-live-chips');
                 if (chipsContainer && data.events && data.events.length > 0) {
                     chipsContainer.innerHTML = data.events.map(ev => {
@@ -3539,7 +3947,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         // Khởi động trang web dựa theo tham số URL (?tab=roi hoặc ?tab=eval)
-        function initAppOnLoad() {
+        async function initAppOnLoad() {
+            await loadDatesList();
             const urlParams = new URLSearchParams(window.location.search);
             const tabParam = urlParams.get('tab');
             if (tabParam === 'roi') {
@@ -3984,15 +4393,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
         from roi import ROIManager
         from violation import ViolationChecker
         from utils import FPSTracker, draw_fps_badge, draw_detection
+        from evidence import EvidenceSaver
 
         roi_info = get_roi_config(video_name)
         config_path = os.path.join("configs", roi_info.get("config_path", ""))
         roi_manager = ROIManager(config_path if os.path.exists(config_path) else "configs/roi_camera1.json")
+        camera_clean_id = roi_manager.camera_id or os.path.splitext(video_name)[0]
         checker = ViolationChecker(threshold=0.30)
         min_avg_c = max(0.20, min(0.35, conf * 1.5))
         verifier = TemporalVerifier(confirm_frames=15, confirm_seconds=0.5, source_fps=fps_source, min_avg_confidence=min_avg_c)
         fps_tracker = FPSTracker(alpha=0.15)
         tracker = get_shared_tracker(conf_threshold=conf, imgsz=imgsz)
+        evidence_saver = EvidenceSaver(base_dir="evidence", blur_faces=True)
 
         frame_idx = 0
         roi_validated = False
@@ -4022,6 +4434,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     roi_manager.validate_resolution(fw, fh)
                     roi_validated = True
 
+                clean_frame = frame.copy()
                 curr_fps = fps_tracker.update()
                 is_infer = (frame_skip <= 0) or (frame_idx % (frame_skip + 1) == 1)
 
@@ -4035,10 +4448,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         tid = obj["track_id"]
                         stat = obj["temporal_status"]
                         sp = obj["spatial_res"]
+                        box = obj["box"]
                         if stat == TrackState.CONFIRMED:
                             viol_count += 1
                             confirmed_ids.add(tid)
                             events.append({"track_id": tid, "status": "CONFIRMED", "overlap": sp["overlap_pct"]})
+
+                            # Tự động lưu bằng chứng ảnh & ghi nhận hồ sơ vi phạm vào CSDL (phục vụ duyệt phạt nguội)
+                            if obj.get("is_new_alert", False):
+                                if not db.is_duplicate_violation(camera_clean_id, box, time_window_minutes=5):
+                                    sw_idx = sp.get("sidewalk_index", 1)
+                                    ev_res = evidence_saver.save_evidence(
+                                        clean_frame, box, track_id=tid, camera_id=camera_clean_id, overlap_pct=sp["overlap_pct"]
+                                    )
+                                    rec_id = db.insert_violation(
+                                        camera_id=camera_clean_id,
+                                        track_id=tid,
+                                        timestamp=ev_res["timestamp"],
+                                        confidence=obj["conf"],
+                                        overlap_pct=sp["overlap_pct"],
+                                        full_image_path=ev_res["full_path"],
+                                        crop_image_path=ev_res.get("crop_path", ""),
+                                        bbox=box,
+                                        sidewalk_index=sw_idx
+                                    )
+                                    print(f"   [WEB LIVE AI] Đã lưu bằng chứng & hồ sơ vi phạm #{rec_id} cho Track #{tid} ({camera_clean_id})")
                         elif stat == TrackState.SUSPECTED:
                             events.append({"track_id": tid, "status": "SUSPECTED", "overlap": sp["overlap_pct"]})
                         else:
@@ -4124,8 +4558,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.end_headers()
-            stats = db.get_statistics()
+            query_params = urllib.parse.parse_qs(parsed.query)
+            date_param = query_params.get("date", [None])[0]
+            if date_param in ("all", "", None):
+                date_param = None
+            stats = db.get_statistics(date_str=date_param)
             self.wfile.write(json.dumps(stats).encode("utf-8"))
+
+        elif path == "/api/dates":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            dates_data = db.get_available_dates()
+            self.wfile.write(json.dumps(dates_data, ensure_ascii=False).encode("utf-8"))
 
         elif path == "/api/violations":
             self.send_response(200)
@@ -4133,7 +4578,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             query_params = urllib.parse.parse_qs(parsed.query)
             status_param = query_params.get("status", [None])[0]
-            records = db.get_violations(limit=100, status=status_param)
+            date_param = query_params.get("date", [None])[0]
+            if date_param in ("all", "", None):
+                date_param = None
+            records = db.get_violations(limit=300, status=status_param, date_str=date_param)
             self.wfile.write(json.dumps(records).encode("utf-8"))
 
         elif path == "/api/roi/videos":

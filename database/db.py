@@ -215,36 +215,59 @@ class ViolationDatabase:
         finally:
             conn.close()
 
-    def get_statistics(self) -> dict:
+    def get_statistics(self, date_str: str = None) -> dict:
         """
         Thống kê tổng quan phục vụ Dashboard.
+        Hỗ trợ lọc theo ngày cụ thể (YYYY-MM-DD) nếu truyền date_str.
         """
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
+            date_filter = " WHERE DATE(timestamp) = DATE(?)" if date_str else ""
+            params = (date_str,) if date_str else ()
             
             # Tổng số vụ
-            cursor.execute("SELECT COUNT(*) FROM violations")
+            cursor.execute(f"SELECT COUNT(*) FROM violations{date_filter}", params)
             total = cursor.fetchone()[0]
 
-            # Số vụ hôm nay
+            # Số vụ hôm nay (hoặc ngày hiện tại)
             cursor.execute("SELECT COUNT(*) FROM violations WHERE DATE(timestamp) = DATE('now', 'localtime')")
             today = cursor.fetchone()[0]
 
             # Thống kê theo camera
-            cursor.execute("SELECT camera_id, COUNT(*) as count FROM violations GROUP BY camera_id")
+            cursor.execute(f"SELECT camera_id, COUNT(*) as count FROM violations{date_filter} GROUP BY camera_id", params)
             by_cam = {row["camera_id"]: row["count"] for row in cursor.fetchall()}
 
             # Thống kê theo trạng thái (Pending, Confirmed, Dismissed, Resolved)
-            cursor.execute("SELECT status, COUNT(*) as count FROM violations GROUP BY status")
+            cursor.execute(f"SELECT status, COUNT(*) as count FROM violations{date_filter} GROUP BY status", params)
             by_status = {row["status"]: row["count"] for row in cursor.fetchall()}
 
             return {
                 "total_violations": total,
                 "today_violations": today,
                 "violations_by_camera": by_cam,
-                "violations_by_status": by_status
+                "violations_by_status": by_status,
+                "filter_date": date_str
             }
+        finally:
+            conn.close()
+
+    def get_available_dates(self) -> list:
+        """
+        Lấy danh sách các ngày có ghi nhận vi phạm kèm số lượng hồ sơ.
+        """
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT DATE(timestamp) as viol_date, COUNT(*) as count 
+                FROM violations 
+                WHERE timestamp IS NOT NULL 
+                GROUP BY DATE(timestamp) 
+                ORDER BY viol_date DESC
+            """)
+            rows = cursor.fetchall()
+            return [{"date": row["viol_date"], "count": row["count"]} for row in rows if row["viol_date"]]
         finally:
             conn.close()
 
