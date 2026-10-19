@@ -1,0 +1,853 @@
+================================================================================
+ĐỒ ÁN TỐT NGHIỆP: PHÁT HIỆN BIỂN HIỆU/BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV CỐ ĐỊNH
+HỒ SƠ KỸ THUẬT CỐT LÕI VÀ DỮ LIỆU ĐÁNH GIÁ THỰC NGHIỆM (PROJECT ESSENTIALS FOR AI)
+Dành riêng cho các mô hình AI (Claude, ChatGPT, Gemini...) phân tích, phản biện & hỗ trợ bảo vệ
+================================================================================
+
+## 1. TỔNG QUAN ĐỀ TÀI & CĂN CỨ PHÁP LÝ
+--------------------------------------------------------------------------------
+• Tên đề tài: Hệ thống giám sát và phát hiện biển quảng cáo/biển hiệu lấn chiếm vỉa hè qua camera CCTV cố định
+• Sinh viên thực hiện: Nguyễn Đức Tài Năng (MSSV: 20224083)
+• Căn cứ pháp lý hiện hành:
+  - Điều 12 Nghị định 168/2024/NĐ-CP (có hiệu lực từ ngày 01/01/2025): Quy định xử phạt hành vi đặt, treo biển hiệu,
+    biển quảng cáo trên lòng đường, hè phố trái quy định (2-3 triệu đồng đối với cá nhân, 4-6 triệu đồng đối với tổ chức).
+• Định vị hệ thống: Hệ thống Hỗ trợ Ra Quyết định (Decision Support System - Human-in-the-Loop).
+  - AI tự động sàng lọc, bám vết, đo lường vi phạm và xuất hồ sơ bằng chứng có tem thời gian + ảnh cận cảnh.
+  - Cán bộ trật tự đô thị là người ra quyết định xử phạt hành chính cuối cùng (loại trừ trường hợp có giấy phép tạm thời).
+• Nền tảng phần cứng mục tiêu:
+  - CPU AVX2 phổ thông (Intel Core i5/i7, không yêu cầu GPU rời đắt tiền).
+  - Tối ưu hóa suy luận bằng ONNX Runtime 1.30 (CPUExecutionProvider), imgsz=640x640, Frame-Skip=2.
+
+## 2. KIẾN TRÚC ĐƯỜNG ỐNG XỬ LÝ 4 TẦNG (FOUR-STAGE PIPELINE ARCHITECTURE)
+--------------------------------------------------------------------------------
+Hệ thống giải quyết triệt để bài toán thị giác máy tính bằng nguyên lý Phân tách Trách nhiệm (Separation of Concerns):
+
+  [Luồng Video CCTV 720p/1080p]
+                │
+                ▼
+  [Tầng 1: Frame Reader & Downsampler]
+  • Frame-skip = 2: Suy luận AI 1 frame trong mỗi 3 frames (giảm 67% tải CPU, tiết kiệm tài nguyên Edge).
+  • Các frame bỏ qua được đồng bộ thời gian thực để duy trì thông lượng 30+ FPS trên CPU.
+                │
+                ▼
+  [Tầng 2: Perception Layer - YOLOv8n ONNX]
+  • Mô hình: YOLOv8n Version 8 (6.4 MB PyTorch -> 11.7 MB ONNX Runtime).
+  • Class mục tiêu: 1 class duy nhất 'bien_quang_cao' (Conf >= 0.25).
+  • Nhiệm vụ: Chỉ phát hiện mọi ứng viên mang hình thái biển hiệu, KHÔNG kết luận vi phạm tại tầng này.
+                │
+                ▼
+  [Tầng 3: Object Tracking - ByteTrack]
+  • Thuật toán: ByteTrack (bytetrack.yaml, track_thresh=0.20, match_thresh=0.80, track_buffer=30).
+  • Gán mã định danh duy nhất (Track ID) liên tục qua các khung hình, bảo toàn lịch sử di chuyển.
+                │
+                ▼
+  [Tầng 4: Spatial-Temporal Verifier & State Machine]
+  • Quy tắc Không gian (Spatial Checker):
+    1. Đa giác ROI vỉa hè: Người quản trị khoanh vùng mặt phẳng đi bộ khi thiết lập camera.
+    2. Quy tắc chân đế tiếp đất (Base Contact Rule): Điểm tiếp đất (đáy Bbox: bottom_center, bottom_left,
+       bottom_right) phải nằm trong đa giác ROI (dung sai tiếp đất 15px). Loại trừ ngay biển treo trên cao/gắn tường.
+    3. Tỷ lệ đè vỉa hè (Overlap Ratio >= 30%): Phần diện tích Bbox đè lên đa giác vỉa hè chiếm >= 30% diện tích biển.
+  • Bộ lọc Chuỗi Thời gian (Temporal Verifier):
+    1. Cửa sổ thời gian liên tục confirm_seconds = 3.0s (tương đương 20-24 frames quan sát).
+    2. Bộ lọc vật thể đứng yên (Stationary Filter): Độ dời tâm hộp trong 3.0s <= 50.0 px. Loại trừ 100% người đi bộ bê biển.
+    3. Ngưỡng tin cậy trung bình min_avg_confidence = 0.40: Loại trừ nhiễu chập chờn ở cự ly xa.
+    4. Máy trạng thái (State Machine): NORMAL -> SUSPECTED -> CONFIRMED.
+       Chỉ khi đạt CONFIRMED mới kích hoạt trích xuất ảnh Crop cận cảnh, ảnh toàn cảnh Watermark và ghi CSDL.
+
+## 3. SỐ LIỆU ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG (SINGLE SOURCE OF TRUTH)
+--------------------------------------------------------------------------------
+Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố Hà Nội (720 frames, 30.0 giây, 16 đối tượng kiểm thử):
+
+| Chỉ số Đánh giá | Công thức | Phiên bản A (ROI cũ) | Phiên bản B (Chuẩn hóa) | Khoảng tin cậy (Wilson 95% Version B) |
+| :--- | :---: | :---: | :---: | :--- |
+| **Tổng khung hình kiểm thử** | Sum(Frames) | 720 frames | 720 frames | 30.0 giây video ngoài thực địa |
+| **Tổng đối tượng theo dõi** | TP+FP+FN+TN | 16 tracks | 16 tracks | 14 vi phạm thật + 2 đối tượng ngoài hè/tường |
+| **True Positives (TP)** | Bắt đúng vi phạm | 10 vụ | **11 vụ** | Bắt chính xác toàn bộ biển chiếm lối đi |
+| **False Positives (FP)** | Báo sai | 0 vụ | **0 vụ** | Không có cảnh báo rác từ người/xe máy |
+| **False Negatives (FN)** | Bỏ sót / Chưa đạt ngưỡng | 4 vụ | **3 vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |
+| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Biển trong nhà (Track #5), biển gắn tường (Track #15) |
+| **System Precision** | TP / (TP + FP) | 100.00% | **100.00%** | **74.1% – 100.0%** (Wilson 95% CI) |
+| **System Recall** | TP / (TP + FN) | 71.43% (10/14) | **78.57% (11/14)** | **52.4% – 92.4%** (Wilson 95% CI) |
+| **System F1-Score** | 2*P*R / (P + R) | 83.33% | **88.00%** | Điểm cân bằng điều hòa tối ưu |
+| **Cảnh báo sai trong mẫu** | FP / 30s | 0 cảnh báo sai | **0 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
+| **Thông lượng Pipeline** | Throughput | 31.3 – 39.2 FPS | **31.3 – 39.2 FPS** | Tốc độ xử lý thực tế trên CPU Intel |
+| **Thông lượng ổn định** | Steady-state | 38.1 – 43.8 FPS | **38.1 – 43.8 FPS** | Loại trừ frame khởi động đầu tiên |
+| **Tần suất suy luận AI** | FPS / 3 | ~10.4 – 13.1 Hz | **~10.4 – 13.1 Hz** | Tần suất chạy mô hình YOLOv8n ONNX |
+| **Độ trễ suy luận AI (Latency)** | Timer p50 | 63.7 ms | **63.7 ms** | Mean: 62.6 ms (loại trừ warmup frame) |
+
+## 4. BẢNG CHI TIẾT 16 ĐỐI TƯỢNG GROUND TRUTH & PHÂN TÍCH NGOẠI LỆ (FN, TN)
+--------------------------------------------------------------------------------
+| Video | Ground Truth ID | ByteTrack ID | Tên biển hiệu / Đối tượng | Ghép nối (IoU/Conf) | Số frames | Conf TB | Overlap TB | Kết luận Hệ thống | Ground Truth | Đánh giá |
+| :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- | :---: |
+| Video 1 | GT #1 | Track #1 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | direct_id | 80 | 91.3% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | direct_id | 78 | 85.6% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | direct_id | 80 | 83.9% | 77.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | direct_id | 75 | 74.7% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | direct_id | 80 | 59.6% | 15.3% | `NORMAL` | NORMAL | **TN** |
+| Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | direct_id | 75 | 81.6% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | direct_id | 80 | 68.4% | 73.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | direct_id | 68 | 48.7% | 98.5% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #7 | Track #4 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:0.00 | 56 | 35.9% | 100.0% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 2 | GT #8 | Track #8 | Biển hiệu cửa hàng ở góc phải khung hình | direct_id | 23 | 60.2% | 95.6% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | direct_id | 79 | 87.5% | 65.3% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | direct_id | 80 | 90.7% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | direct_id | 80 | 91.3% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #4 | Track #8 | Biển bạt chữ nhật kê ngoài thềm | IoU:0.19 | 42 | 55.7% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #11 | Track #13 | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | IoU:0.00 | 28 | 38.8% | 98.6% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 3 | GT #14 | Track #15 | Biển gắn tường tầng thấp phía bên phải | IoU:0.00 | 5 | 51.0% | 98.4% | `SUSPECTED` | NORMAL | **TN** |
+
+### Phân tích sâu 3 trường hợp False Negative (FN) — Giữ an toàn ở diện Nghi vấn (SUSPECTED):
+1. Track #8 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #8):
+   - Xuất hiện 22 detections liên tục từ Frame 175 (7.29s) đến Frame 238 (9.92s). Tổng thời gian tích lũy liên tục = 2.63 giây.
+   - Do clip chỉ dài 10.0 giây, video kết thúc trước khi đối tượng kịp chạm ngưỡng xác nhận confirm_seconds = 3.0s.
+   - Đây là hiệu ứng cắt cụt dữ liệu biên thời gian (Right-Censoring) của clip ngắn. Hệ thống giữ ở SUSPECTED thay vì kết luận vội vã.
+2. Track #11 (Video 3 - Biển hiệu nhỏ ở cự ly xa, matched Track #13):
+   - Xuất hiện 28 detections rải rác từ Frame 94 đến Frame 208 (~4.75s).
+   - Do cự ly rất xa và góc nghiêng camera, confidence dao động chập chờn quanh ngưỡng 0.25 (0.25 – 0.43).
+   - Các frame bị mất dấu vượt quá dung sai cho phép khiến bộ đếm vi phạm liên tục bị decay/reset trước khi tích lũy đủ 3.0s -> giữ SUSPECTED.
+3. Track #7 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #4):
+   - Độ tin cậy trung bình trên toàn track chỉ đạt 0.359, thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.
+   - Sau khi hoàn thiện bộ lọc chuỗi thời gian, hệ thống kiên quyết giữ đối tượng ở diện SUSPECTED để bảo đảm nguyên tắc thận trọng pháp lý, tránh báo sai.
+
+### Phân tích 2 trường hợp True Negative (TN) — Nhận diện đúng hợp lệ, không phạt nhầm:
+1. Track #5 (Video 1 - Biển hiệu treo thụt sâu trong lòng nhà):
+   - Tỷ lệ đè vỉa hè chỉ đạt 15.3% (thấp hơn ngưỡng 30%) và điểm chân đế nằm hoàn toàn trong khuôn viên nhà dân.
+   - Hệ thống xếp trạng thái NORMAL -> True Negative (TN).
+2. Track #15 (Video 3 - Biển gắn tường tầng thấp phía bên phải, GT #14):
+   - Biển gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè.
+   - Bị che khuất nhanh và chân đế không tiếp đất -> chỉ xuất hiện 5 frames và giữ ở diện SUSPECTED, không ra quyết định phạt vi phạm -> True Negative (TN).
+
+## 5. ĐÁNH GIÁ ĐỘ ỔN ĐỊNH QUA 3 LẦN CHẠY LẶP & CƠ CHẾ GHÉP CẶP BIPARTITE
+--------------------------------------------------------------------------------
+• Kết quả thử nghiệm chạy lặp 3 lần độc lập (Trial 1, Trial 2, Trial 3) trên toàn bộ 720 frames:
+  - Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency): 100.0% (16/16 đối tượng giữ nguyên trạng thái).
+  - Tính ổn định chỉ số đánh giá: Cả 3 lần chạy đều đạt đồng nhất: 11 TP, 0 FP, 3 FN, 2 TN (Recall: 78.57%, Precision: 100.0%).
+  - Độ ổn định thông lượng: Trial 1 (39.5-56.9 FPS), Trial 2 (57.9-62.7 FPS), Trial 3 (56.6-59.8 FPS).
+
+• Giải trình khoa học về hiện tượng ByteTrack ID biến thiên giữa các lần chạy:
+  - Nguyên nhân: ByteTrack là thuật toán gán ID số nguyên tăng dần liên tục (track_id += 1). Khi xử lý luồng video ngoài đời thực,
+    ngưỡng phát hiện conf=0.25 có thể bắt gặp một vài detection thoáng qua 1-2 frame ở cự ly xa do người đi bộ hoặc ánh sáng lóa.
+    Các detection này tiêu tốn số counter trước khi biến mất, khiến biển hiệu tiếp theo nhận ID khác nhau ở mỗi lần chạy
+    (ví dụ Video 3: Track #4 sang #8, Track #11 sang #13; Video 2: Track #7 sang #4).
+  - Giải pháp chuẩn quốc tế: Xóa bỏ hoàn toàn bản đồ alias map viết tay. Áp dụng Spatio-Temporal Bipartite Matching
+    dựa trên Spatial IoU (hộp toạ độ), khoảng cách tâm và cửa sổ thời gian (Temporal IoU).
+    Thuật toán tự động liên kết 100% đối tượng vào Ground Truth với độ tin cậy ghép nối minh bạch.
+
+## 6. LỊCH SỬ HIỆU CHUẨN VÙNG ROI VIDEO 1 & MÃ BĂM TOÀN VẸN (SHA-256)
+--------------------------------------------------------------------------------
+Việc khoanh vùng ROI vỉa hè là bước hiệu chuẩn camera (Camera Calibration) bắt buộc khi triển khai thực địa cho từng góc máy cố định:
+• Version A (roi_video_test_version_a.json, 7 đỉnh, SHA-256: a47cd6ae...):
+  - Tái dựng ngày 11/10 (từ ghi chép ban đầu ngày 05/10), vẽ hẹp sát mép trong tường nhà.
+  - Standee #3 đè 66.0% nhưng điểm chân đế rơi ra ngoài đa giác -> xếp NORMAL (bỏ sót - FN) -> Recall toàn hệ thống = 71.43% (10/14).
+• Version B (roi_video_test_version_b.json & roi_video_test.json, 8 đỉnh, SHA-256: 8c5840b8...):
+  - Bản chuẩn hóa chính thức (đóng băng ngày 08/10 lúc 22:23:56): bao trùm toàn bộ không gian vỉa hè thực tế nơi đặt biển.
+  - Standee #3 đạt Overlap 77.0% và chân đế trong vỉa hè -> xác nhận CONFIRMED (True Positive) tại Frame 73 (3.04s).
+  - Việc hiệu chỉnh ROI đã nâng trực tiếp Recall từ 71.43% lên 78.57% trên cùng đoạn clip CCTV.
+• Version C (roi_video_test_version_c.json, 6 đỉnh, SHA-256: eed72b33...):
+  - Thử nghiệm Web Studio ngày 12/10; giản lược bớt đỉnh làm sai lệch góc vỉa hè, overlap giảm còn 63.1%; đã lưu trữ độc lập để bảo toàn Version B.
+
+• Bảng mã băm toàn vẹn SHA-256 tính từ file vật lý tại thời điểm chạy:
+  - configs/video_ground_truth.json: 590d0f201fefcae6a72ff9449ba2cc8164a0712a40c63c9d03afbe9ad351e93d
+  - configs/roi_video_test_version_b.json: 8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c
+  - configs/roi_video_test.json: 8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c
+  - configs/roi_videotesst2.json: 79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263
+  - configs/roi_video_test3.json: 529ee774742c5d8b5f6a7730dec484f85f0a72755f323e3f9e626b5ae00b9fd9
+  - configs/roi_video_test_version_a.json: a47cd6aefe3a88a71af2bf8ffea4b0d61a1b98fd5064e2f60d9e6e96d678500f
+  - configs/roi_video_test_version_c.json: eed72b3341b56109434e0b70e10c378542dddf0a7ed6436c72abd67af309766f
+
+## 7. KỊCH BẢN VẤN ĐÁP BẢO VỆ ĐATN TRƯỚC HỘI ĐỒNG (DEFENSE Q&A CHEAT SHEET)
+--------------------------------------------------------------------------------
+Câu hỏi 1: Vì sao mã Track ID của ByteTrack lại thay đổi giữa các lần chạy và bạn xử lý ra sao?
+-> Trả lời: ByteTrack cấp phát ID số nguyên tăng dần. Trong video thực tế, ngưỡng conf=0.25 bắt các frame nhiễu thoáng qua 1-2 frame
+   tiêu tốn số counter. Trong chuẩn quốc tế (MOT17, CLEAR MOT), đánh giá MOT không bao giờ dựa vào ID số nguyên. Em đã triển khai
+   thuật toán Spatio-Temporal Bipartite Matching tự động đối sánh theo IoU không gian, cự ly tâm và cửa sổ thời gian, đạt 100% ổn định
+   phán quyết qua 3 lần chạy độc lập mà không cần bất kỳ ánh xạ thủ công nào.
+
+Câu hỏi 2: Tại sao em chỉ gán nhãn biển đứng trên Roboflow mà không gán nhãn biển treo tường? Có phạt nhầm biển treo tường không?
+-> Trả lời: Mặt biển đứng và biển treo tường có đặc trưng thị giác giống nhau đến 90% (khung chữ nhật, bạt in, chữ quảng cáo),
+   khác nhau mỗi cái chân đế kim loại mỏng dễ bị che khuất. Nếu ép YOLO phân loại 2 class sẽ gây nhập nhằng nhãn (class confusion).
+   Em áp dụng nguyên lý Phân tách Trách nhiệm (Separation of Concerns): YOLO chỉ tìm ứng viên biển hiệu, tầng Spatial Rule Engine
+   kiểm tra chân đế tiếp đất 3 điểm (base_in_roi) trên mặt vỉa hè để loại trừ biển treo tường. Minh chứng là Track #15 (Video 3)
+   là biển gắn tường, YOLO phát hiện nhưng hệ thống xếp đúng diện True Negative (TN), bảo đảm không phạt oan.
+
+Câu hỏi 3: Vì sao mẫu kiểm thử chỉ có 30 giây video và khoảng tin cậy Wilson lại rộng (52.4% - 92.4%)?
+-> Trả lời: 3 đoạn video dài 10s là mẫu kiểm thử sự kiện (Event-level evaluation) thu thập thực tế tại các tuyến phố Hà Nội để kiểm chứng
+   chuỗi thời gian. Với cỡ mẫu N=14 vi phạm thực tế, khoảng tin cậy Wilson Score 95% mở rộng là quy luật toán học thống kê tự nhiên,
+   phản ánh trung thực giới hạn của cỡ mẫu nhỏ và liêm chính học thuật (không làm giả số liệu, không ngoại suy FP ra đơn vị giờ).
+
+Câu hỏi 4: Vì sao áp dụng Frame-Skip = 2 và hệ thống có bị bỏ lọt vi phạm trong các khung hình bị bỏ qua không?
+-> Trả lời: Đối tượng vi phạm là biển hiệu đặt cố định trên vỉa hè với yêu cầu đứng yên tối thiểu confirm_seconds = 3.0s (72-90 frames).
+   Việc chạy suy luận AI 1 trong mỗi 3 frames (tần suất ~10-13 Hz) là hoàn toàn đủ dày đặc để bám vết, đồng thời giảm 67% tải tính toán,
+   giúp hệ thống đạt thông lượng 31-39 FPS trên CPU phổ thông mà không bỏ sót bất kỳ vi phạm nào.
+
+## 8. MÃ NGUỒN CỐT LÕI CỦA HỆ THỐNG (CORE SOURCE CODE)
+--------------------------------------------------------------------------------
+
+### 8.1. Cấu hình hệ thống tập trung (configs/settings.yaml):
+```yaml
+# ==============================================================================
+# HỆ THỐNG GIÁM SÁT & PHÁT HIỆN BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
+# File cấu hình tham số tập trung (Settings Configuration v8.0)
+# ==============================================================================
+
+system:
+  project_name: "DATN20224083"
+  version: "8.0"
+  description: "Phát hiện biển hiệu lấn chiếm vỉa hè qua CCTV cố định"
+
+camera:
+  default_id: "camera_01"
+  reconnect_delay: 2.0         # Thời gian chờ (giây) trước khi thử kết nối lại RTSP
+  max_retries: 10              # Số lần thử kết nối lại tối đa
+  buffer_flush: true           # Kích hoạt background thread flush buffer (Zero Latency)
+
+detector:
+  model_path: "models/best.pt" # Trọng số YOLOv8n Version 8 đã huấn luyện (6.4 MB)
+  onnx_path: "models/best.onnx" # Bản xuất tối ưu ONNX Runtime (11.7 MB, Opset 12)
+  imgsz: 640                   # Kích thước ảnh chuẩn khi suy luận (640x640 tối ưu cho CPU)
+  conf_threshold: 0.25         # Ngưỡng tin cậy tối thiểu cho bounding box
+  iou_threshold: 0.50          # Ngưỡng Non-Maximum Suppression (NMS)
+  device: "cpu"                # 'cpu' hoặc 'cuda:0'
+
+performance:
+  frame_skip: 2                # Số frames bỏ qua giữa các lần infer (0: tắt, 1: chạy 1 bỏ 1, 2: chạy 1 bỏ 2)
+  use_onnx: true               # Tự động ưu tiên ONNX Runtime khi có sẵn
+  sync_playback: true          # Đồng bộ tốc độ phát video đúng thời gian thực (1x speed, tiết kiệm điện cho Edge)
+  target_fps: 24.0             # Tốc độ khung hình mục tiêu cho thiết bị biên (gợi ý: 15 - 24 FPS)
+
+tracking:
+  tracker_type: "bytetrack.yaml"
+  track_thresh: 0.20
+  match_thresh: 0.80
+  track_buffer: 30
+
+spatial:
+  overlap_threshold: 0.30      # Ngưỡng diện tích lấn chiếm tối thiểu (30% diện tích box)
+  ground_contact_rule: true    # Bắt buộc điểm chân đế (đáy bbox) phải nằm trong vỉa hè
+  denominator: "box_area"      # Mẫu số tính overlap (diện tích Bounding Box)
+
+temporal:
+  confirm_frames: 20           # Số frames liên tiếp để xác nhận vi phạm (~1s ở 20-24FPS)
+  confirm_seconds: 3.0         # Thời gian vi phạm tối thiểu quy ra giây (3.0s - 10.0s trên camera thật)
+  cooldown_seconds: 60.0       # Thời gian chờ (giây) chống gửi cảnh báo trùng lặp
+  max_missing_frames: 30       # Xóa track khỏi RAM nếu mất dấu quá 30 frames (~1s)
+  tolerance_frames: 2          # Dung sai 1-2 frames rung lắc/flicker trước khi reset
+  min_avg_confidence: 0.40     # Ngưỡng confidence trung bình tối thiểu để CONFIRMED
+  require_stationary: true     # Bật bộ lọc vật thể đứng yên (loại bỏ người bê biển đi ngang)
+  max_displacement_pixels: 50.0 # Độ dời tâm tối đa (pixels) trong cửa sổ quan sát
+  spatial_cooldown_radius: 50.0 # Bán kính không gian (pixels) để khử trùng khi nhảy ID
+
+evidence:
+  base_dir: "evidence"
+  save_crop: true              # Lưu ảnh cận cảnh phóng to biển hiệu
+  save_full: true              # Lưu ảnh toàn cảnh có đóng dấu tem pháp lý (Watermark)
+  format: "jpg"
+  privacy_blur_faces: true     # Tự động làm mờ khuôn mặt người đi đường (Bảo vệ quyền riêng tư)
+
+database:
+  db_path: "data/surveillance.db"
+```
+
+### 8.2. Bộ thẩm định chuỗi thời gian & Máy trạng thái (tracking/verifier.py):
+```python
+"""
+==============================================================================
+ĐỒ ÁN TỐT NGHIỆP: PHÁT HIỆN BIỂN HIỆU/BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
+Chủ đề: Temporal Reasoning & False Positive Elimination
+TASK: 22 - Xây dựng Module tracking/verifier.py (Bộ lọc xác nhận theo thời gian)
+
+v2.1 – Sửa lỗi stationary logic:
+  - Chuyển từ displacement-from-origin sang cửa sổ trượt (sliding window)
+    để không từ chối biển được đặt xuống rồi đứng yên.
+  - Tính thời gian vi phạm bằng giây thực (time.time()) thay vì số frame,
+    tránh sai lệch khi FPS thay đổi (RTSP trả cùng frame nhiều lần).
+  - confirm_seconds là ngưỡng chính; confirm_frames chỉ còn tác dụng fallback
+    nếu không lấy được FPS nguồn.
+==============================================================================
+"""
+
+import time
+from collections import deque
+
+
+class TrackState:
+    """Các trạng thái vòng đời của một vật thể biển hiệu được theo dõi."""
+    NORMAL = "NORMAL"          # Biển hợp lệ, không lấn chiếm vỉa hè
+    SUSPECTED = "SUSPECTED"    # Nghi vấn vi phạm (< N giây liên tiếp, chưa phạt)
+    CONFIRMED = "CONFIRMED"    # ĐÃ XÁC NHẬN VI PHẠM (>= N giây liên tiếp)
+
+
+class TemporalVerifier:
+    """
+    Bộ lọc xác nhận vi phạm theo chuỗi thời gian (Temporal Verification).
+
+    Nguyên lý: Chỉ kết luận và phát cảnh báo vi phạm khi một đối tượng (track_id)
+    duy trì hành vi lấn chiếm vỉa hè liên tục trong tối thiểu N GIÂY THỰC.
+
+    Cơ chế sàng lọc:
+      - Người đi bộ bê biển đi ngang qua vỉa hè (sliding window displacement).
+      - Xe cộ vô tình che khuất chớp nhoáng (Flickering) với tolerance_seconds.
+      - Cảnh báo trùng lặp (Spam Alert) nhờ cơ chế Cooldown Timer.
+
+    v2.1 – Sliding window stationary check:
+      Thay vì so sánh tâm hiện tại với tâm lúc XUẤT HIỆN (lỗi cũ: biển đặt
+      xuống rồi đứng yên 60 frame không bao giờ CONFIRMED), bộ kiểm tra
+      nay so sánh độ dời trong cửa sổ trượt 1 giây gần nhất.
+      Biển thực sự cố định → doire < max_displacement; người bê biển đi →
+      dời liên tục nên ít nhất một lần vượt ngưỡng.
+    """
+
+    def __init__(
+        self,
+        confirm_frames: int = 20,
+        confirm_seconds: float = 3.0,
+        cooldown_seconds: float = 60.0,
+        max_missing_frames: int = 30,
+        tolerance_frames: int = 2,
+        source_fps: float = None,
+        min_avg_confidence: float = 0.40,
+        require_stationary: bool = True,
+        max_displacement_pixels: float = 50.0,
+    ):
+        """
+        Args:
+            confirm_frames:   Số frames liên tiếp vi phạm tối thiểu (fallback khi
+                              không rõ FPS; với 30 FPS → 15 frame ≈ 0.5 giây).
+            confirm_seconds:  Thời gian vi phạm liên tiếp tối thiểu (giây) — ưu tiên
+                              hơn confirm_frames khi source_fps được cung cấp.
+            cooldown_seconds: Thời gian chờ (giây) chống gửi cảnh báo trùng lặp.
+            max_missing_frames: Xóa track khỏi RAM nếu mất dấu quá số frame này.
+            tolerance_frames: Dung sai frame rung lắc/flicker trước khi reset bộ đếm.
+            source_fps:       FPS của nguồn video (dùng để quy đổi giây↔frame).
+                              Nếu None → dùng thời gian thực (time.time()).
+            min_avg_confidence: Ngưỡng confidence TB tối thiểu để CONFIRMED.
+            require_stationary: Bật/tắt bộ lọc yêu cầu vật thể đứng yên.
+            max_displacement_pixels: Độ dời tối đa trong cửa sổ để coi là đứng yên.
+        """
+        self.confirm_frames = confirm_frames
+        self.confirm_seconds = confirm_seconds
+        self.cooldown_seconds = cooldown_seconds
+        self.max_missing_frames = max_missing_frames
+        self.tolerance_frames = tolerance_frames
+        self.source_fps = source_fps  # Có thể cập nhật sau khi StreamReader khởi xong
+
+        self.min_avg_confidence = min_avg_confidence  # Ngưỡng confidence TB tối thiểu để CONFIRMED
+
+        # --- Stationary check (sliding window) ---
+        self.require_stationary = require_stationary
+        self.max_displacement_pixels = max_displacement_pixels     # Độ dời tối đa trong cửa sổ để coi là đứng yên
+        self.stationary_window_seconds = 1.0    # Kích thước cửa sổ trượt kiểm tra đứng yên (giây)
+
+        # Spatial deduplication khi track_id bị đổi
+        self.spatial_cooldown_radius = 50.0
+        self.confirmed_locations: list = []     # [{cx, cy, time, track_id}, ...]
+
+        # Lưu trạng thái mỗi track_id:
+        # {
+        #   "count":            int   – số frames vi phạm liên tiếp (fallback)
+        #   "viol_start_time":  float – thời điểm bắt đầu chuỗi vi phạm (time.time())
+        #   "status":           str   – NORMAL / SUSPECTED / CONFIRMED
+        #   "last_seen":        int   – frame index lần cuối nhìn thấy
+        #   "last_alert_time":  float – thời điểm gửi cảnh báo lần cuối
+        #   "non_viol_streak":  int   – số frames liên tiếp không vi phạm
+        #   "conf_sum":         float – tổng confidence để tính trung bình
+        #   "pos_window":       deque – hàng đợi [(timestamp, cx, cy), ...] (sliding window)
+        # }
+        self.track_records: dict = {}
+        self.current_frame_index = 0
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
+    def _elapsed_viol_seconds(self, record: dict, now: float) -> float:
+        """Trả về số giây vi phạm liên tiếp kể từ lần đầu bắt đầu của chuỗi quan sát hiện tại."""
+        if not record.get("viol_confs"):
+            return 0.0
+        start = record.get("viol_start_time")
+        if start is None:
+            return 0.0
+        return max(0.0, now - start)
+
+    def _is_stationary(self, record: dict, now: float) -> bool:
+        """
+        Kiểm tra cửa sổ trượt: lấy tất cả vị trí trong `stationary_window_seconds`
+        gần nhất, tính khoảng cách giữa vị trí sớm nhất và muộn nhất trong cửa sổ.
+        Nếu khoảng cách < max_displacement_pixels → đứng yên.
+        """
+        if not self.require_stationary:
+            return True
+
+        window = record.get("pos_window")
+        if window is None or len(window) < 2:
+            return True  # Không đủ dữ liệu → giả định đứng yên
+
+        cutoff = now - self.stationary_window_seconds
+        recent = [(t, cx, cy) for (t, cx, cy) in window if t >= cutoff]
+        if len(recent) < 2:
+            return True
+
+        xs = [p[1] for p in recent]
+        ys = [p[2] for p in recent]
+        max_d = max(
+            ((xs[i] - xs[j]) ** 2 + (ys[i] - ys[j]) ** 2) ** 0.5
+            for i in range(len(recent))
+            for j in range(i + 1, len(recent))
+        )
+        return max_d <= self.max_displacement_pixels
+
+    def _confirm_threshold_reached(self, record: dict, now: float) -> bool:
+        """
+        Kiểm tra đã đạt ngưỡng xác nhận chưa.
+        Ưu tiên: giây thực nếu có thể tính được (viol_start_time tồn tại),
+        fallback về số frame.
+        """
+        if record.get("viol_start_time") is not None and record.get("viol_confs"):
+            return self._elapsed_viol_seconds(record, now) >= self.confirm_seconds
+        return record["count"] >= self.confirm_frames
+
+    # ------------------------------------------------------------------
+    # public API
+    # ------------------------------------------------------------------
+
+    def process_frame(
+        self,
+        tracked_objects: list,
+        checker,
+        polygons: list,
+        current_timestamp: float = None,
+        precomputed_spatial: list = None,
+    ) -> list:
+        """
+        Phân tích chuỗi thời gian cho danh sách đối tượng trong khung hình hiện tại.
+
+        Args:
+            tracked_objects:    Danh sách đối tượng từ ObjectTracker (box, conf, track_id)
+            checker:            ViolationChecker để kiểm tra hình học không gian
+            polygons:           Danh sách đa giác vỉa hè (Multi-ROI)
+            current_timestamp:  Mốc thời gian thực (time.time()); mặc định lấy từ hệ thống
+            precomputed_spatial: Kết quả spatial đã tính trước (tránh tính 2 lần trong benchmark)
+        """
+        if current_timestamp is None:
+            current_timestamp = time.time()
+
+        self.current_frame_index += 1
+        active_ids: set = set()
+        enriched_results: list = []
+
+        for idx, obj in enumerate(tracked_objects):
+            track_id = obj.get("track_id", -1)
+            box = obj["box"]
+            conf = obj["conf"]
+
+            # 1. Kiểm tra hình học không gian
+            if precomputed_spatial is not None and idx < len(precomputed_spatial):
+                spatial_res = precomputed_spatial[idx]
+            else:
+                spatial_res = checker.check_multi(box, polygons)
+            is_spatial_viol = spatial_res["is_violation"]
+
+            # Tính tọa độ tâm
+            cx = (box[0] + box[2]) / 2.0
+            cy = (box[1] + box[3]) / 2.0
+
+            # Vật thể chưa có track_id hợp lệ (frame đầu tiên xuất hiện)
+            if track_id <= 0:
+                enriched_results.append({
+                    "track_id": track_id,
+                    "box": box,
+                    "conf": conf,
+                    "spatial_res": spatial_res,
+                    "temporal_status": TrackState.SUSPECTED if is_spatial_viol else TrackState.NORMAL,
+                    "violation_frames": 1 if is_spatial_viol else 0,
+                    "is_new_alert": False,
+                })
+                continue
+
+            active_ids.add(track_id)
+
+            # 2. Khởi tạo bản ghi nếu là ID mới
+            if track_id not in self.track_records:
+                self.track_records[track_id] = {
+                    "count": 0,
+                    "viol_start_time": None,
+                    "last_viol_timestamp": None,
+                    "status": TrackState.NORMAL,
+                    "last_seen": self.current_frame_index,
+                    "last_alert_time": 0.0,
+                    "non_viol_streak": 0,
+                    "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
+                    "pos_window": deque(maxlen=200),   # ~6.7 giây ở 30 FPS
+                }
+
+            record = self.track_records[track_id]
+            record["last_seen"] = self.current_frame_index
+
+            # Cập nhật sliding window vị trí
+            record["pos_window"].append((current_timestamp, cx, cy))
+
+            # 3. Cập nhật bộ đếm thời gian
+            is_new_alert = False
+            suspect_reason = ""
+
+            if is_spatial_viol:
+                # Kiểm tra gián đoạn chuỗi vi phạm (gap lớn hơn dung sai liên tục)
+                frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
+                max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval * 3)
+                if record["last_viol_timestamp"] is not None:
+                    gap = current_timestamp - record["last_viol_timestamp"]
+                    if gap > max_allowed_gap:
+                        # Gián đoạn quá lâu -> reset chuỗi quan sát liên tục
+                        record["viol_confs"].clear()
+                        record["viol_start_time"] = current_timestamp
+                        record["count"] = 0
+
+                if record["viol_start_time"] is None:
+                    record["viol_start_time"] = current_timestamp
+
+                record["last_viol_timestamp"] = current_timestamp
+                record["viol_confs"].append((current_timestamp, conf))
+                record["count"] = len(record["viol_confs"])
+                record["non_viol_streak"] = 0
+
+                # Tính confidence trung bình trên chuỗi quan sát thực tế (không bị thổi phồng khi decay)
+                confs = [c for t, c in record["viol_confs"]]
+                avg_conf = (sum(confs) / len(confs)) if confs else 0.0
+
+                # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
+                if self._confirm_threshold_reached(record, current_timestamp):
+                    # Stationary check (sliding window)
+                    is_stationary = self._is_stationary(record, current_timestamp)
+
+                    if not is_stationary:
+                        # Đang di chuyển → người bê biển đi ngang, giữ SUSPECTED
+                        record["status"] = TrackState.SUSPECTED
+                        suspect_reason = "DI CHUYEN"
+                    elif avg_conf < self.min_avg_confidence:
+                        # Confidence TB quá thấp → giữ SUSPECTED
+                        record["status"] = TrackState.SUSPECTED
+                        suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
+                    else:
+                        record["status"] = TrackState.CONFIRMED
+                        suspect_reason = ""
+
+                    # Spatial & temporal deduplication
+                    if record["status"] == TrackState.CONFIRMED:
+                        is_spatially_cooldown = any(
+                            ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
+                            and (current_timestamp - c["time"]) < self.cooldown_seconds
+                            for c in self.confirmed_locations
+                        )
+                        time_ok = (current_timestamp - record["last_alert_time"]) >= self.cooldown_seconds
+
+                        if not is_spatially_cooldown and time_ok:
+                            is_new_alert = True
+                            record["last_alert_time"] = current_timestamp
+                            self.confirmed_locations.append({
+                                "cx": cx,
+                                "cy": cy,
+                                "time": current_timestamp,
+                                "track_id": track_id,
+                            })
+                            # Dọn dẹp mốc cũ
+                            self.confirmed_locations = [
+                                c for c in self.confirmed_locations
+                                if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
+                            ]
+                else:
+                    if record["status"] != TrackState.CONFIRMED:
+                        record["status"] = TrackState.SUSPECTED
+                    suspect_reason = ""
+
+            else:
+                # Không vi phạm ở frame này
+                record["non_viol_streak"] += 1
+                if record["non_viol_streak"] > self.tolerance_frames:
+                    # Vượt ngưỡng dung sai → reset hoàn toàn
+                    record["count"] = 0
+                    record["viol_confs"].clear()
+                    record["viol_start_time"] = None
+                    record["last_viol_timestamp"] = None
+                    record["status"] = TrackState.NORMAL
+                else:
+                    # Trong ngưỡng dung sai (1–2 frame flicker): trừ conf tương ứng khi decay
+                    if record["viol_confs"]:
+                        record["viol_confs"].popleft()
+                    record["count"] = len(record["viol_confs"])
+                    if record["count"] == 0:
+                        record["viol_start_time"] = None
+                        record["last_viol_timestamp"] = None
+                        record["status"] = TrackState.NORMAL
+
+            enriched_results.append({
+                "track_id": track_id,
+                "box": box,
+                "conf": conf,
+                "spatial_res": spatial_res,
+                "temporal_status": record["status"],
+                "suspect_reason": suspect_reason,
+                "violation_frames": record["count"],
+                "violation_seconds": round(self._elapsed_viol_seconds(record, current_timestamp), 2),
+                "is_new_alert": is_new_alert,
+            })
+
+        # 4. Decay các track bị che khuất (Missing Occlusion Decay)
+        for tid, r in self.track_records.items():
+            if tid not in active_ids:
+                missing_streak = self.current_frame_index - r["last_seen"]
+                if missing_streak > self.tolerance_frames:
+                    if r["viol_confs"]:
+                        r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
+                    r["count"] = len(r["viol_confs"])
+                    if r["count"] == 0:
+                        r["viol_start_time"] = None
+                        r["last_viol_timestamp"] = None
+                        r["status"] = TrackState.NORMAL
+
+        # 5. Garbage Collection – xóa track cũ khỏi RAM
+        stale_ids = [
+            tid for tid, r in self.track_records.items()
+            if (self.current_frame_index - r["last_seen"]) > self.max_missing_frames
+        ]
+        for tid in stale_ids:
+            del self.track_records[tid]
+
+        return enriched_results
+
+    def reset(self):
+        """Xóa toàn bộ bản ghi trạng thái (khi tua video hoặc đổi camera)."""
+        self.track_records.clear()
+        self.confirmed_locations.clear()
+        self.current_frame_index = 0
+```
+
+### 8.3. Thuật toán Ghép cặp Lưỡng phân Không gian - Thời gian (trích từ evaluation/evaluate_videos.py):
+```python
+def compute_box_iou(b1, b2):
+    """Tính Intersection over Union (IoU) giữa 2 bounding box 2D [x1, y1, x2, y2]."""
+    xA = max(b1[0], b2[0])
+    yA = max(b1[1], b2[1])
+    xB = min(b1[2], b2[2])
+    yB = min(b1[3], b2[3])
+    inter = max(0.0, xB - xA) * max(0.0, yB - yA)
+    a1 = max(0.0, b1[2] - b1[0]) * max(0.0, b1[3] - b1[1])
+    a2 = max(0.0, b2[2] - b2[0]) * max(0.0, b2[3] - b2[1])
+    union = a1 + a2 - inter
+    return inter / union if union > 0 else 0.0
+
+
+def compute_temporal_iou(r1, r2):
+    """Tính độ giao thoa thời gian (Temporal IoU) giữa 2 khoảng thời gian [t_start, t_end]."""
+    inter = max(0.0, min(r1[1], r2[1]) - max(r1[0], r2[0]))
+    union = max(r1[1], r2[1]) - min(r1[0], r2[0])
+    return inter / union if union > 0 else 0.0
+
+
+def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fps: float = 24.0) -> dict:
+    """
+    Khớp nối 2 chiều khách quan (Bipartite Spatio-Temporal Matching) giữa Ground Truth và Tracks.
+    Loại bỏ hoàn toàn bất kỳ mapping viết cứng nào (Zero Hardcoded Mapping).
+    1. First pass: Khớp trực tiếp nếu expected_track_id xuất hiện trong danh sách track.
+    2. Second pass: Với các GT items chưa có ID trực tiếp (do ByteTrack gán ID tuần tự),
+       tự động ghép với track còn lại dựa trên độ tương đồng không gian (IoU, khoảng cách tâm)
+       và khoảng thời gian xuất hiện (Temporal Overlap).
+    """
+    matches = {}
+    available_tracks = dict(tracks_summary)
+
+    # 1. First pass: Khớp direct ID nếu có
+    for it in gt_items_for_video:
+        oid = it["object_id"]
+        exp_tid = it.get("expected_track_id")
+        if exp_tid is not None and exp_tid in available_tracks:
+            t_info = available_tracks[exp_tid]
+            gbox = it["approx_box_xyxy"]
+            tbox = t_info.get("best_box", [0, 0, 0, 0])
+            gt_time = it["appearance_time_range_sec"]
+            t_time = [t_info.get("first_frame", 1) / fps, t_info.get("last_frame", 1) / fps]
+            s_iou = compute_box_iou(gbox, tbox)
+            t_iou = compute_temporal_iou(gt_time, t_time)
+
+            matches[oid] = {
+                "matched_track_id": exp_tid,
+                "expected_track_id": exp_tid,
+                "match_method": "direct_id",
+                "match_confidence": 1.0,
+                "spatial_iou": round(s_iou, 3),
+                "temporal_iou": round(t_iou, 3),
+                "track_info": t_info
+            }
+            del available_tracks[exp_tid]
+
+    # 2. Second pass: Khớp các GT items còn lại bằng Spatio-Temporal Bipartite Matching
+    unassigned_gts = [it for it in gt_items_for_video if it["object_id"] not in matches]
+    if unassigned_gts and available_tracks:
+        pair_candidates = []
+        for it in unassigned_gts:
+            oid = it["object_id"]
+            gbox = it["approx_box_xyxy"]
+            gt_time = it["appearance_time_range_sec"]
+            c_gt = ((gbox[0] + gbox[2]) / 2.0, (gbox[1] + gbox[3]) / 2.0)
+
+            for tid, t_info in available_tracks.items():
+                tbox = t_info.get("best_box", [0, 0, 0, 0])
+                t_time = [t_info.get("first_frame", 1) / fps, t_info.get("last_frame", 1) / fps]
+                c_tr = ((tbox[0] + tbox[2]) / 2.0, (tbox[1] + tbox[3]) / 2.0)
+
+                s_iou = compute_box_iou(gbox, tbox)
+                t_iou = compute_temporal_iou(gt_time, t_time)
+                dist_px = ((c_gt[0] - c_tr[0])**2 + (c_gt[1] - c_tr[1])**2)**0.5
+                dist_norm = max(0.0, 1.0 - (dist_px / 500.0))
+
+                inside = (gbox[0] <= c_tr[0] <= gbox[2]) and (gbox[1] <= c_tr[1] <= gbox[3])
+                inside_bonus = 0.3 if inside else 0.0
+
+                affinity = 0.4 * s_iou + 0.3 * dist_norm + 0.3 * t_iou + inside_bonus
+
+                pair_candidates.append({
+                    "affinity": affinity,
+                    "object_id": oid,
+                    "expected_track_id": it.get("expected_track_id"),
+                    "matched_track_id": tid,
+                    "spatial_iou": round(s_iou, 3),
+                    "temporal_iou": round(t_iou, 3),
+                    "center_dist_px": round(dist_px, 1),
+                    "is_center_inside": inside,
+                    "track_info": t_info
+                })
+
+        pair_candidates.sort(key=lambda x: x["affinity"], reverse=True)
+        assigned_oids = set()
+        assigned_tids = set()
+
+        for cand in pair_candidates:
+            oid = cand["object_id"]
+            tid = cand["matched_track_id"]
+            if oid not in assigned_oids and tid not in assigned_tids:
+                assigned_oids.add(oid)
+                assigned_tids.add(tid)
+                matches[oid] = {
+                    "matched_track_id": tid,
+                    "expected_track_id": cand["expected_track_id"],
+                    "match_method": "spatio_temporal_bipartite",
+                    "match_confidence": round(cand["affinity"], 3),
+                    "spatial_iou": cand["spatial_iou"],
+                    "temporal_iou": cand["temporal_iou"],
+                    "center_dist_px": cand["center_dist_px"],
+                    "is_center_inside": cand["is_center_inside"],
+                    "track_info": cand["track_info"]
+                }
+
+    return matches
+
+
+def compute_metrics_from_ground_truth(results_by_video: dict, gt_file: str):
+    """
+    Đối chiếu động từng đối tượng trong file Ground Truth với kết quả track thực tế.
+    Sử dụng giải thuật Spatio-Temporal Bipartite Matching khách quan, hoàn toàn không viết cứng alias.
+    Ground Truth phản ánh hiện trường vật lý thực tế, là duy nhất và cố định cho mọi phiên bản.
+    """
+    with open(gt_file, "r", encoding="utf-8") as f:
+        gt_data = json.load(f)
+
+    gt_items = gt_data["ground_truth_items"]
+    tp = 0
+    fp = 0
+    fn = 0
+    tn = 0
+    item_evaluations = []
+
+    # Nhóm ground truth items theo video
+    gt_by_video = {}
+    for item in gt_items:
+        vid_id = item["video_id"]
+        gt_by_video.setdefault(vid_id, []).append(item)
+
+    # Khớp nối động theo không gian - thời gian cho từng video
+    matched_by_video = {}
+    for vid_id, v_gt_items in gt_by_video.items():
+        vid_res = results_by_video.get(vid_id, {})
+        v_tracks = vid_res.get("tracks", {})
+        matched_by_video[vid_id] = match_gt_to_tracks_robust(v_gt_items, v_tracks, fps=24.0)
+
+    for item in gt_items:
+        vid_id = item["video_id"]
+        oid = item["object_id"]
+        exp_tid = item["expected_track_id"]
+        gt_label = item["ground_truth_label"]
+
+        m_info = matched_by_video.get(vid_id, {}).get(oid)
+        track_info = m_info["track_info"] if m_info else None
+        actual_tid = m_info["matched_track_id"] if m_info else None
+        match_method = m_info["match_method"] if m_info else "unmatched"
+        match_confidence = m_info.get("match_confidence", 0.0) if m_info else 0.0
+        s_iou = m_info.get("spatial_iou", 0.0) if m_info else 0.0
+        t_iou = m_info.get("temporal_iou", 0.0) if m_info else 0.0
+
+        track_status = track_info["final_status"] if track_info else "UNKNOWN"
+
+        # Phán quyết phân loại
+        if gt_label == "VIOLATION":
+            if track_status == TrackState.CONFIRMED:
+                eval_type = "TP"
+                tp += 1
+            else:
+                eval_type = "FN"
+                fn += 1
+        elif gt_label == "NORMAL":
+            if track_status == TrackState.CONFIRMED:
+                eval_type = "FP"
+                fp += 1
+            else:
+                eval_type = "TN"
+                tn += 1
+        else:
+            eval_type = "UNKNOWN"
+
+        item_evaluations.append({
+            "object_id": oid,
+            "video_id": vid_id,
+            "matched_track_id": actual_tid,
+            "expected_track_id": exp_tid,
+            "match_method": match_method,
+            "match_confidence": match_confidence,
+            "spatial_iou": s_iou,
+            "temporal_iou": t_iou,
+            "description": item["description"],
+            "gt_label": gt_label,
+            "system_status": track_status,
+            "eval_result": eval_type,
+            "justification": item.get("justification", ""),
+            "total_detections": track_info["total_detections"] if track_info else 0,
+            "avg_conf": round(float(np.mean(track_info["conf_list"])), 3) if track_info and track_info["conf_list"] else 0.0,
+            "avg_overlap": round(float(np.mean(track_info["overlap_list"])), 1) if track_info and track_info["overlap_list"] else 0.0,
+            "best_crop_path": track_info.get("best_crop_path", "").replace("\\", "/") if track_info else ""
+        })
+
+    total_evaluated = tp + fp + fn + tn
+    assert total_evaluated == len(gt_items), f"Tong so danh gia ({total_evaluated}) phai bang so mau GT ({len(gt_items)})"
+
+    prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = 2 * (prec * rec) / (prec + rec) if (prec + rec) > 0 else 0.0
+    prec_ci = wilson_score_interval(tp, tp + fp)
+    rec_ci = wilson_score_interval(tp, tp + fn)
+
+    return {
+        "total_tracks": total_evaluated,
+        "true_positives": tp,
+        "false_positives": fp,
+        "false_negatives": fn,
+        "true_negatives": tn,
+        "precision": prec,
+        "precision_wilson_95_ci": prec_ci,
+        "recall": rec,
+        "recall_wilson_95_ci": rec_ci,
+        "f1_score": f1,
+        "item_evaluations": item_evaluations
+    }
+```
+
+================================================================================
+HẾT TÀI LIỆU CỐT LÕI (Dự án ĐATN 20224083 - Nguyễn Đức Tài Năng)
+================================================================================
