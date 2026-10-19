@@ -190,8 +190,8 @@ def test_images_batch(
         n_viol = sum(1 for d in details if d["is_violation"])
         total_violations += n_viol
 
-        print(f"\n📸 [ẢNH {idx}/{len(images)}] {img_name} ({w}x{h})")
-        print(f"   ⏱️  Thời gian suy luận: {t_infer_ms:.1f} ms | Số biển: {len(detections)} | Vi phạm vỉa hè: {n_viol}")
+        print(f"\n [ẢNH {idx}/{len(images)}] {img_name} ({w}x{h})")
+        print(f"   ️  Thời gian suy luận: {t_infer_ms:.1f} ms | Số biển: {len(detections)} | Vi phạm vỉa hè: {n_viol}")
         
         for d in details:
             print(f"      • Biển #{d['idx']}: Box={d['box']} | Chân={d['base_pt']} | Conf={d['conf']*100:.1f}% | Nhãn: {d['status_text']}")
@@ -200,7 +200,7 @@ def test_images_batch(
         clean_name = f"v8_result_{idx}_{img_name.replace(' ', '_')}"
         out_path = os.path.join(output_dir, clean_name)
         cv2.imwrite(out_path, vis)
-        print(f"   💾 Đã lưu kết quả tại: {out_path}")
+        print(f"    Đã lưu kết quả tại: {out_path}")
 
     # Báo cáo tổng kết
     avg_time = total_time_ms / len(images) if images else 0

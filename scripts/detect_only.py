@@ -37,7 +37,7 @@ def detect_image(model, img_path, conf_thresh, out_dir):
     boxes = res.boxes
 
     print("=" * 65)
-    print(f"📷 Ảnh: {os.path.basename(img_path)} ({w}x{h})")
+    print(f" Ảnh: {os.path.basename(img_path)} ({w}x{h})")
     print(f"-> Số biển quảng cáo phát hiện: {len(boxes)}")
     for idx, b in enumerate(boxes, 1):
         conf = float(b.conf[0])
@@ -50,7 +50,7 @@ def detect_image(model, img_path, conf_thresh, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"detected_{os.path.basename(img_path)}")
     cv2.imwrite(out_path, annotated)
-    print(f"✅ Đã lưu kết quả tại: {out_path}")
+    print(f" Đã lưu kết quả tại: {out_path}")
     print("=" * 65)
 
 
@@ -73,7 +73,7 @@ def detect_video(model, video_path, conf_thresh, out_dir, max_frames=None):
     writer = cv2.VideoWriter(out_path, fourcc, fps, (w, h))
 
     print("=" * 65)
-    print(f"🎬 Video: {os.path.basename(video_path)} ({w}x{h} @ {fps:.1f} FPS, Tổng {total_frames} frames)")
+    print(f" Video: {os.path.basename(video_path)} ({w}x{h} @ {fps:.1f} FPS, Tổng {total_frames} frames)")
     print(f"Đang nhận diện biển quảng cáo...")
 
     frame_count = 0
@@ -102,7 +102,7 @@ def detect_video(model, video_path, conf_thresh, out_dir, max_frames=None):
     cap.release()
     writer.release()
 
-    print(f"\n✅ Hoàn thành! Đã xuất video kết quả tại: {out_path}")
+    print(f"\n Hoàn thành! Đã xuất video kết quả tại: {out_path}")
     print(f"Tổng số lượt phát hiện qua {frame_count} frames: {total_detections}")
     print("=" * 65)
 

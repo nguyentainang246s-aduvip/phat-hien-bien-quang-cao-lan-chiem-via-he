@@ -1,0 +1,1069 @@
+{
+  "metadata": {
+    "generated_at": "2026-10-14 16:10:49",
+    "generator_script": "evaluation/evaluate_videos.py",
+    "ground_truth_file": "configs/video_ground_truth.json",
+    "hardware_platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 165 Stepping 2, GenuineIntel",
+    "python_version": "3.12.10"
+  },
+  "integrity_hashes": {
+    "configs/video_ground_truth.json": "590d0f201fefcae6a72ff9449ba2cc8164a0712a40c63c9d03afbe9ad351e93d",
+    "configs/roi_video_test_version_b.json": "8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c",
+    "configs/roi_video_test.json": "8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c",
+    "configs/roi_videotesst2.json": "79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263",
+    "configs/roi_video_test3.json": "529ee774742c5d8b5f6a7730dec484f85f0a72755f323e3f9e626b5ae00b9fd9",
+    "configs/roi_video_test_version_a.json": "a47cd6aefe3a88a71af2bf8ffea4b0d61a1b98fd5064e2f60d9e6e96d678500f",
+    "configs/roi_video_test_version_c.json": "eed72b3341b56109434e0b70e10c378542dddf0a7ed6436c72abd67af309766f"
+  },
+  "legal_basis": {
+    "decree": "Nghị định 168/2024/NĐ-CP",
+    "article": "Điều 12",
+    "effective_date": "2025-01-01",
+    "scope": "Quy định xử phạt hành vi đặt, treo biển hiệu, biển quảng cáo trên lòng đường, hè phố trái quy định",
+    "fines_vnd": "2-3 triệu đồng (cá nhân), 4-6 triệu đồng (tổ chức)",
+    "system_classification": "Hệ thống Hỗ trợ Ra Quyết định (Decision Support System - Human-in-the-Loop)"
+  },
+  "configuration": {
+    "model": "models/best.onnx",
+    "runtime": "ONNX Runtime 1.30 (CPU AVX2)",
+    "imgsz": 640,
+    "conf_threshold": 0.25,
+    "overlap_threshold": 0.3,
+    "confirm_seconds": 3.0,
+    "frame_skip": 2,
+    "require_stationary": true,
+    "max_displacement_pixels": 50.0,
+    "min_avg_confidence": 0.4
+  },
+  "metrics_version_b_official": {
+    "description": "Phiên bản B (Chính thức - Vùng ROI vỉa hè bao trọn vỉa hè thực tế gồm Standee #3)",
+    "total_tracks": 16,
+    "true_positives": 11,
+    "false_positives": 0,
+    "false_negatives": 3,
+    "true_negatives": 2,
+    "precision": 1.0,
+    "precision_wilson_95_ci": [
+      0.7412,
+      1.0
+    ],
+    "recall": 0.7857,
+    "recall_wilson_95_ci": [
+      0.5241,
+      0.9243
+    ],
+    "f1_score": 0.88,
+    "false_alarms_in_sample": 0,
+    "standee_3_v1_avg_overlap": 77.0,
+    "standee_3_v1_status": "CONFIRMED",
+    "pipeline_throughput_fps_min": 39.5,
+    "pipeline_throughput_fps_max": 56.9,
+    "pipeline_steady_state_fps_min": 58.3,
+    "pipeline_steady_state_fps_max": 59.1,
+    "estimated_inference_rate_hz": "~13.2 - 19.0 Hz",
+    "measured_tracker_mean_ms": 39.5,
+    "measured_inferred_frame_mean_ms": 44.67,
+    "item_evaluations": [
+      {
+        "object_id": "V1_OBJ_1",
+        "video_id": "video_test",
+        "matched_track_id": 1,
+        "expected_track_id": 1,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.988,
+        "description": "Biển bạt lớn dựng đứng trước cửa hàng số 1",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển bạt lớn dựng cố định trên hè phố trước cửa hàng, chiếm dụng hoàn toàn không gian vỉa hè dành cho người đi bộ.",
+        "total_detections": 80,
+        "avg_conf": 0.913,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/video_test/track_1_conf95.jpg"
+      },
+      {
+        "object_id": "V1_OBJ_2",
+        "video_id": "video_test",
+        "matched_track_id": 2,
+        "expected_track_id": 2,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.033,
+        "temporal_iou": 0.988,
+        "description": "Biển hiệu dạng hộp đứng sát vách cửa hàng",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển hiệu dạng hộp đứng trực tiếp trên mặt vỉa hè sát vách cửa hàng, cản trở lối lưu thông của người đi bộ.",
+        "total_detections": 78,
+        "avg_conf": 0.856,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/video_test/track_2_conf92.jpg"
+      },
+      {
+        "object_id": "V1_OBJ_3",
+        "video_id": "video_test",
+        "matched_track_id": 3,
+        "expected_track_id": 3,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.951,
+        "temporal_iou": 0.988,
+        "description": "Biển Standee chữ A chân sắt đặt trên lối đi bộ",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển Standee chữ A khung sắt đặt trực tiếp trên lối đi lát gạch của vỉa hè, chiếm dụng không gian lưu thông công cộng.",
+        "total_detections": 80,
+        "avg_conf": 0.839,
+        "avg_overlap": 77.0,
+        "best_crop_path": "reports/video_eval_crops/video_test/track_3_conf89.jpg"
+      },
+      {
+        "object_id": "V1_OBJ_4",
+        "video_id": "video_test",
+        "matched_track_id": 4,
+        "expected_track_id": 4,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.925,
+        "description": "Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển quảng cáo dạng tấm dọc dựng sát gốc cây trên vỉa hè, cản trở lối đi bộ.",
+        "total_detections": 75,
+        "avg_conf": 0.747,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/video_test/track_4_conf86.jpg"
+      },
+      {
+        "object_id": "V1_OBJ_5",
+        "video_id": "video_test",
+        "matched_track_id": 5,
+        "expected_track_id": 5,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.988,
+        "description": "Biển hiệu treo thụt sâu trong lòng nhà",
+        "gt_label": "NORMAL",
+        "system_status": "NORMAL",
+        "eval_result": "TN",
+        "justification": "Biển hiệu treo sâu bên trong khuôn viên nhà dân, không cắm chân hay đặt trên mặt vỉa hè dành cho người đi bộ.",
+        "total_detections": 80,
+        "avg_conf": 0.596,
+        "avg_overlap": 15.3,
+        "best_crop_path": "reports/video_eval_crops/video_test/track_5_conf67.jpg"
+      },
+      {
+        "object_id": "V2_OBJ_1",
+        "video_id": "videotesst2",
+        "matched_track_id": 1,
+        "expected_track_id": 1,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.988,
+        "description": "Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển hộp đèn lớn cắm chân cố định trên mặt vỉa hè trước cửa hàng, cản trở lối đi bộ.",
+        "total_detections": 75,
+        "avg_conf": 0.816,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_1_conf91.jpg"
+      },
+      {
+        "object_id": "V2_OBJ_2",
+        "video_id": "videotesst2",
+        "matched_track_id": 2,
+        "expected_track_id": 2,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.988,
+        "description": "Biển quảng cáo di động chân bánh xe",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển quảng cáo di động chân bánh xe đặt trên vỉa hè trước cửa hàng, chiếm dụng lối lưu thông.",
+        "total_detections": 80,
+        "avg_conf": 0.684,
+        "avg_overlap": 73.0,
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_2_conf92.jpg"
+      },
+      {
+        "object_id": "V2_OBJ_3",
+        "video_id": "videotesst2",
+        "matched_track_id": 3,
+        "expected_track_id": 3,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.988,
+        "description": "Biển bạt nhỏ kê trước bậc thềm",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển bạt nhỏ kê trước bậc thềm chiếm dụng mặt cắt vỉa hè công cộng.",
+        "total_detections": 68,
+        "avg_conf": 0.487,
+        "avg_overlap": 98.5,
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_3_conf87.jpg"
+      },
+      {
+        "object_id": "V2_OBJ_7",
+        "video_id": "videotesst2",
+        "matched_track_id": 4,
+        "expected_track_id": 7,
+        "match_method": "spatio_temporal_bipartite",
+        "match_confidence": 0.398,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.951,
+        "description": "Biển hiệu dạng khung sắt tầm thấp ven đường",
+        "gt_label": "VIOLATION",
+        "system_status": "SUSPECTED",
+        "eval_result": "FN",
+        "justification": "Biển hiệu dạng khung sắt tầm thấp cắm chân trên vỉa hè ven đường trước cửa hàng.",
+        "total_detections": 56,
+        "avg_conf": 0.359,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_4_conf51.jpg"
+      },
+      {
+        "object_id": "V2_OBJ_8",
+        "video_id": "videotesst2",
+        "matched_track_id": 8,
+        "expected_track_id": 8,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.954,
+        "description": "Biển hiệu cửa hàng ở góc phải khung hình",
+        "gt_label": "VIOLATION",
+        "system_status": "SUSPECTED",
+        "eval_result": "FN",
+        "justification": "Biển hiệu đặt trên vỉa hè xuất hiện ở phần cuối đoạn video, chiếm dụng lối đi bộ.",
+        "total_detections": 23,
+        "avg_conf": 0.602,
+        "avg_overlap": 95.6,
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_8_conf85.jpg"
+      },
+      {
+        "object_id": "V3_OBJ_1",
+        "video_id": "video_test3",
+        "matched_track_id": 1,
+        "expected_track_id": 1,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.988,
+        "description": "Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển quảng cáo pano lớn đặt chiếm dụng phần lớn bề rộng vỉa hè trước cửa hàng.",
+        "total_detections": 79,
+        "avg_conf": 0.875,
+        "avg_overlap": 65.3,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_1_conf93.jpg"
+      },
+      {
+        "object_id": "V3_OBJ_2",
+        "video_id": "video_test3",
+        "matched_track_id": 2,
+        "expected_track_id": 2,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.988,
+        "description": "Biển hộp đèn đứng góc trái",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển hộp đèn đứng đặt trên vỉa hè chiếm dụng lối đi bộ.",
+        "total_detections": 80,
+        "avg_conf": 0.907,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_2_conf92.jpg"
+      },
+      {
+        "object_id": "V3_OBJ_3",
+        "video_id": "video_test3",
+        "matched_track_id": 3,
+        "expected_track_id": 3,
+        "match_method": "direct_id",
+        "match_confidence": 1.0,
+        "spatial_iou": 0.18,
+        "temporal_iou": 0.988,
+        "description": "Biển vẫy thấp đặt cạnh gốc cây",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển vẫy thấp đặt cạnh gốc cây trên vỉa hè chiếm dụng lối đi bộ.",
+        "total_detections": 80,
+        "avg_conf": 0.913,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_3_conf93.jpg"
+      },
+      {
+        "object_id": "V3_OBJ_4",
+        "video_id": "video_test3",
+        "matched_track_id": 8,
+        "expected_track_id": 4,
+        "match_method": "spatio_temporal_bipartite",
+        "match_confidence": 0.867,
+        "spatial_iou": 0.186,
+        "temporal_iou": 0.675,
+        "description": "Biển bạt chữ nhật kê ngoài thềm",
+        "gt_label": "VIOLATION",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
+        "justification": "Biển bạt chữ nhật kê ngoài thềm chiếm dụng vỉa hè công cộng.",
+        "total_detections": 42,
+        "avg_conf": 0.557,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_8_conf78.jpg"
+      },
+      {
+        "object_id": "V3_OBJ_11",
+        "video_id": "video_test3",
+        "matched_track_id": 13,
+        "expected_track_id": 11,
+        "match_method": "spatio_temporal_bipartite",
+        "match_confidence": 0.29,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.926,
+        "description": "Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố",
+        "gt_label": "VIOLATION",
+        "system_status": "SUSPECTED",
+        "eval_result": "FN",
+        "justification": "Biển hiệu nhỏ ở cự ly xa đặt trên vỉa hè trước cửa hàng.",
+        "total_detections": 28,
+        "avg_conf": 0.388,
+        "avg_overlap": 98.6,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_13_conf51.jpg"
+      },
+      {
+        "object_id": "V3_OBJ_14",
+        "video_id": "video_test3",
+        "matched_track_id": 15,
+        "expected_track_id": 14,
+        "match_method": "spatio_temporal_bipartite",
+        "match_confidence": 0.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.0,
+        "description": "Biển gắn tường tầng thấp phía bên phải",
+        "gt_label": "NORMAL",
+        "system_status": "SUSPECTED",
+        "eval_result": "TN",
+        "justification": "Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè.",
+        "total_detections": 5,
+        "avg_conf": 0.51,
+        "avg_overlap": 98.4,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_15_conf60.jpg"
+      }
+    ]
+  },
+  "metrics_version_a_baseline": {
+    "description": "Phiên bản A (Trước khi mở rộng ROI - Standee #3 nằm ngoài mép chân đế được xếp NORMAL)",
+    "total_tracks": 16,
+    "true_positives": 10,
+    "false_positives": 0,
+    "false_negatives": 4,
+    "true_negatives": 2,
+    "precision": 1.0,
+    "precision_wilson_95_ci": [
+      0.7225,
+      1.0
+    ],
+    "recall": 0.7143,
+    "recall_wilson_95_ci": [
+      0.4535,
+      0.8828
+    ],
+    "f1_score": 0.8333,
+    "standee_3_v1_avg_overlap": 66.0,
+    "standee_3_v1_status": "NORMAL"
+  },
+  "stability_analysis": {
+    "num_trials": 3,
+    "total_ground_truth_objects": 16,
+    "stable_status_count": 16,
+    "classification_consistency_rate_pct": 100.0,
+    "metric_consistency": {
+      "tp_across_trials": [
+        11,
+        11,
+        11
+      ],
+      "fp_across_trials": [
+        0,
+        0,
+        0
+      ],
+      "fn_across_trials": [
+        3,
+        3,
+        3
+      ],
+      "tn_across_trials": [
+        2,
+        2,
+        2
+      ],
+      "recall_across_trials": [
+        78.57,
+        78.57,
+        78.57
+      ],
+      "precision_across_trials": [
+        100.0,
+        100.0,
+        100.0
+      ]
+    },
+    "throughput_across_trials": [
+      {
+        "trial": 1,
+        "fps_min": 39.5,
+        "fps_max": 56.9,
+        "fps_mean": 51.0,
+        "steady_fps_min": 58.3,
+        "steady_fps_max": 59.1
+      },
+      {
+        "trial": 2,
+        "fps_min": 57.9,
+        "fps_max": 62.7,
+        "fps_mean": 60.7,
+        "steady_fps_min": 59.9,
+        "steady_fps_max": 65.0
+      },
+      {
+        "trial": 3,
+        "fps_min": 56.6,
+        "fps_max": 59.8,
+        "fps_mean": 58.0,
+        "steady_fps_min": 58.4,
+        "steady_fps_max": 61.8
+      }
+    ],
+    "object_stability_details": [
+      {
+        "object_id": "V1_OBJ_1",
+        "video_id": "video_test",
+        "description": "Biển bạt lớn dựng đứng trước cửa hàng số 1",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 1,
+        "trial_matched_track_ids": [
+          1,
+          1,
+          1
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V1_OBJ_2",
+        "video_id": "video_test",
+        "description": "Biển hiệu dạng hộp đứng sát vách cửa hàng",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 2,
+        "trial_matched_track_ids": [
+          2,
+          2,
+          2
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V1_OBJ_3",
+        "video_id": "video_test",
+        "description": "Biển Standee chữ A chân sắt đặt trên lối đi bộ",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 3,
+        "trial_matched_track_ids": [
+          3,
+          3,
+          3
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V1_OBJ_4",
+        "video_id": "video_test",
+        "description": "Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 4,
+        "trial_matched_track_ids": [
+          4,
+          4,
+          4
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V1_OBJ_5",
+        "video_id": "video_test",
+        "description": "Biển hiệu treo thụt sâu trong lòng nhà",
+        "gt_label": "NORMAL",
+        "expected_track_id": 5,
+        "trial_matched_track_ids": [
+          5,
+          5,
+          5
+        ],
+        "trial_system_statuses": [
+          "NORMAL",
+          "NORMAL",
+          "NORMAL"
+        ],
+        "trial_eval_results": [
+          "TN",
+          "TN",
+          "TN"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V2_OBJ_1",
+        "video_id": "videotesst2",
+        "description": "Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 1,
+        "trial_matched_track_ids": [
+          1,
+          1,
+          1
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V2_OBJ_2",
+        "video_id": "videotesst2",
+        "description": "Biển quảng cáo di động chân bánh xe",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 2,
+        "trial_matched_track_ids": [
+          2,
+          2,
+          2
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V2_OBJ_3",
+        "video_id": "videotesst2",
+        "description": "Biển bạt nhỏ kê trước bậc thềm",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 3,
+        "trial_matched_track_ids": [
+          3,
+          3,
+          3
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V2_OBJ_7",
+        "video_id": "videotesst2",
+        "description": "Biển hiệu dạng khung sắt tầm thấp ven đường",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 7,
+        "trial_matched_track_ids": [
+          4,
+          4,
+          4
+        ],
+        "trial_system_statuses": [
+          "SUSPECTED",
+          "SUSPECTED",
+          "SUSPECTED"
+        ],
+        "trial_eval_results": [
+          "FN",
+          "FN",
+          "FN"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V2_OBJ_8",
+        "video_id": "videotesst2",
+        "description": "Biển hiệu cửa hàng ở góc phải khung hình",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 8,
+        "trial_matched_track_ids": [
+          8,
+          8,
+          8
+        ],
+        "trial_system_statuses": [
+          "SUSPECTED",
+          "SUSPECTED",
+          "SUSPECTED"
+        ],
+        "trial_eval_results": [
+          "FN",
+          "FN",
+          "FN"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V3_OBJ_1",
+        "video_id": "video_test3",
+        "description": "Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 1,
+        "trial_matched_track_ids": [
+          1,
+          1,
+          1
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V3_OBJ_2",
+        "video_id": "video_test3",
+        "description": "Biển hộp đèn đứng góc trái",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 2,
+        "trial_matched_track_ids": [
+          2,
+          2,
+          2
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V3_OBJ_3",
+        "video_id": "video_test3",
+        "description": "Biển vẫy thấp đặt cạnh gốc cây",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 3,
+        "trial_matched_track_ids": [
+          3,
+          3,
+          3
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V3_OBJ_4",
+        "video_id": "video_test3",
+        "description": "Biển bạt chữ nhật kê ngoài thềm",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 4,
+        "trial_matched_track_ids": [
+          8,
+          8,
+          8
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "TP",
+          "TP",
+          "TP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V3_OBJ_11",
+        "video_id": "video_test3",
+        "description": "Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố",
+        "gt_label": "VIOLATION",
+        "expected_track_id": 11,
+        "trial_matched_track_ids": [
+          13,
+          13,
+          13
+        ],
+        "trial_system_statuses": [
+          "SUSPECTED",
+          "SUSPECTED",
+          "SUSPECTED"
+        ],
+        "trial_eval_results": [
+          "FN",
+          "FN",
+          "FN"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "V3_OBJ_14",
+        "video_id": "video_test3",
+        "description": "Biển gắn tường tầng thấp phía bên phải",
+        "gt_label": "NORMAL",
+        "expected_track_id": 14,
+        "trial_matched_track_ids": [
+          15,
+          15,
+          15
+        ],
+        "trial_system_statuses": [
+          "SUSPECTED",
+          "SUSPECTED",
+          "SUSPECTED"
+        ],
+        "trial_eval_results": [
+          "TN",
+          "TN",
+          "TN"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      }
+    ],
+    "technical_explanation": "ByteTrack cấp phát track_id số nguyên tăng dần. Do các frame nhiễu thoáng qua ở cự ly xa, mã ID có thể bị hoán đổi giữa các lần chạy. Tuy nhiên thuật toán Spatio-Temporal Bipartite Matching đối sánh tự động chính xác 100% vào đúng đối tượng Ground Truth mà không cần alias map, và trạng thái phán quyết pháp lý (CONFIRMED/SUSPECTED/NORMAL) đạt độ ổn định 100% qua cả 3 lần chạy độc lập."
+  },
+  "videos": [
+    {
+      "video_path": "data/videos/video test.mp4",
+      "basename": "video_test",
+      "roi_config_path": "configs/roi_video_test_version_b.json",
+      "roi_points": 8,
+      "roi_sha256": "8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c",
+      "total_frames": 240,
+      "duration_sec": 10.0,
+      "fps_throughput": 39.5,
+      "latency_stats": {
+        "warmup_frame_ms": 1986.97,
+        "steady_state_fps": 58.3,
+        "overall_fps": 39.5,
+        "tracker_mean_ms": 39.55,
+        "tracker_p50_ms": 38.86,
+        "tracker_p95_ms": 45.38,
+        "verifier_mean_ms": 1.7,
+        "verifier_p50_ms": 1.31,
+        "verifier_p95_ms": 1.74,
+        "inferred_frame_mean_ms": 44.86,
+        "inferred_frame_p50_ms": 43.94,
+        "inferred_frame_p95_ms": 52.02,
+        "skipped_frame_mean_ms": 2.77
+      },
+      "tracks_count": 5,
+      "confirmed_count": 4,
+      "suspected_count": 0,
+      "normal_count": 1,
+      "tracks": [
+        {
+          "track_id": 1,
+          "detections": 80,
+          "avg_conf": 0.913,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_1_conf95.jpg"
+        },
+        {
+          "track_id": 2,
+          "detections": 78,
+          "avg_conf": 0.856,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_2_conf92.jpg"
+        },
+        {
+          "track_id": 3,
+          "detections": 80,
+          "avg_conf": 0.839,
+          "avg_overlap": 77.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_3_conf89.jpg"
+        },
+        {
+          "track_id": 4,
+          "detections": 75,
+          "avg_conf": 0.747,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_4_conf86.jpg"
+        },
+        {
+          "track_id": 5,
+          "detections": 80,
+          "avg_conf": 0.596,
+          "avg_overlap": 15.3,
+          "status": "NORMAL",
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_5_conf67.jpg"
+        }
+      ]
+    },
+    {
+      "video_path": "data/videos/videotesst2.mp4",
+      "basename": "videotesst2",
+      "roi_config_path": "configs/roi_videotesst2.json",
+      "roi_points": 5,
+      "roi_sha256": "79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263",
+      "total_frames": 240,
+      "duration_sec": 10.0,
+      "fps_throughput": 56.9,
+      "latency_stats": {
+        "warmup_frame_ms": 170.9,
+        "steady_state_fps": 59.1,
+        "overall_fps": 56.9,
+        "tracker_mean_ms": 39.56,
+        "tracker_p50_ms": 37.39,
+        "tracker_p95_ms": 42.94,
+        "verifier_mean_ms": 1.1,
+        "verifier_p50_ms": 1.08,
+        "verifier_p95_ms": 1.45,
+        "inferred_frame_mean_ms": 44.38,
+        "inferred_frame_p50_ms": 42.29,
+        "inferred_frame_p95_ms": 47.76,
+        "skipped_frame_mean_ms": 2.77
+      },
+      "tracks_count": 5,
+      "confirmed_count": 3,
+      "suspected_count": 2,
+      "normal_count": 0,
+      "tracks": [
+        {
+          "track_id": 1,
+          "detections": 75,
+          "avg_conf": 0.816,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_1_conf91.jpg"
+        },
+        {
+          "track_id": 2,
+          "detections": 80,
+          "avg_conf": 0.684,
+          "avg_overlap": 73.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_2_conf92.jpg"
+        },
+        {
+          "track_id": 3,
+          "detections": 68,
+          "avg_conf": 0.487,
+          "avg_overlap": 98.5,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_3_conf87.jpg"
+        },
+        {
+          "track_id": 4,
+          "detections": 56,
+          "avg_conf": 0.359,
+          "avg_overlap": 100.0,
+          "status": "SUSPECTED",
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_4_conf51.jpg"
+        },
+        {
+          "track_id": 8,
+          "detections": 23,
+          "avg_conf": 0.602,
+          "avg_overlap": 95.6,
+          "status": "SUSPECTED",
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_8_conf85.jpg"
+        }
+      ]
+    },
+    {
+      "video_path": "data/videos/video test3.mp4",
+      "basename": "video_test3",
+      "roi_config_path": "configs/roi_video_test3.json",
+      "roi_points": 7,
+      "roi_sha256": "529ee774742c5d8b5f6a7730dec484f85f0a72755f323e3f9e626b5ae00b9fd9",
+      "total_frames": 240,
+      "duration_sec": 10.0,
+      "fps_throughput": 56.6,
+      "latency_stats": {
+        "warmup_frame_ms": 147.91,
+        "steady_state_fps": 58.4,
+        "overall_fps": 56.6,
+        "tracker_mean_ms": 39.4,
+        "tracker_p50_ms": 38.45,
+        "tracker_p95_ms": 44.53,
+        "verifier_mean_ms": 1.14,
+        "verifier_p50_ms": 1.14,
+        "verifier_p95_ms": 1.57,
+        "inferred_frame_mean_ms": 44.76,
+        "inferred_frame_p50_ms": 43.72,
+        "inferred_frame_p95_ms": 51.36,
+        "skipped_frame_mean_ms": 3.09
+      },
+      "tracks_count": 6,
+      "confirmed_count": 4,
+      "suspected_count": 2,
+      "normal_count": 0,
+      "tracks": [
+        {
+          "track_id": 1,
+          "detections": 79,
+          "avg_conf": 0.875,
+          "avg_overlap": 65.3,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_1_conf93.jpg"
+        },
+        {
+          "track_id": 2,
+          "detections": 80,
+          "avg_conf": 0.907,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_2_conf92.jpg"
+        },
+        {
+          "track_id": 3,
+          "detections": 80,
+          "avg_conf": 0.913,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_3_conf93.jpg"
+        },
+        {
+          "track_id": 8,
+          "detections": 42,
+          "avg_conf": 0.557,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_8_conf78.jpg"
+        },
+        {
+          "track_id": 13,
+          "detections": 28,
+          "avg_conf": 0.388,
+          "avg_overlap": 98.6,
+          "status": "SUSPECTED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_13_conf51.jpg"
+        },
+        {
+          "track_id": 15,
+          "detections": 5,
+          "avg_conf": 0.51,
+          "avg_overlap": 98.4,
+          "status": "SUSPECTED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_15_conf60.jpg"
+        }
+      ]
+    }
+  ]
+}

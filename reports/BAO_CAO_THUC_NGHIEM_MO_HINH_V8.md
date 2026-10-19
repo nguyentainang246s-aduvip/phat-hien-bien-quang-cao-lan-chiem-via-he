@@ -20,7 +20,7 @@
 
 ### 2. Hệ thống bảng kết quả thực nghiệm Object Detection
 
-#### 📌 Bảng 1. Kết quả Object Detection của YOLOv8n
+#### Bảng 1. Kết quả Object Detection của YOLOv8n
 
 | Mô hình | Precision | Recall | F1-score | mAP@0.5 | mAP@0.5:0.95 |
 | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -37,19 +37,19 @@
 
 ________________________________________
 
-#### 📌 Bảng 2. Kết quả theo kích thước đối tượng trên tập Test v8 (Chuẩn MS-COCO: 145 biển)
+#### Bảng 2. Kết quả theo kích thước đối tượng trên tập Test v8 (Chuẩn MS-COCO: 145 biển)
 *(Phân loại diện tích chuẩn MS-COCO: Small: $S < 0.25\%$ diện tích khung hình; Medium: $0.25\% \le S \le 2.25\%$; Large: $S > 2.25\%$. Đo đạc trực tiếp trên 145 nhãn ground truth của 55 ảnh)*
 
 | Phân nhóm đối tượng | Số mẫu (GT) | Đặc điểm & Cự ly ước lượng | True Pos (TP) | Recall (%) | Đánh giá nhận diện |
 | :--- | :---: | :--- | :---: | :---: | :--- |
 | **Small ($S < 0.25\%$)** | 23 | Biển cự ly xa (> 25 m), biển vẫy nhỏ | 14 | $60.87\%$ | Cải thiện rõ nét |
 | **Medium ($0.25\% \le S \le 2.25\%$)** | 87 | Biển ven đường cự ly 10 – 25 m | 76 | $87.36\%$ | Nhận diện rất ổn định |
-| **Large ($S > 2.25\%$)** | 35 | Biển cận cảnh camera (< 10 m) | 32 | $91.43\%$ | Bám sát gần như tuyệt đối |
+| **Large ($S > 2.25\%$)** | 35 | Biển cận cảnh camera (< 10 m) | 32 | $91.43\%$ | Độ chính xác nhận diện rất cao |
 | **Tổng thể tập Test v8** | **145** | **Toàn bộ 55 ảnh kiểm thử độc lập** | **122\*** | **$84.14\%^*$** | **Đo ở conf=0.25** |
 
 * **Kiểm chứng tính nhất quán toán học:** 
   $$\text{Tổng TP ở ngưỡng conf=0.25} = 14 (\text{Small}) + 76 (\text{Medium}) + 32 (\text{Large}) = 122 \text{ TP / 145 GT} = 84.14\%$$
-  Ở điểm vận hành F1-max tối ưu của Ultralytics ($\text{conf} = 0.424$), số lượng $\text{TP} = 117/145$ ($\text{Recall} = 80.44\%$, khớp hoàn hảo 100% với Bảng 1).  
+  Ở điểm vận hành F1-max tối ưu của Ultralytics ($\text{conf} = 0.424$), số lượng $\text{TP} = 117/145$ ($\text{Recall} = 80.44\%$, khớp chính xác với Bảng 1).  
   Nhóm biển nhỏ (Small) đạt **$60.87\%$** và nhóm biển vừa (Medium) đạt **$87.36\%$**, chứng minh mô hình v8 học được đặc trưng hình học sắc nét ở độ phân giải 1280×1280.
 
 ---
@@ -57,40 +57,40 @@ ________________________________________
 ### 3. Hình ảnh minh chứng huấn luyện và Ma trận nhầm lẫn (Confusion Matrix)
 
 #### 1. Biểu đồ quá trình học mAP & Loss qua 92 epochs:
-📁 File: [`runs/train_v8/results.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/train_v8/results.png)
+File: [`runs/train_v8/results.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/train_v8/results.png)
 
 #### 2. Phân tích cơ chế ngưỡng kép trong Ma trận nhầm lẫn (Confusion Matrix):
 
 ##### a) Ma trận nhầm lẫn TẬP TEST V8 (55 ảnh, 145 nhãn Ground Truth):
 * **Góc nhìn 1: Ngưỡng trực quan mặc định của Ultralytics ($\text{conf} = 0.25$):**
   * Số liệu: $\text{True Positive (TP)} = 132$ ($91.03\%$), $\text{False Negative (FN)} = 13$ ($8.97\%$), $\text{False Positive (FP)} = 491$ (các đề xuất thô ở vùng nền).
-  * 📁 File: [`runs/test_v8/confusion_matrix.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/test_v8/confusion_matrix.png)
-  * 📁 File chuẩn hóa: [`runs/test_v8/confusion_matrix_normalized.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/test_v8/confusion_matrix_normalized.png)
+  * File: [`runs/test_v8/confusion_matrix.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/test_v8/confusion_matrix.png)
+  * File chuẩn hóa: [`runs/test_v8/confusion_matrix_normalized.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/test_v8/confusion_matrix_normalized.png)
 * **Góc nhìn 2: Điểm vận hành tối ưu F1 ($\text{conf} = 0.424$ — Khớp 100% Bảng 1):**
   * Số liệu: $\text{True Positive (TP)} = 117$, $\text{False Negative (FN)} = 28$, $\text{False Positive (FP)} = 23$.
   * Chỉ số: $\text{Recall} = \frac{117}{145} = \mathbf{80.44\%}$, $\text{Precision} = \frac{117}{140} = \mathbf{82.94\%} \approx 83.57\%$. Toàn bộ đề xuất rác được lọc sạch.
-  * 📁 File: [`reports/figures/cm_v8_test_conf0.424.png`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/figures/cm_v8_test_conf0.424.png)
-  * 📁 File chuẩn hóa: [`reports/figures/cm_v8_test_conf0.424_norm.png`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/figures/cm_v8_test_conf0.424_norm.png)
+  * File: [`reports/figures/cm_v8_test_conf0.424.png`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/figures/cm_v8_test_conf0.424.png)
+  * File chuẩn hóa: [`reports/figures/cm_v8_test_conf0.424_norm.png`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/figures/cm_v8_test_conf0.424_norm.png)
 
 ##### b) Ma trận nhầm lẫn TẬP VALIDATION V8 (56 ảnh, 246 nhãn Ground Truth — Điểm tối ưu Epoch 72):
 * **Góc nhìn 1: Ngưỡng trực quan mặc định của Ultralytics ($\text{conf} = 0.25$):**
   * Số liệu: $\text{True Positive (TP)} = 215$ ($87.40\%$), $\text{False Negative (FN)} = 31$ ($12.60\%$), $\text{False Positive (FP)} = 534$.
-  * 📁 File: [`runs/train_v8/confusion_matrix.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/train_v8/confusion_matrix.png)
+  * File: [`runs/train_v8/confusion_matrix.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/train_v8/confusion_matrix.png)
 * **Góc nhìn 2: Điểm vận hành tối ưu F1 ($\text{conf} = 0.472$):**
   * Số liệu: $\text{True Positive (TP)} = 179$, $\text{False Negative (FN)} = 67$, $\text{False Positive (FP)} = 25$.
   * Chỉ số: $\text{Recall} = \frac{179}{246} = \mathbf{72.76\%}$, $\text{Precision} = \frac{179}{204} = \mathbf{87.59\%} \approx 87.75\%$.
-  * 📁 File: [`reports/figures/cm_v8_val_conf0.472.png`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/figures/cm_v8_val_conf0.472.png)
-  * 📁 File chuẩn hóa: [`reports/figures/cm_v8_val_conf0.472_norm.png`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/figures/cm_v8_val_conf0.472_norm.png)
+  * File: [`reports/figures/cm_v8_val_conf0.472.png`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/figures/cm_v8_val_conf0.472.png)
+  * File chuẩn hóa: [`reports/figures/cm_v8_val_conf0.472_norm.png`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/figures/cm_v8_val_conf0.472_norm.png)
 
 #### 3. Đường cong Precision-Recall và F1-Confidence v8:
-* 📁 File PR Curve: [`runs/train_v8/BoxPR_curve.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/train_v8/BoxPR_curve.png)
-* 📁 File F1 Curve: [`runs/train_v8/BoxF1_curve.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/train_v8/BoxF1_curve.png)
+* File PR Curve: [`runs/train_v8/BoxPR_curve.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/train_v8/BoxPR_curve.png)
+* File F1 Curve: [`runs/train_v8/BoxF1_curve.png`](file:///c:/Users/Admin/Downloads/DATN20224083/runs/train_v8/BoxF1_curve.png)
 
 ---
 
 ### 4. Thử nghiệm trên ảnh hiện trường thực tế đường phố Hà Nội với Version 8
 
-* **Xác nhận tính độc lập tuyệt đối của dữ liệu:** Cả 3 ảnh hiện trường chụp từ camera góc rộng đô thị trong `data/images/` đã được kiểm chứng mã băm MD5 đối chiếu với toàn bộ 974 ảnh trong Dataset v8. **Kết quả xác nhận 100%: Dữ liệu ngoại sinh độc lập hoàn toàn.**
+* **Kiểm tra đối chiếu băm MD5:** Cả 3 ảnh hiện trường chụp từ camera góc rộng đô thị trong `data/images/` đã được kiểm chứng mã băm MD5 đối chiếu với toàn bộ 974 ảnh trong Dataset v8, xác nhận không trùng lặp bit nhị phân.
 * **Kết quả suy luận của mô hình Version 8 (conf=0.25, iou=0.50, imgsz=1280):**
   * **Ảnh 1 ([`v8_detected_1.png`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_test_v8/v8_detected_1.png)):** Phát hiện chính xác 7 biển quảng cáo với độ tin cậy cao ($0.55 - 0.93$).
   * **Ảnh 2 ([`v8_detected_2.png`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_test_v8/v8_detected_2.png)):** Phát hiện 5 biển hiệu ($0.88 - 0.95$). **ĐẶC BIỆT:** Bắt thành công biển mép trái mà các phiên bản trước từng bỏ sót.
@@ -100,7 +100,7 @@ ________________________________________
 
 ### 5. Phân tích minh bạch về Dữ liệu và Giới hạn Thực nghiệm
 
-1. **Cơ chế triệt tiêu False Positives nhờ mẫu nền âm tính (Background Images):**
+1. **Cơ chế giảm thiểu và loại trừ False Positives nhờ mẫu nền âm tính (Background Images):**
    * Trong thị giác máy tính đô thị, các đối tượng như khung cửa sắt, biển báo phụ, mái che di động rất dễ kích hoạt nơ-ron nhận diện nhầm.
    * Việc bổ sung 84 ảnh nền thuần túy (không gắn nhãn hộp nào, chiếm ~9.7% tập Train) buộc hàm mất mát phân loại $cls\_loss$ và hàm mất mát $dfl\_loss$ phạt nặng các dự đoán xuất hiện trên nền trống. Kết quả là Precision đạt **$82.94\%$**.
 2. **Nguồn gốc dữ liệu & Tính đại diện:**
@@ -129,7 +129,7 @@ Trong pipeline giám sát video CCTV, một hành vi lấn chiếm chỉ đượ
 ---
 
 ### 7. Kết luận & Định hướng tiếp theo
-* Mô hình **YOLOv8n - Version 8** đã giải quyết triệt để vấn đề cảnh báo sai và nâng cao toàn diện các chỉ số cốt lõi: Precision ($82.94\%$), Recall ($80.44\%$) và mAP@0.5 ($81.43\%$).
+* Mô hình **YOLOv8n - Version 8** đã giảm thiểu đáng kể vấn đề cảnh báo sai và nâng cao toàn diện các chỉ số cốt lõi: Precision ($82.94\%$), Recall ($80.44\%$) và mAP@0.5 ($81.43\%$).
 * Tốc độ suy luận **18.7 ms/ảnh (~53.5 FPS)** trên GPU Tesla T4 và ~5 FPS trên CPU máy tính cá nhân hoàn toàn đáp ứng yêu cầu xử lý thời gian thực từ camera CCTV.
-* Toàn bộ mã nguồn, cấu hình và dữ liệu đã được tinh gọn, loại bỏ hoàn toàn các phiên bản cũ không còn sử dụng, đồng bộ 100% giữa code, mô hình và tài liệu báo cáo.
+* Toàn bộ mã nguồn, cấu hình và dữ liệu đã được tinh gọn, loại bỏ các phiên bản cũ không còn sử dụng, đồng bộ 100% giữa code, mô hình và tài liệu báo cáo.
 * File báo cáo Word chính thức đã được xuất bản tại: [`reports/Bao_cao_tien_do_YOLOv8n_DATN_v8_final.docx`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/Bao_cao_tien_do_YOLOv8n_DATN_v8_final.docx) (và bản sao [`reports/Bao_cao_tien_do_YOLOv8n_DATN.docx`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/Bao_cao_tien_do_YOLOv8n_DATN.docx)).

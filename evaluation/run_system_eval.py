@@ -48,7 +48,7 @@ def run_system_evaluation(
     all_pred = []
 
     print("=" * 70)
-    print("🔬 ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG (SYSTEM-LEVEL EVALUATION)")
+    print(" ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG (SYSTEM-LEVEL EVALUATION)")
     print("=" * 70)
 
     for entry in gt_data:
@@ -100,7 +100,7 @@ def run_system_evaluation(
     results = evaluator.evaluate(all_gt, all_pred)
 
     print("\n" + "=" * 70)
-    print("📊 KẾT QUẢ ĐÁNH GIÁ SYSTEM-LEVEL")
+    print(" KẾT QUẢ ĐÁNH GIÁ SYSTEM-LEVEL")
     print("=" * 70)
     print(f"  • True Positives (TP)  : {results['TP']}")
     print(f"  • False Positives (FP) : {results['FP']}")

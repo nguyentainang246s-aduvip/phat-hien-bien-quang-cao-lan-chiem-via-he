@@ -283,12 +283,12 @@ def run_batch_roi_drawer(img_dir: str = "data/images"):
     for idx, img_name in enumerate(images, start=1):
         img_path = os.path.join(img_dir, img_name)
         cfg_path = get_default_config_for_source(img_path)
-        print(f"\n👉 [ẢNH {idx}/{len(images)}]: {img_name}")
+        print(f"\n [ẢNH {idx}/{len(images)}]: {img_name}")
         print(f"   Lưu file cấu hình tại: {cfg_path}")
         run_roi_tool(img_path, cfg_path)
 
     print("\n" + "=" * 70)
-    print("✅ ĐÃ HOÀN TẤT VẼ ROI CHO TẤT CẢ CÁC ẢNH!")
+    print(" ĐÃ HOÀN TẤT VẼ ROI CHO TẤT CẢ CÁC ẢNH!")
     print("Bây giờ bạn có thể chạy: python test_on_image.py --gui để xem kết quả kiểm tra vi phạm!")
     print("=" * 70)
 

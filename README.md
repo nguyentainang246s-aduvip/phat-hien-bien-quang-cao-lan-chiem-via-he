@@ -26,7 +26,7 @@ flowchart LR
 - **Tầng Hình học (Spatial Decision):** Sử dụng thư viện hình học giải tích Shapely để tính toán tỷ lệ giao cắt:
   $$\text{Overlap Ratio} = \frac{\text{Area}(\text{Bounding Box} \cap \text{ROI})}{\text{Area}(\text{Bounding Box})}$$
   Kết hợp với điều kiện điểm tiếp xúc mặt đất (Ground Contact Point - đáy tâm bounding box) nằm trọn trong vùng vỉa hè.
-- **Tầng Thời gian (Temporal Verification):** Bộ lọc chuỗi thời gian yêu cầu hành vi lấn chiếm duy trì liên tục $\ge 15$ frames kèm cơ chế dung sai ($K=2$ frames) và cơ chế suy giảm khi che khuất (Occlusion Decay). Điều này triệt tiêu hoàn toàn báo động giả do người cầm biển đi ngang hoặc xe cộ che khuất tạm thời.
+- **Tầng Thời gian (Temporal Verification):** Bộ lọc chuỗi thời gian yêu cầu hành vi lấn chiếm duy trì liên tục $\ge 15$ frames kèm cơ chế dung sai ($K=2$ frames) và cơ chế suy giảm khi che khuất (Occlusion Decay). Điều này giảm thiểu tối đa và loại trừ hiệu quả báo động giả do người cầm biển đi ngang hoặc xe cộ che khuất tạm thời.
 
 ---
 

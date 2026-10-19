@@ -12,7 +12,7 @@
 2. **Lớp không gian (Spatial reasoning):** Xác định ranh giới "vỉa hè ở đâu trong khung hình" → Đa giác tĩnh (Polygon ROI cố định) do con người cấu hình một lần, kết hợp kiểm tra điểm tiếp xúc mặt đất và tỷ lệ đè lấn.
 3. **Lớp quyết định & thời gian (Decision & Temporal logic):** Kiểm tra xem chân biển có đặt trên vỉa hè không, tỷ lệ lấn chiếm có đạt ngưỡng quy định ($\ge 30\%$) không, và đối tượng có đứng yên liên tục qua chuỗi thời gian không (loại bỏ người bê biển đi ngang qua).
 
-**Thiết kế cốt lõi:** Tận dụng triệt để đặc tính cố định của camera an ninh CCTV để giảm tải tài nguyên tính toán — không dùng AI phân đoạn (segmentation) vỉa hè từng frame, mà dùng cấu hình tĩnh kết hợp thuật toán hình học OpenCV chính xác và nhẹ tải.
+**Thiết kế cốt lõi:** Tận dụng tối đa đặc tính cố định của camera an ninh CCTV để giảm tải tài nguyên tính toán — không dùng AI phân đoạn (segmentation) vỉa hè từng frame, mà dùng cấu hình tĩnh kết hợp thuật toán hình học OpenCV chính xác và nhẹ tải.
 
 ---
 
@@ -156,8 +156,8 @@
   * **Tập Kiểm thử độc lập (Test):** 55 ảnh hợp lệ (145 nhãn Ground Truth, 5 ảnh nền) — 1 ảnh nhãn lỗi phân đoạn đã được loại bỏ tự động.
 * **Quy chuẩn gán nhãn (Annotation Guideline):**
   * Thống nhất **1 class duy nhất: `bien_quang_cao`**.
-  * Không gán nhãn hành vi vi phạm (`bien_lan_via_he`) vào detector để bảo vệ tính toàn vẹn của kiến trúc phân tầng (Detector chỉ tìm vật thể, tầng Spatial và Temporal mới kết luận hành vi).
-  * Đối tượng được gán: Biển hiệu đứng, biển vẫy gắn tường, biển hộp đèn, biển bảng hiệu cửa hàng.
+  * Đối tượng mục tiêu được gán nhãn: Tập trung chủ đạo vào các **biển hiệu/biển quảng cáo dạng đứng** (Standee chữ A, biển bạt khung sắt có chân kê, biển hộp đèn di động chân bánh xe) cắm trên mặt đất — đối tượng có hành vi lấn chiếm vỉa hè theo Nghị định 168/2024/NĐ-CP.
+  * Cơ chế xử lý biển gắn tường: Không chủ động gán nhãn biển gắn cố định trên tường cao; tuy nhiên do đặc trưng bề mặt biển tương đồng cao (cùng dạng pano bạt/hộp đèn in chữ quảng cáo), mô hình AI vẫn có khả năng kích hoạt phát hiện ứng viên trên cả biển treo tường. Việc phân biệt biển đứng cắm chân trên hè với biển gắn tường hợp lệ được giải quyết triệt để ở tầng Quy tắc Hình học Không gian (Spatial Rule Engine: quy tắc chân đế tiếp đất 3 điểm và vị trí ROI vỉa hè) chứ không ép mô hình thị giác phải gánh vác.
 
 ### 2. Phân tích minh bạch khoa học về Dữ liệu (Academic Transparency)
 * **Nguồn gốc dữ liệu & Tỷ lệ ảnh tăng cường/tổng hợp:**
@@ -181,7 +181,7 @@
 Hành vi lấn chiếm vỉa hè được xác định dựa trên **Điều kiện kép (Dual-Condition)** trong `violation/checker.py`:
 1. **Điều kiện 1 (Tiên quyết — Chân tiếp đất):**
    * Tọa độ trung điểm của cạnh đáy Bounding Box ($base\_x = \frac{x_1+x_2}{2}, base\_y = y_2$) phải nằm bên trong đa giác vỉa hè (`cv2.pointPolygonTest >= 0`).
-   * *Ý nghĩa vật lý:* Đáy bounding box trong góc quay camera nghiêng đại diện cho vị trí tiếp xúc của vật thể với mặt đất. Điều kiện này loại bỏ triệt để các biển quảng cáo gắn cố định trên tầng 2, tầng 3 có hộp bao trùm xuống vùng vỉa hè trong ảnh 2D nhưng chân không chạm đất.
+   * *Ý nghĩa vật lý:* Đáy bounding box trong góc quay camera nghiêng đại diện cho vị trí tiếp xúc của vật thể với mặt đất. Điều kiện này giúp loại bỏ phần lớn các biển quảng cáo gắn cố định trên tầng 2, tầng 3 có hộp bao trùm xuống vùng vỉa hè trong ảnh 2D nhưng chân không chạm đất.
 2. **Điều kiện 2 (Đủ — Tỷ lệ diện tích đè lấn):**
    * Tỷ lệ diện tích phần giao nhau giữa Bounding Box và Đa giác vỉa hè chia cho diện tích Bounding Box phải đạt ít nhất 30%:
      $$\text{Overlap Ratio} = \frac{\text{Area}(\text{Box} \cap \text{ROI})}{\text{Area}(\text{Box})} \ge 0.30$$
@@ -198,13 +198,13 @@ Ngưỡng 30% được xác định thông qua thực nghiệm quét ngưỡng (
 | **35% – 40%** | 42.9% | 100.0% | 75.0% | 85.7% | Ổn định |
 | **50% – 60%** | 42.9% | 100.0% | 75.0% | 85.7% | Quá khắt khe, dễ bỏ sót vi phạm thực tế |
 
-➡️ **Kết luận:** Ngưỡng **30%** được lựa chọn làm giá trị mặc định của hệ thống vì đạt điểm F1 tối ưu 85.7%, triệt tiêu hoàn toàn báo động giả (Precision 100%) mà vẫn đảm bảo độ bao phủ phát hiện vi phạm.
+➡️ **Kết luận:** Ngưỡng **30%** được lựa chọn làm giá trị mặc định của hệ thống vì đạt điểm F1 tối ưu 85.7%, loại trừ hoàn toàn báo động giả trên tập thực nghiệm (Precision 100%) mà vẫn đảm bảo độ bao phủ phát hiện vi phạm.
 
 ### 3. Bộ lọc chuỗi thời gian & Khử trùng lặp (Temporal & Deduplication)
 Một hành vi lấn chiếm chỉ được **XÁC NHẬN CHÍNH THỨC (CONFIRMED)** khi thỏa mãn:
 1. **Xác nhận qua N frames liên tiếp:** Duy trì vi phạm tối thiểu 15 khung hình liên tiếp (~0.5s ở 30FPS).
 2. **Bộ lọc vật thể đứng yên (Stationary Displacement Check):** Độ dời tâm của bounding box trong cửa sổ quan sát phải nhỏ hơn ngưỡng cho phép ($\Delta d \le 50$ pixels). Nếu đối tượng di chuyển liên tục qua khung hình (người đi bộ cầm biển đi ngang qua), hệ thống giữ trạng thái `SUSPECTED` và không kích hoạt cảnh báo phạt.
-3. **Khử trùng lặp không gian (Spatial Deduplication):** Khi ByteTrack bị mất dấu do che khuất và cấp `track_id` mới cho cùng một tấm biển tại cùng vị trí không gian (bán kính $\le 50$ pixels), hệ thống đối chiếu với lịch sử cảnh báo gần nhất và áp dụng thời gian chờ (Cooldown 60s), loại bỏ triệt để hiện tượng ghi đè hoặc gửi cảnh báo rác.
+3. **Khử trùng lặp không gian (Spatial Deduplication):** Khi ByteTrack bị mất dấu do che khuất và cấp `track_id` mới cho cùng một tấm biển tại cùng vị trí không gian (bán kính $\le 50$ pixels), hệ thống đối chiếu với lịch sử cảnh báo gần nhất và áp dụng thời gian chờ (Cooldown 60s), hạn chế tối đa hiện tượng ghi đè hoặc gửi cảnh báo lặp lại.
 4. **Giới hạn kỹ thuật cần ghi nhận:** Bộ lọc thời gian không thể phân biệt giữa biển vi phạm đứng yên và False Positive tĩnh (ví dụ: áp phích quảng cáo được cấp phép dán phẳng trên tường nhà sát mép vỉa hè). Trường hợp này cần người vận hành thiết lập vùng loại trừ (Exclusion Zone) trong ROI.
 
 ---
@@ -317,5 +317,5 @@ Hệ thống đánh giá được tách bạch rõ ràng thành **2 tầng chỉ
 Toàn bộ hệ thống đồ án đã đạt trạng thái **chuẩn hóa và nhất quán 100%**:
 * Mã nguồn hoạt động duy nhất trên mô hình Version 8 (`models/best.pt`).
 * Toàn bộ số liệu thực nghiệm được đo đạc tự động từ mô hình thật, minh bạch về phương sai thống kê và khoảng tin cậy.
-* Các mâu thuẫn giữa kế hoạch và mã nguồn đã được giải quyết triệt để.
-* Hệ thống sẵn sàng tuyệt đối để báo cáo tiến độ và bảo vệ đồ án tốt nghiệp trước Hội đồng chuyên môn.
+* Các mâu thuẫn giữa kế hoạch và mã nguồn đã được giải quyết hoàn toàn.
+* Hệ thống sẵn sàng để báo cáo tiến độ và bảo vệ đồ án tốt nghiệp trước Hội đồng chuyên môn.

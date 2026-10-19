@@ -35,14 +35,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-# Import các module cốt lõi trong hệ thống
-from camera import StreamReader
-from roi import ROIManager
-from tracking import ObjectTracker, TemporalVerifier, TrackState
-from violation import ViolationChecker
-from evidence import EvidenceSaver
-from database import ViolationDatabase
-from utils import FPSTracker, draw_fps_badge, draw_detection
+# Module imports được nạp động theo từng mode hoạt động tương ứng để tối ưu tốc độ khởi động
 
 
 BANNER = r"""
@@ -74,6 +67,14 @@ def run_monitor_mode(args):
     print(">> ĐANG KHỞI ĐỘNG CHẾ ĐỘ GIÁM SÁT THỜI GIAN THỰC (MONITOR MODE)...")
     print("-" * 78)
 
+    from camera import StreamReader
+    from roi import ROIManager
+    from tracking import ObjectTracker, TemporalVerifier, TrackState
+    from violation import ViolationChecker
+    from evidence import EvidenceSaver
+    from database import ViolationDatabase
+    from utils import FPSTracker, draw_fps_badge, draw_detection
+
     # 1. Khởi tạo nguồn Camera / Video
     source = args.source
     if source is None:
@@ -99,10 +100,14 @@ def run_monitor_mode(args):
     config_path = args.config
     if config_path is None:
         source_name = os.path.basename(str(source)).lower()
-        # Thử tìm file roi khớp theo tên source
-        candidate = os.path.join("configs", f"roi_{source_name.rsplit('.', 1)[0]}.json")
-        if os.path.exists(candidate):
-            config_path = candidate
+        base_no_ext = source_name.rsplit('.', 1)[0]
+        clean_no_ext = base_no_ext.replace(" ", "_").replace(",", "").replace("-", "_")
+        candidate_1 = os.path.join("configs", f"roi_{clean_no_ext}.json")
+        candidate_2 = os.path.join("configs", f"roi_{base_no_ext}.json")
+        if os.path.exists(candidate_1):
+            config_path = candidate_1
+        elif os.path.exists(candidate_2):
+            config_path = candidate_2
         elif os.path.exists("configs/roi_camera1.json"):
             config_path = "configs/roi_camera1.json"
         else:
@@ -229,7 +234,7 @@ def run_monitor_mode(args):
                     bbox=box,
                     sidewalk_index=sw_idx
                 )
-                print(f"  📸 [BẰNG CHỨNG #{confirmed_count}] Đã ghi nhận vi phạm ID #{track_id} -> DB record #{rec_id}")
+                print(f"   [BẰNG CHỨNG #{confirmed_count}] Đã ghi nhận vi phạm ID #{track_id} -> DB record #{rec_id}")
             else:
                 lbl = f"HOP LE: {sp['overlap_pct']}%"
                 status = TrackState.NORMAL
@@ -356,8 +361,8 @@ def run_monitor_mode(args):
                                     bbox=box,
                                     sidewalk_index=sw_idx
                                 )
-                                print(f"🚨 [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
-                                print(f"   📸 Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
+                                print(f" [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
+                                print(f"    Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
 
                     elif temporal_status == TrackState.SUSPECTED:
                         current_frame_suspected += 1
@@ -443,18 +448,32 @@ def run_dashboard_mode(args):
 def run_roi_mode(args):
     """
     Chế độ 3: Khởi chạy công cụ vẽ & cấu hình vỉa hè đa vùng (Multi-ROI).
+    Mặc định: Khởi chạy Web ROI Studio trực quan trong Dashboard (quản lý & chuyển đổi mọi video).
+    --opencv: Sử dụng công cụ cửa sổ OpenCV truyền thống cho 1 video.
     """
     print(BANNER)
-    print(">> ĐANG KHỞI ĐỘNG CÔNG CỤ VẼ VÙNG VỈA HÈ (MULTI-ROI DRAWER)...")
-    source = args.source
-    if source is None:
-        video_dir = "data/videos"
-        files = [f for f in os.listdir(video_dir) if f.lower().endswith(('.mp4', '.avi', '.mov'))] if os.path.exists(video_dir) else []
-        source = os.path.join(video_dir, files[0]) if files else "data/videos/sample_cctv.mp4"
+    if getattr(args, "opencv", False):
+        print(">> ĐANG KHỞI ĐỘNG CÔNG CỤ OPENCV VẼ VÙNG VỈA HÈ...")
+        source = args.source
+        if source is None:
+            video_dir = "data/videos"
+            files = [f for f in os.listdir(video_dir) if f.lower().endswith(('.mp4', '.avi', '.mov'))] if os.path.exists(video_dir) else []
+            source = os.path.join(video_dir, files[0]) if files else "data/videos/sample_cctv.mp4"
 
-    cfg = args.config if args.config else "configs/roi_camera1.json"
-    from roi_drawer import run_roi_tool
-    run_roi_tool(source, cfg)
+        cfg = args.config if args.config else "configs/roi_camera1.json"
+        from roi_drawer import run_roi_tool
+        run_roi_tool(source, cfg)
+    else:
+        print(">> ĐANG KHỞI ĐỘNG WEB ROI STUDIO (TRỰC QUAN - QUẢN LÝ TẤT CẢ VIDEO)...")
+        print(">> Chuyển đổi video và lưu cấu hình trực tiếp trên Web Dashboard mà không cần gõ lệnh terminal.")
+        port = args.port if hasattr(args, "port") else 8501
+        import webbrowser
+        try:
+            webbrowser.open(f"http://127.0.0.1:{port}/?tab=roi")
+        except Exception:
+            pass
+        from dashboard.web_app import run_dashboard
+        run_dashboard(port=port, initial_tab="roi")
 
 
 def run_benchmark_mode(args):
@@ -541,6 +560,8 @@ Ví dụ sử dụng:
                         help="Ngưỡng tin cậy trung bình tối thiểu để CONFIRMED (mặc định: 0.40)")
     parser.add_argument("--headless", action="store_true",
                         help="Chạy ở chế độ không mở cửa sổ giao diện OpenCV (cho server)")
+    parser.add_argument("--opencv", action="store_true",
+                        help="Dùng công cụ vẽ ROI bằng cửa sổ OpenCV cũ thay vì Web ROI Studio")
 
     args = parser.parse_args()
 

@@ -1,0 +1,74 @@
+{
+    "camera_id": "video test",
+    "description": "Vung via he ban dau (Version A - ROI hep sat mep tuong, chua bao trum chan de Standee #3)",
+    "resolution": {
+        "width": 1280,
+        "height": 720
+    },
+    "total_regions": 1,
+    "total_points": 7,
+    "polygons": [
+        [
+            [
+                390,
+                57
+            ],
+            [
+                716,
+                49
+            ],
+            [
+                801,
+                200
+            ],
+            [
+                940,
+                665
+            ],
+            [
+                820,
+                680
+            ],
+            [
+                62,
+                719
+            ],
+            [
+                6,
+                717
+            ]
+        ]
+    ],
+    "polygon_points": [
+        [
+            390,
+            57
+        ],
+        [
+            716,
+            49
+        ],
+        [
+            801,
+            200
+        ],
+        [
+            940,
+            665
+        ],
+        [
+            820,
+            680
+        ],
+        [
+            62,
+            719
+        ],
+        [
+            6,
+            717
+        ]
+    ],
+    "created_at": "2026-10-11 23:30:00 (Tái dựng lại dựa trên ghi chép thực nghiệm sơ khai ngày 2026-10-05)",
+    "note": "Bản 7 đỉnh vẽ hẹp sát mép trong nhà, khiến Standee #3 bị loại do điểm chân đế nằm ngoài ROI (Recall 71.43%)."
+}

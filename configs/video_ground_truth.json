@@ -1,0 +1,200 @@
+{
+  "metadata": {
+    "title": "Bảng gán nhãn Ground Truth thực nghiệm trên 3 Video CCTV thực tế",
+    "annotator": "Nguyễn Đức Tài Năng (Tác giả đề tài ĐATN)",
+    "annotation_date": "2026-10-08",
+    "last_reviewed": "2026-10-12",
+    "methodology": "Do một người gán (tác giả đề tài), chưa kiểm định chéo độc lập. Gán nhãn dựa trên quan sát hiện trường thực tế, vị trí chân đế tiếp xúc mặt đất và mức độ cản trở lối đi bộ qua video trích xuất.",
+    "legal_basis": "Nghị định 168/2024/NĐ-CP Điều 12 (Quy định xử phạt hành vi đặt, treo biển hiệu, biển quảng cáo trên lòng đường, hè phố)"
+  },
+  "video_sources": {
+    "video_test": {
+      "path": "data/videos/video test.mp4",
+      "location": "Phố Huế / Hàng Bài, Hoàn Kiếm, Hà Nội",
+      "camera_angle": "Camera góc ngang hướng về vỉa hè thương mại",
+      "fps": 24.0,
+      "duration_sec": 10.0,
+      "total_frames": 240
+    },
+    "videotesst2": {
+      "path": "data/videos/videotesst2.mp4",
+      "location": "Phố Bạch Mai, Hai Bà Trưng, Hà Nội",
+      "camera_angle": "Camera góc nghiêng 45 độ hướng vỉa hè và cửa hàng",
+      "fps": 24.0,
+      "duration_sec": 10.0,
+      "total_frames": 240
+    },
+    "video_test3": {
+      "path": "data/videos/video test3.mp4",
+      "location": "Phố Trần Đại Nghĩa, Hai Bà Trưng, Hà Nội",
+      "camera_angle": "Camera góc cao nhìn xuống vỉa hè trước cửa hàng",
+      "fps": 24.0,
+      "duration_sec": 10.0,
+      "total_frames": 240
+    }
+  },
+  "ground_truth_items": [
+    {
+      "video_id": "video_test",
+      "object_id": "V1_OBJ_1",
+      "description": "Biển bạt lớn dựng đứng trước cửa hàng số 1",
+      "expected_track_id": 1,
+      "approx_box_xyxy": [11, 280, 203, 620],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển bạt lớn dựng cố định trên hè phố trước cửa hàng, chiếm dụng hoàn toàn không gian vỉa hè dành cho người đi bộ."
+    },
+    {
+      "video_id": "video_test",
+      "object_id": "V1_OBJ_2",
+      "description": "Biển hiệu dạng hộp đứng sát vách cửa hàng",
+      "expected_track_id": 2,
+      "approx_box_xyxy": [215, 290, 360, 615],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển hiệu dạng hộp đứng trực tiếp trên mặt vỉa hè sát vách cửa hàng, cản trở lối lưu thông của người đi bộ."
+    },
+    {
+      "video_id": "video_test",
+      "object_id": "V1_OBJ_3",
+      "description": "Biển Standee chữ A chân sắt đặt trên lối đi bộ",
+      "expected_track_id": 3,
+      "approx_box_xyxy": [804, 475, 941, 718],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển Standee chữ A khung sắt đặt trực tiếp trên lối đi lát gạch của vỉa hè, chiếm dụng không gian lưu thông công cộng."
+    },
+    {
+      "video_id": "video_test",
+      "object_id": "V1_OBJ_4",
+      "description": "Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè",
+      "expected_track_id": 4,
+      "approx_box_xyxy": [450, 250, 560, 520],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển quảng cáo dạng tấm dọc dựng sát gốc cây trên vỉa hè, cản trở lối đi bộ."
+    },
+    {
+      "video_id": "video_test",
+      "object_id": "V1_OBJ_5",
+      "description": "Biển hiệu treo thụt sâu trong lòng nhà",
+      "expected_track_id": 5,
+      "approx_box_xyxy": [600, 150, 710, 320],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "NORMAL",
+      "justification": "Biển hiệu treo sâu bên trong khuôn viên nhà dân, không cắm chân hay đặt trên mặt vỉa hè dành cho người đi bộ."
+    },
+
+    {
+      "video_id": "videotesst2",
+      "object_id": "V2_OBJ_1",
+      "description": "Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai",
+      "expected_track_id": 1,
+      "approx_box_xyxy": [50, 200, 220, 680],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển hộp đèn lớn cắm chân cố định trên mặt vỉa hè trước cửa hàng, cản trở lối đi bộ."
+    },
+    {
+      "video_id": "videotesst2",
+      "object_id": "V2_OBJ_2",
+      "description": "Biển quảng cáo di động chân bánh xe",
+      "expected_track_id": 2,
+      "approx_box_xyxy": [280, 260, 410, 580],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển quảng cáo di động chân bánh xe đặt trên vỉa hè trước cửa hàng, chiếm dụng lối lưu thông."
+    },
+    {
+      "video_id": "videotesst2",
+      "object_id": "V2_OBJ_3",
+      "description": "Biển bạt nhỏ kê trước bậc thềm",
+      "expected_track_id": 3,
+      "approx_box_xyxy": [450, 310, 570, 550],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển bạt nhỏ kê trước bậc thềm chiếm dụng mặt cắt vỉa hè công cộng."
+    },
+    {
+      "video_id": "videotesst2",
+      "object_id": "V2_OBJ_7",
+      "description": "Biển hiệu dạng khung sắt tầm thấp ven đường",
+      "expected_track_id": 7,
+      "approx_box_xyxy": [720, 390, 890, 640],
+      "appearance_time_range_sec": [0.92, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển hiệu dạng khung sắt tầm thấp cắm chân trên vỉa hè ven đường trước cửa hàng."
+    },
+    {
+      "video_id": "videotesst2",
+      "object_id": "V2_OBJ_8",
+      "description": "Biển hiệu cửa hàng ở góc phải khung hình",
+      "expected_track_id": 8,
+      "approx_box_xyxy": [920, 420, 1080, 670],
+      "appearance_time_range_sec": [7.29, 9.92],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển hiệu đặt trên vỉa hè xuất hiện ở phần cuối đoạn video, chiếm dụng lối đi bộ."
+    },
+
+    {
+      "video_id": "video_test3",
+      "object_id": "V3_OBJ_1",
+      "description": "Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa",
+      "expected_track_id": 1,
+      "approx_box_xyxy": [80, 220, 310, 640],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển quảng cáo pano lớn đặt chiếm dụng phần lớn bề rộng vỉa hè trước cửa hàng."
+    },
+    {
+      "video_id": "video_test3",
+      "object_id": "V3_OBJ_2",
+      "description": "Biển hộp đèn đứng góc trái",
+      "expected_track_id": 2,
+      "approx_box_xyxy": [330, 260, 460, 610],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển hộp đèn đứng đặt trên vỉa hè chiếm dụng lối đi bộ."
+    },
+    {
+      "video_id": "video_test3",
+      "object_id": "V3_OBJ_3",
+      "description": "Biển vẫy thấp đặt cạnh gốc cây",
+      "expected_track_id": 3,
+      "approx_box_xyxy": [520, 290, 640, 580],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển vẫy thấp đặt cạnh gốc cây trên vỉa hè chiếm dụng lối đi bộ."
+    },
+    {
+      "video_id": "video_test3",
+      "object_id": "V3_OBJ_4",
+      "description": "Biển bạt chữ nhật kê ngoài thềm",
+      "expected_track_id": 4,
+      "approx_box_xyxy": [700, 340, 830, 560],
+      "appearance_time_range_sec": [0.0, 10.0],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển bạt chữ nhật kê ngoài thềm chiếm dụng vỉa hè công cộng."
+    },
+    {
+      "video_id": "video_test3",
+      "object_id": "V3_OBJ_11",
+      "description": "Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố",
+      "expected_track_id": 11,
+      "approx_box_xyxy": [880, 210, 960, 360],
+      "appearance_time_range_sec": [3.92, 8.67],
+      "ground_truth_label": "VIOLATION",
+      "justification": "Biển hiệu nhỏ ở cự ly xa đặt trên vỉa hè trước cửa hàng."
+    },
+    {
+      "video_id": "video_test3",
+      "object_id": "V3_OBJ_14",
+      "description": "Biển gắn tường tầng thấp phía bên phải",
+      "expected_track_id": 14,
+      "approx_box_xyxy": [1020, 180, 1140, 330],
+      "appearance_time_range_sec": [0.0, 0.17],
+      "ground_truth_label": "NORMAL",
+      "justification": "Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè."
+    }
+  ]
+}

@@ -69,7 +69,7 @@ def run_threshold_sweep(
 
     # 3. Quét qua các ngưỡng overlap ratio
     print("=" * 70)
-    print("🔬 THỰC NGHIỆM QUÉT NGƯỠNG DIỆN TÍCH (THRESHOLD SWEEP)")
+    print(" THỰC NGHIỆM QUÉT NGƯỠNG DIỆN TÍCH (THRESHOLD SWEEP)")
     print("=" * 70)
 
     sweep_results = []
@@ -138,7 +138,7 @@ def run_threshold_sweep(
               f"P={precision*100:5.1f}% R={recall*100:5.1f}% F1={f1*100:5.1f}%"
               f"{' ← BEST' if th == best_threshold and f1 == best_f1 else ''}")
 
-    print(f"\n  🏆 Ngưỡng tối ưu (F1 cao nhất): {int(best_threshold*100)}% (F1 = {best_f1*100:.1f}%)")
+    print(f"\n   Ngưỡng tối ưu (F1 cao nhất): {int(best_threshold*100)}% (F1 = {best_f1*100:.1f}%)")
     print("=" * 70)
 
     # 4. Xuất báo cáo Markdown
@@ -154,7 +154,7 @@ def run_threshold_sweep(
 
         for r in sweep_results:
             is_best = (r["threshold"] == best_threshold)
-            note = "**🏆 Tối ưu (F1 cao nhất)**" if is_best else (
+            note = "** Tối ưu (F1 cao nhất)**" if is_best else (
                 "Quá nhạy (nhiều FP)" if r["threshold"] <= 0.15 else (
                     "Quá khắt khe (bỏ sót FN)" if r["threshold"] >= 0.50 else "Chấp nhận được"
                 )

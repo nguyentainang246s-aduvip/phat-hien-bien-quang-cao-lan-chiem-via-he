@@ -18,13 +18,13 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.20, tracker_type: str = "bytetrack.yaml", imgsz: int = 640):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = "bytetrack.yaml", imgsz: int = 640):
         """
         Khởi tạo ObjectTracker.
         
         Args:
             model_path: Đường dẫn file trọng số YOLO (vd: 'models/best.pt', 'models/best.onnx')
-            conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.20 = 20%)
+            conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.25 = 25% theo chuẩn đánh giá hệ thống)
             tracker_type: File cấu hình tracker ('bytetrack.yaml' hoặc 'botsort.yaml')
             imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
         """
@@ -40,12 +40,14 @@ class ObjectTracker:
         self.model = YOLO(model_path)
         self.class_names = self.model.names
 
-    def track(self, frame) -> list:
+    def track(self, frame, conf: float = None, imgsz: int = None) -> list:
         """
         Thực hiện phát hiện và bám vết đối tượng trong khung hình.
         
         Args:
             frame: Ảnh ma trận BGR nguyên bản từ camera (Raw Frame)
+            conf: Tùy chọn override ngưỡng tin cậy (mặc định dùng self.conf_threshold)
+            imgsz: Tùy chọn override kích thước suy luận (mặc định dùng self.imgsz)
             
         Returns:
             list: Danh sách các đối tượng được bám vết:
@@ -60,13 +62,15 @@ class ObjectTracker:
                       ...
                   ]
         """
+        target_conf = conf if conf is not None else self.conf_threshold
+        target_imgsz = imgsz if imgsz is not None else self.imgsz
         # persist=True: Bắt buộc để ByteTrack nhớ trạng thái Kalman Filter giữa các frames liên tiếp
         results = self.model.track(
             source=frame,
             persist=True,
             tracker=self.tracker_type,
-            conf=self.conf_threshold,
-            imgsz=self.imgsz,
+            conf=target_conf,
+            imgsz=target_imgsz,
             verbose=False
         )
 

@@ -30,7 +30,7 @@ from utils import FPSTracker, draw_fps_badge, draw_detection
 # Cấu hình giao diện Streamlit
 st.set_page_config(
     page_title="Hệ Thống Giám Sát Lấn Chiếm Vỉa Hè CCTV",
-    page_icon="🚨",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -89,7 +89,7 @@ st.sidebar.markdown("---")
 
 menu = st.sidebar.radio(
     "CHỨC NĂNG CHÍNH",
-    ["📊 Tổng Quan Hệ Thống", "📹 Giám Sát Trực Tiếp", "🔍 Tra Cứu Vi Phạm & Bằng Chứng", "⚙️ Quản Lý Vùng Vỉa Hè (ROI)"]
+    [" Tổng Quan Hệ Thống", " Giám Sát Trực Tiếp", " Tra Cứu Vi Phạm & Bằng Chứng", "️ Quản Lý Vùng Vỉa Hè (ROI)"]
 )
 
 st.sidebar.markdown("---")
@@ -102,22 +102,22 @@ st.sidebar.metric("Vi phạm hôm nay", stats["today_violations"])
 # ==============================================================================
 # TRANG 1: TỔNG QUAN HỆ THỐNG
 # ==============================================================================
-if menu == "📊 Tổng Quan Hệ Thống":
-    st.markdown('<div class="main-header">🚨 HỆ THỐNG GIÁM SÁT BIỂN HIỆU LẤN CHIẾM VỈA HÈ</div>', unsafe_allow_html=True)
+if menu == " Tổng Quan Hệ Thống":
+    st.markdown('<div class="main-header"> HỆ THỐNG GIÁM SÁT BIỂN HIỆU LẤN CHIẾM VỈA HÈ</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Phát hiện, định danh theo thời gian và quản lý xử phạt thông qua camera an ninh CCTV cố định</div>', unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("📹 Điểm Giám Sát Có Dữ Liệu", len(stats["violations_by_camera"]))
+        st.metric(" Điểm Giám Sát Có Dữ Liệu", len(stats["violations_by_camera"]))
     with col2:
-        st.metric("🚨 Tổng Số Vụ Vi Phạm", stats["total_violations"])
+        st.metric(" Tổng Số Vụ Vi Phạm", stats["total_violations"])
     with col3:
-        st.metric("📅 Vi Phạm Trong Ngày", stats["today_violations"])
+        st.metric(" Vi Phạm Trong Ngày", stats["today_violations"])
     with col4:
-        st.metric("⚡ Thuật Toán AI & Tracking", "YOLOv8 + ByteTrack")
+        st.metric(" Thuật Toán AI & Tracking", "YOLOv8 + ByteTrack")
 
     st.markdown("---")
-    st.subheader("📈 Phân Bố Vi Phạm Theo Từng Vị Trí Camera")
+    st.subheader(" Phân Bố Vi Phạm Theo Từng Vị Trí Camera")
     
     if stats["violations_by_camera"]:
         df_cam = pd.DataFrame(list(stats["violations_by_camera"].items()), columns=["Camera ID", "Số Vụ Vi Phạm"])
@@ -126,7 +126,7 @@ if menu == "📊 Tổng Quan Hệ Thống":
         st.info("Chưa có bản ghi vi phạm nào trong cơ sở dữ liệu. Hãy chạy tính năng Giám Sát Trực Tiếp để thu thập dữ liệu.")
 
     st.markdown("---")
-    st.subheader("🕒 Các Vụ Vi Phạm Gần Nhất")
+    st.subheader(" Các Vụ Vi Phạm Gần Nhất")
     recent_violations = db.get_violations(limit=5)
     if recent_violations:
         df_recent = pd.DataFrame(recent_violations)
@@ -138,14 +138,14 @@ if menu == "📊 Tổng Quan Hệ Thống":
 # ==============================================================================
 # TRANG 2: GIÁM SÁT TRỰC TIẾP
 # ==============================================================================
-elif menu == "📹 Giám Sát Trực Tiếp":
-    st.markdown('<div class="main-header">📹 GIÁM SÁT CAMERA THỜI GIAN THỰC</div>', unsafe_allow_html=True)
+elif menu == " Giám Sát Trực Tiếp":
+    st.markdown('<div class="main-header"> GIÁM SÁT CAMERA THỜI GIAN THỰC</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Luồng phân tích hình ảnh AI trực tiếp kèm cảnh báo thời gian thực</div>', unsafe_allow_html=True)
 
     col_ctrl, col_view = st.columns([1, 3])
 
     with col_ctrl:
-        st.subheader("⚙️ Cấu Hình Luồng")
+        st.subheader("️ Cấu Hình Luồng")
         # Chọn nguồn
         video_dir = "data/videos"
         v_files = [f for f in os.listdir(video_dir) if f.lower().endswith(('.mp4', '.avi', '.mov'))] if os.path.exists(video_dir) else []
@@ -167,7 +167,7 @@ elif menu == "📹 Giám Sát Trực Tiếp":
         confirm_n_frames = st.slider("Số frames xác nhận (N-frames)", 3, 30, 15, 1)
 
         btn_start = st.button("▶️ Khởi Động Giám Sát", use_container_width=True, type="primary")
-        btn_stop = st.button("⏹️ Dừng Giám Sát", use_container_width=True)
+        btn_stop = st.button("️ Dừng Giám Sát", use_container_width=True)
 
     with col_view:
         frame_placeholder = st.empty()
@@ -247,7 +247,7 @@ elif menu == "📹 Giám Sát Trực Tiếp":
                             if it["is_new_alert"]:
                                 ev_res = ev_saver.save_evidence(frame, it["box"], it["track_id"], camera_id=roi_mgr.camera_id, overlap_pct=sp["overlap_pct"])
                                 db.insert_violation(roi_mgr.camera_id, it["track_id"], ev_res["timestamp"], it["conf"], sp["overlap_pct"], ev_res["full_path"], ev_res["crop_path"])
-                                log_placeholder.warning(f"🚨 [CẢNH BÁO VI PHẠM] ID #{it['track_id']} lấn chiếm vỉa hè ({sp['overlap_pct']}%) lúc {ev_res['timestamp']}!")
+                                log_placeholder.warning(f" [CẢNH BÁO VI PHẠM] ID #{it['track_id']} lấn chiếm vỉa hè ({sp['overlap_pct']}%) lúc {ev_res['timestamp']}!")
                         elif st_val == TrackState.SUSPECTED:
                             susp_cnt += 1
                             lbl = f"NGHI VAN {it['violation_frames']}/{confirm_n_frames}"
@@ -271,8 +271,8 @@ elif menu == "📹 Giám Sát Trực Tiếp":
 # ==============================================================================
 # TRANG 3: TRA CỨU VI PHẠM & BẰNG CHỨNG
 # ==============================================================================
-elif menu == "🔍 Tra Cứu Vi Phạm & Bằng Chứng":
-    st.markdown('<div class="main-header">🔍 KHO LƯU TRỮ BẰNG CHỨNG & LỊCH SỬ PHẠT NGUỘI</div>', unsafe_allow_html=True)
+elif menu == " Tra Cứu Vi Phạm & Bằng Chứng":
+    st.markdown('<div class="main-header"> KHO LƯU TRỮ BẰNG CHỨNG & LỊCH SỬ PHẠT NGUỘI</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Truy vấn chi tiết từng vụ việc, hình ảnh đóng dấu tem pháp lý và xuất báo cáo</div>', unsafe_allow_html=True)
 
     # Bộ lọc
@@ -302,7 +302,7 @@ elif menu == "🔍 Tra Cứu Vi Phạm & Bằng Chứng":
         df_export = pd.DataFrame(records)
         csv_data = df_export.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Xuất Báo Cáo Vi Phạm (CSV)",
+            label=" Xuất Báo Cáo Vi Phạm (CSV)",
             data=csv_data,
             file_name=f"bao_cao_vi_pham_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
@@ -311,7 +311,7 @@ elif menu == "🔍 Tra Cứu Vi Phạm & Bằng Chứng":
         st.markdown("---")
         # Hiển thị từng card vụ việc
         for rec in records:
-            with st.expander(f"🚨 Vụ #{rec['id']} | Cam: {rec['camera_id']} | ID Biển: #{rec['track_id']} | Thời gian: {rec['timestamp']} | Lấn chiếm: {rec['overlap_pct']}%"):
+            with st.expander(f" Vụ #{rec['id']} | Cam: {rec['camera_id']} | ID Biển: #{rec['track_id']} | Thời gian: {rec['timestamp']} | Lấn chiếm: {rec['overlap_pct']}%"):
                 c1, c2 = st.columns([2, 1])
 
                 with c1:
@@ -344,8 +344,8 @@ elif menu == "🔍 Tra Cứu Vi Phạm & Bằng Chứng":
 # ==============================================================================
 # TRANG 4: QUẢN LÝ VÙNG VỈA HÈ (ROI)
 # ==============================================================================
-elif menu == "⚙️ Quản Lý Vùng Vỉa Hè (ROI)":
-    st.markdown('<div class="main-header">⚙️ QUẢN LÝ VÙNG QUAN TÂM VỈA HÈ (ROI)</div>', unsafe_allow_html=True)
+elif menu == "️ Quản Lý Vùng Vỉa Hè (ROI)":
+    st.markdown('<div class="main-header">️ QUẢN LÝ VÙNG QUAN TÂM VỈA HÈ (ROI)</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Danh sách cấu hình đa giác vỉa hè cho từng camera an ninh</div>', unsafe_allow_html=True)
 
     cfg_dir = "configs"
@@ -356,13 +356,13 @@ elif menu == "⚙️ Quản Lý Vùng Vỉa Hè (ROI)":
         for f in files:
             path = os.path.join(cfg_dir, f)
             mgr = ROIManager(path)
-            with st.expander(f"📁 {f} ({mgr.camera_id} - {len(mgr.polygons)} vùng vỉa hè)"):
+            with st.expander(f" {f} ({mgr.camera_id} - {len(mgr.polygons)} vùng vỉa hè)"):
                 st.write(f"**Số vùng vỉa hè:** {len(mgr.polygons)}")
                 for idx, p in enumerate(mgr.polygons, 1):
                     st.write(f"- Vỉa hè #{idx}: `{p}`")
 
     st.markdown("---")
-    st.subheader("💡 Cách Vẽ Thêm Vỉa Hè Mới:")
+    st.subheader(" Cách Vẽ Thêm Vỉa Hè Mới:")
     st.code(r".\.venv\Scripts\python.exe roi_drawer.py <đường_dẫn_ảnh_hoặc_video> configs/roi_ten_moi.json", language="powershell")
     st.markdown("""
     1. Click chuột trái để chấm các đỉnh vỉa hè.

@@ -35,7 +35,7 @@ class SystemBenchmark:
     Thu thập:
       1. Thời gian xử lý từng thành phần (Latency breakdown: Camera, AI Track, Spatial, Temporal, Render).
       2. Tốc độ khung hình (FPS) trung bình, Min, Max, Độ lệch chuẩn.
-      3. Nghiên cứu bóc tách (Ablation Study) chứng minh vai trò của Temporal Verifier trong việc triệt tiêu báo giả.
+      3. Nghiên cứu bóc tách (Ablation Study) chứng minh vai trò của Temporal Verifier trong việc giảm thiểu và loại trừ báo giả.
     """
 
     def __init__(
@@ -141,7 +141,7 @@ class SystemBenchmark:
         """
         if verbose:
             print("=" * 78)
-            print("🚀 BẮT ĐẦU ĐO ĐẠC HIỆU NĂNG THỰC NGHIỆM (SYSTEM BENCHMARK)")
+            print(" BẮT ĐẦU ĐO ĐẠC HIỆU NĂNG THỰC NGHIỆM (SYSTEM BENCHMARK)")
             print(f"   • Nguồn kiểm thử     : {self.source}")
             print(f"   • Cấu hình ROI       : {self.config_path}")
             print(f"   • Mô hình AI         : {self.model_path}")
@@ -277,7 +277,7 @@ class SystemBenchmark:
         abl = res["ablation_study"]
 
         print("\n" + "=" * 78)
-        print("📊 BẢNG TỔNG HỢP HIỆU NĂNG THỰC NGHIỆM (BENCHMARK SUMMARY)")
+        print(" BẢNG TỔNG HỢP HIỆU NĂNG THỰC NGHIỆM (BENCHMARK SUMMARY)")
         print("=" * 78)
         print(f"1. Thiết bị kiểm thử    : {res['hardware']['device_name']} | Python {res['hardware']['python_version']}")
         print(f"2. Độ phân giải video   : {res['source_info']['resolution']} | FPS camera gốc: {res['source_info']['stream_fps']:.1f}")
@@ -295,7 +295,7 @@ class SystemBenchmark:
         print("5. Nghiên cứu bóc tách thành phần (Ablation Study - Temporal Verification):")
         print(f"   • Cảnh báo thô từng frame (No Temporal) : {abl['raw_single_frame_alerts']} lần (dễ bị spam/báo giả)")
         print(f"   • Cảnh báo chốt sau 15 frames (Proposed): {abl['temporal_verified_alerts']} sự kiện xác thực")
-        print(f"   => Tỷ lệ triệt tiêu báo động giả/spam   : {abl['false_alarm_reduction_pct']}%")
+        print(f"   => Tỷ lệ giảm thiểu và loại trừ báo động giả/spam   : {abl['false_alarm_reduction_pct']}%")
         print("=" * 78)
 
     def export_markdown_report(self, results: dict, output_file: str = "reports/benchmark_report.md") -> str:
@@ -365,7 +365,7 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 1. **Kịch bản cơ sở (Baseline - Không có Temporal Verifier):** Phán quyết vi phạm tức thời theo từng khung hình độc lập (Single-frame).
 2. **Kịch bản đề xuất (Proposed System):** Tích hợp máy trạng thái xác thực 15 khung hình liên tiếp và cơ chế làm nguội (Cooldown 60s).
 
-### Bảng 7.3. Kết quả so sánh khả năng triệt tiêu báo động giả
+### Bảng 7.3. Kết quả so sánh khả năng giảm thiểu và loại trừ báo động giả
 
 | Kịch bản đánh giá | Tổng số cảnh báo sinh ra | Số vụ vi phạm chốt lưu DB | Tỷ lệ giảm báo giả/spam |
 | :--- | :---: | :---: | :---: |
@@ -376,7 +376,7 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 """
         # ISSUE 02 FIX: Kết luận có điều kiện dựa trên dữ liệu thực tế
         if abl['raw_single_frame_alerts'] == 0 and abl['temporal_verified_alerts'] == 0:
-            md_content += f"""> **Lưu ý:** Không phát hiện sự kiện vi phạm nào trong {src['frames_evaluated']} khung hình đánh giá. Để kết luận chính xác về khả năng triệt tiêu báo động giả, cần chạy lại trên nguồn video có chứa biển hiệu lấn chiếm vỉa hè.
+            md_content += f"""> **Lưu ý:** Không phát hiện sự kiện vi phạm nào trong {src['frames_evaluated']} khung hình đánh giá. Để kết luận chính xác về khả năng giảm thiểu và loại trừ báo động giả, cần chạy lại trên nguồn video có chứa biển hiệu lấn chiếm vỉa hè.
 """
         elif abl['raw_single_frame_alerts'] > 0 and abl['false_alarm_reduction_pct'] > 0:
             md_content += f"""> Nhờ có bộ xác minh thời gian (Temporal Verifier), hệ thống đã loại bỏ được **{abl['false_alarm_reduction_pct']}%** số lượng cảnh báo trùng lặp và các trường hợp người đi bộ mang biển hiệu ngang qua vỉa hè trong chốc lát, giảm đáng kể tình trạng tràn ngập dữ liệu (Alert Fatigue) cho trung tâm chỉ huy đô thị.

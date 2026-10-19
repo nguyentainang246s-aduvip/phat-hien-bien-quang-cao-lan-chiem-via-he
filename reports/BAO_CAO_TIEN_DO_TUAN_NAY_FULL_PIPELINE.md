@@ -19,8 +19,7 @@ Trong tuần trước, sinh viên đã hoàn thành và báo cáo kết quả hu
   * **Precision:** $82.94\%$ (khoảng tin cậy 95% Wilson: $[75.8\% – 88.3\%]$)
   * **Recall:** $80.44\%$ (khoảng tin cậy 95% Wilson: $[73.5\% – 86.3\%]$)
   * **F1-Score:** $81.67\%$ (điểm tối ưu tại conf = 0.42)
-  * **mAP@0.5:** $81.43\%$
-* **Tốc độ suy luận:** $18.7\text{ ms/ảnh}$ (~$53.5\text{ FPS}$) trên GPU Tesla T4 và ~160–180 ms (~5.5–6.2 FPS) trên CPU cá nhân Intel Core i5.
+* **Tốc độ suy luận:** $18.7\text{ ms/ảnh}$ (~$53.5\text{ FPS}$) trên GPU Tesla T4 (PyTorch .pt ở `imgsz=1280`). Trên CPU khi thử nghiệm thô ban đầu chưa tối ưu (PyTorch .pt, `imgsz=1280`, xử lý từng frame đơn lẻ) tốc độ đạt ~5.5–6.2 FPS; sau khi tối ưu hóa sang ONNX Runtime (`imgsz=640`) và áp dụng `frame_skip=2`, thông lượng xử lý luồng video thực tế đạt **31.3 – 39.2 FPS** (thông lượng ổn định loại trừ frame khởi động: **38.1 – 43.8 FPS**).
 
 ---
 
@@ -29,11 +28,11 @@ Trong tuần trước, sinh viên đã hoàn thành và báo cáo kết quả hu
 Sau khi hoàn thiện mô hình AI, tuần này sinh viên tập trung giải quyết bài toán cốt lõi: *"Làm thế nào để đưa mô hình vào luồng video CCTV thực tế và phán quyết chính xác hành vi lấn chiếm vỉa hè mà không gây cảnh báo giả?"*.
 
 ### 2.1. Quản lý và Định hình Vùng quan tâm Vỉa hè (Sidewalk ROI Management)
-Thay vì sử dụng mô hình Semantic Segmentation nặng nề gây tốn tài nguyên GPU trong từng khung hình, hệ thống tận dụng triệt để đặc tính cố định của camera CCTV thông qua module `roi/roi_manager.py` và công cụ đồ họa `roi_drawer.py`:
+Thay vì sử dụng mô hình Semantic Segmentation nặng nề gây tốn tài nguyên GPU trong từng khung hình, hệ thống khai thác tối đa đặc tính cố định của camera CCTV thông qua module `roi/roi_manager.py` và công cụ đồ họa `roi_drawer.py`:
 
-1. **Triết lý thiết kế ROI tĩnh (Static ROI):** Người vận hành dùng chuột click các đỉnh đa giác vỉa hè 1 lần duy nhất cho mỗi camera. Tọa độ lưu thành file JSON chuẩn (vd: `configs/roi_pho_bang.json`, `configs/roi_screenshot.json`). Chạy **0% GPU runtime**, không trễ khung hình, chính xác tuyệt đối theo thực địa quy hoạch.
+1. **Triết lý thiết kế ROI tĩnh (Static ROI):** Người vận hành dùng chuột click các đỉnh đa giác vỉa hè 1 lần duy nhất cho mỗi camera. Tọa độ lưu thành file JSON chuẩn (vd: `configs/roi_pho_bang.json`, `configs/roi_screenshot.json`). Chạy **0% GPU runtime**, không trễ khung hình, khớp chính xác theo thực địa quy hoạch.
 2. **Tính năng đa vỉa hè (Multi-ROI):** Cho phép cấu hình đồng thời nhiều đa giác vỉa hè (vỉa hè trái, vỉa hè phải) trên cùng một khung hình.
-3. **Tự động co giãn theo độ phân giải (Resolution Auto-Scaling):** Khi người vận hành vẽ ROI trên ảnh mẫu 1080p nhưng stream video camera gửi về ở 720p hoặc 4K, class `ROIManager` tự động nhân ma trận tỷ lệ và co giãn tọa độ đa giác, triệt tiêu sai lệch ranh giới.
+3. **Tự động co giãn theo độ phân giải (Resolution Auto-Scaling):** Khi người vận hành vẽ ROI trên ảnh mẫu 1080p nhưng stream video camera gửi về ở 720p hoặc 4K, class `ROIManager` tự động nhân ma trận tỷ lệ và co giãn tọa độ đa giác, giảm thiểu sai lệch ranh giới.
 4. **Tiện ích tương tác trực tiếp:** Tích hợp phím tắt `r` ngay trong công cụ kiểm thử để mở cửa sổ vẽ lại hoặc xóa ROI bất kỳ lúc nào.
 
 ### 2.2. Cơ chế Phán quyết Hình học Kép nâng cao (3-Point Ground Contact)
@@ -45,7 +44,7 @@ Trong module `violation/checker.py`, hệ thống áp dụng điều kiện kép
     2. Trung tâm đáy: $\left(\frac{x_1 + x_2}{2}, y_2\right)$
     3. Chân phải: $(x_2, y_2)$
   * **Quy tắc:** Chỉ cần ít nhất 1 trong 3 điểm này cắm trên mặt đa giác vỉa hè (`pointPolygonTest >= 0`), máy tính công nhận chân biển đã tiếp đất trên vỉa hè.
-  * **Ý nghĩa:** Loại bỏ hoàn toàn các biển gắn trên tường nhà, ban công tầng 2 chìa ra ngoài không gian ảnh 2D nhưng chân lơ lửng không chạm đất.
+  * **Ý nghĩa:** Loại bỏ hiệu quả các biển gắn trên tường nhà, ban công tầng 2 chìa ra ngoài không gian ảnh 2D nhưng chân lơ lửng không chạm đất.
 * **Điều kiện 2 (Tỷ lệ diện tích đè vỉa hè - Overlap Ratio $\ge 30\%$):**
   $$\text{Overlap Ratio} = \frac{\text{Area}(\text{Box} \cap \text{ROI})}{\text{Area}(\text{Box})} \ge 0.30$$
   * Mẫu số là diện tích Bounding Box (không dùng IoU, không dùng diện tích ROI) để phản ánh câu hỏi pháp lý: *"Bao nhiêu % diện tích tấm biển đang chiếm dụng vỉa hè?"*.
@@ -55,7 +54,7 @@ Trong module `violation/checker.py`, hệ thống áp dụng điều kiện kép
 | :---: | :---: | :---: | :---: | :---: | :--- |
 | **10% – 15%** | 57.1% | 75.0% | 75.0% | 75.0% | Quá nhạy, dễ báo sai với biển chỉ nhô nhẹ mép |
 | **20% – 25%** | 57.1% | 75.0% | 75.0% | 75.0% | Vùng chuyển tiếp |
-| **30%** | **42.9%** | **100.0%** | **75.0%** | **85.71% 🏆** | **Tối ưu nhất (F1 đạt đỉnh, Precision 100%)** |
+| **30%** | **42.9%** | **100.0%** | **75.0%** | **85.71%** | **Tối ưu nhất (F1 đạt đỉnh, Precision 100%)** |
 | **35% – 40%** | 42.9% | 100.0% | 75.0% | 85.71% | Ổn định |
 | **50% – 60%** | 42.9% | 100.0% | 75.0% | 85.71% | Quá khắt khe, dễ bỏ sót vi phạm thật |
 
@@ -63,7 +62,7 @@ Trong module `violation/checker.py`, hệ thống áp dụng điều kiện kép
 Trong module `tracking/verifier.py`, hệ thống tích hợp ByteTrack giải quyết 4 bài toán thực địa:
 1. **Loại bỏ người đi bộ bê biển đi ngang:** Đo độ dời tâm qua các frame ($\Delta d = \|\mathbf{c}_t - \mathbf{c}_0\|$). Nếu $\Delta d > 50\text{ px}$ (đang di chuyển), giữ trạng thái `SUSPECTED` và không báo vi phạm. Chỉ các biển đứng yên ($\Delta d \le 50\text{ px}$) mới nâng cấp `CONFIRMED`.
 2. **Xác nhận qua chuỗi thời gian ($N = 15\text{ frames}$):** Phải duy trì trạng thái lấn chiếm liên tục ~0.5–1 giây để loại bỏ nhiễu rung lắc camera hoặc xe máy đi lướt qua che khuất.
-3. **Khử trùng lặp cảnh báo theo vị trí (Spatial Deduplication):** Khi xe buýt che khuất biển quá 30 frames khiến ByteTrack mất dấu và cấp `track_id` mới tại cùng tọa độ, bộ lọc bán kính $R \le 50\text{ px}$ kết hợp Cooldown 60s chặn hoàn toàn Spam Alert.
+3. **Khử trùng lặp cảnh báo theo vị trí (Spatial Deduplication):** Khi xe buýt che khuất biển quá 30 frames khiến ByteTrack mất dấu và cấp `track_id` mới tại cùng tọa độ, bộ lọc bán kính $R \le 50\text{ px}$ kết hợp Cooldown 60s ngăn ngừa hiệu quả hiện tượng Spam Alert.
 4. **Xử lý che khuất (Occlusion Decay):** Bộ đếm giảm dần khi đối tượng bị che khuất tạm thời.
 
 ### 2.4. Đóng gói Bằng chứng pháp lý Phạt nguội & CSDL SQLite
@@ -80,10 +79,10 @@ Sinh viên đã trực tiếp sử dụng công cụ `roi_drawer.py` thiết l�
 
 | STT | Tên tệp ảnh | Số biển phát hiện | Vi phạm vỉa hè | Hợp lệ | Chi tiết phán quyết theo hình học |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| **1** | `ChatGPT Image 09_49_42` | **7 biển** | **7 / 7 biển (100%)** 🔴 | 0 biển | Cả 7 biển đều có chân cắm trên vỉa hè và đè vỉa hè từ 64% – 100% |
-| **2** | `ChatGPT Image 09_51_43` | **5 biển** | **3 / 5 biển (60%)** 🔴 | 2 biển 🟢 | 3 biển đè 100% vỉa hè; 2 biển còn lại chớm mép đường (3% và 27% < 30%) được kết luận hợp lệ |
-| **3** | `Screenshot 214856` | **5 biển** | **5 / 5 biển (100%)** 🔴 | 0 biển | 5/5 biển cắm trọn trên vỉa hè (đè từ 54% – 100%) |
-| **Tổng** | **3 ảnh phức tạp** | **17 biển** | **15 vi phạm (88.2%)** | **2 hợp lệ (11.8%)** | **Chính xác 100% theo hiện trường thực tế** |
+| **1** | `ChatGPT Image 09_49_42` | **7 biển** | **7 / 7 biển (100%)** | 0 biển | Cả 7 biển đều có chân cắm trên vỉa hè và đè vỉa hè từ 64% – 100% |
+| **2** | `ChatGPT Image 09_51_43` | **5 biển** | **3 / 5 biển (60%)** | 2 biển | 3 biển đè 100% vỉa hè; 2 biển còn lại chớm mép đường (3% và 27% < 30%) được kết luận hợp lệ |
+| **3** | `Screenshot 214856` | **5 biển** | **5 / 5 biển (100%)** | 0 biển | 5/5 biển cắm trọn trên vỉa hè (đè từ 54% – 100%) |
+| **Tổng** | **3 ảnh phức tạp** | **17 biển** | **15 vi phạm (88.2%)** | **2 hợp lệ (11.8%)** | **Khớp với hiện trường thực tế** |
 
 #### Hình ảnh minh chứng thực tế trên 3 bức ảnh (Đã nhúng trực tiếp vào file Word):
 * **Hình 2 (Ảnh 1 - `ChatGPT Image 09_49_42`):** [v8_result_1_ChatGPT_Image_Sep_30,_2026,_09_49_42_PM.png](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_test_v8/v8_result_1_ChatGPT_Image_Sep_30,_2026,_09_49_42_PM.png) — Phát hiện 7/7 biển vi phạm (đè 64% – 100%), hiển thị rõ vùng ROI vỉa hè và thanh chân đế với 3 chấm vàng tiếp xúc mặt đất.
@@ -94,12 +93,31 @@ Sinh viên đã trực tiếp sử dụng công cụ `roi_drawer.py` thiết l�
 
 ## 4. Đánh giá Chất lượng Cấp độ Toàn hệ thống (System-level Metrics)
 
-| Chỉ số | Tầng Nhận diện (Detector-level) | Toàn Hệ thống (System-level) | Ý nghĩa đánh giá |
-| :--- | :---: | :---: | :--- |
-| **Precision** | $82.94\%$ (ảnh tĩnh) | **$100.00\%$** | Không phát sinh báo động giả ngoài vỉa hè |
-| **Recall** | $80.44\%$ (ảnh tĩnh) | **$75.00\%$** | Bắt đúng 3/4 vi phạm thực tế trong video |
-| **F1-Score** | $81.67\%$ | **$85.71\%$** | Điểm cân bằng tối ưu sau chuỗi lọc |
-| **Tốc độ xử lý** | 18.7 ms (GPU) / 160 ms (CPU) | **~5.5 FPS** (CPU i5-10300H) | Đạt near-realtime trên máy tính thông thường |
+Thực nghiệm đo lường độc lập trên 3 video CCTV thực địa Hà Nội (720 frames, 16 tracks đối tượng) bằng script `evaluation/evaluate_videos.py` ghi nhận số liệu cụ thể như sau:
+
+| Chỉ số | Tầng Nhận diện (Detector-level) | Toàn Hệ thống (System-level - Bản A) | Toàn Hệ thống (System-level - Bản B) | Ý nghĩa đánh giá |
+| :--- | :---: | :---: | :---: | :--- |
+| **Precision** | $82.94\%$ (ảnh tĩnh) | **$100.00\%$** (CI: 72.2–100%) | **$100.00\%$** (CI: 74.1–100%) | 0 cảnh báo giả ngoài vỉa hè (FP = 0) |
+| **Recall** | $80.44\%$ (ảnh tĩnh) | **$71.43\%$** (10/14, CI: 45.4–88.3%) | **$78.57\%$** (11/14, CI: 52.4–92.4%) | Bắt đúng 11/14 biển vi phạm thực tế (Bản B) |
+| **F1-Score** | $81.67\%$ | **$83.33\%$** | **$88.00\%$** | Điểm cân bằng điều hòa tối ưu toàn chuỗi pipeline |
+| **Throughput luồng** | 18.7 ms (Tesla T4) | **31.3 – 39.2 FPS** (CPU Intel) | **31.3 – 39.2 FPS** (CPU Intel) | Ổn định: **38.1 – 43.8 FPS** (loại trừ warmup) |
+| **Độ trễ AI (Mean/p50/p95)** | 18.7 ms (GPU) | 62.6 ms / 63.7 ms / 74.5–118.4 ms | 62.6 ms / 63.7 ms / 74.5–118.4 ms | ONNX Runtime CPU (`imgsz=640`, `frame_skip=2`, loại trừ warmup) |
+
+*Ghi chú về các con số tốc độ trong các tài liệu:*
+1. **~5.5 FPS (160–180 ms):** Đo khi chạy mô hình PyTorch gốc (.pt) trên CPU ở độ phân giải lớn `imgsz=1280` trên từng frame (thử nghiệm baseline thô ban đầu của mô hình detector đơn lẻ).
+2. **22.2 FPS (~45.0 ms AI + Tracker):** Đo trong `benchmark.py` bằng ONNX Runtime trên CPU ở `imgsz=640` khi xử lý liên tục từng frame (`frame_skip=0`).
+3. **31.3 – 39.2 FPS (Ổn định: 38.1 – 43.8 FPS):** Throughput xử lý luồng thực tế của toàn bộ pipeline với cơ chế `frame_skip=2` (suy luận 1 frame, 2 frame bỏ qua). Cụ thể: 1 frame suy luận AI + cập nhật ByteTrack (~62.6 ms) cộng với 2 frame bỏ qua chỉ giải mã và đọc từ luồng (~2.6 ms/frame) tạo thành chu kỳ 3 frames ~68 ms, tương ứng throughput ổn định đạt 38.1 – 43.8 FPS. Khung hình khởi động (Warmup Frame 0 tốn 2.21s ở Video 1 do nạp ONNX runtime ban đầu, ~184–188 ms ở Video 2, 3) được tách riêng để phản ánh chính xác hiệu năng ổn định (steady-state).
+
+### 4.1. Lịch Sử Hiệu Chuẩn Vùng ROI Video 1 & Mã Băm Toàn Vẹn SHA-256
+Việc điều chỉnh ROI qua các đợt phát triển phản ánh bản chất của bước hiệu chuẩn camera (Camera Calibration) tại góc quan sát thực địa:
+
+| Phiên bản | Tên file cấu hình | Số đỉnh | Mã băm toàn vẹn (SHA-256) | Thời điểm ghi nhận | Kết quả đối sánh | Ý nghĩa kỹ thuật |
+| :--- | :--- | :---: | :--- | :--- | :---: | :--- |
+| **Version A** | `configs/roi_video_test_version_a.json` | 7 đỉnh | `a47cd6aefe3a88a71af2bf8ffea4b0d61a1b98fd5064e2f60d9e6e96d678500f` | Tái dựng 11/10 (từ ghi chép 05/10) | Recall 71.43% (10/14) | Thử nghiệm sơ khai: vẽ hẹp sát mép trong, chân đế Standee #3 rơi ra ngoài ROI -> bỏ sót (FN). |
+| **Version B** | `configs/roi_video_test_version_b.json` & `roi_video_test.json` | 8 đỉnh | `8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c` | 2026-10-08 22:23:56 (Đóng băng) | Recall 78.57% (11/14) | **Bản chuẩn hóa chính thức**: bao trùm toàn bộ không gian vỉa hè thực tế, Standee #3 đạt Overlap ~77.0% -> CONFIRMED (TP). |
+| **Version C** | `configs/roi_video_test_version_c.json` | 6 đỉnh | `eed72b3341b56109434e0b70e10c378542dddf0a7ed6436c72abd67af309766f` | 2026-10-12 14:27:30 (Thử nghiệm Web) | Overlap giảm còn 63.1% | Thử nghiệm rút gọn đỉnh trên Web Studio; đã lưu trữ độc lập và loại bỏ để bảo toàn tính đóng băng của Version B. |
+
+*Mã băm Ground Truth đối soát:* `configs/video_ground_truth.json` (16 tracks) — SHA-256: `590d0f201fefcae6a72ff9449ba2cc8164a0712a40c63c9d03afbe9ad351e93d` (đóng băng độc lập, không thay đổi).
 
 ---
 

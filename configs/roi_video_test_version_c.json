@@ -1,0 +1,68 @@
+{
+    "camera_id": "video test",
+    "description": "Vung via he 6 dinh (Version C - Ban thu nghiem tren web dashboard 2026-10-12 14:27:30, bi loai bo de dong bang ban chuan Version B 8 dinh)",
+    "resolution": {
+        "width": 1280,
+        "height": 720
+    },
+    "total_regions": 1,
+    "total_points": 6,
+    "polygons": [
+        [
+            [
+                14,
+                57
+            ],
+            [
+                719,
+                52
+            ],
+            [
+                929,
+                719
+            ],
+            [
+                36,
+                719
+            ],
+            [
+                295,
+                76
+            ],
+            [
+                388,
+                58
+            ]
+        ]
+    ],
+    "polygon_points": [
+        [
+            [
+                14,
+                57
+            ],
+            [
+                719,
+                52
+            ],
+            [
+                929,
+                719
+            ],
+            [
+                36,
+                719
+            ],
+            [
+                295,
+                76
+            ],
+            [
+                388,
+                58
+            ]
+        ]
+    ],
+    "created_at": "2026-10-12 14:27:30",
+    "note": "Phien ban 6 dinh ve thu nghiem tren web dashboard ngay 12/10, da duoc luu tru doc lap de doi chieu va khong su dung lam benchmark chinh thuc."
+}

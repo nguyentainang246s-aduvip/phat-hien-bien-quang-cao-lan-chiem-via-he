@@ -52,7 +52,7 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 1. **Kịch bản cơ sở (Baseline - Không có Temporal Verifier):** Phán quyết vi phạm tức thời theo từng khung hình độc lập (Single-frame).
 2. **Kịch bản đề xuất (Proposed System):** Tích hợp máy trạng thái xác thực 15 khung hình liên tiếp và cơ chế làm nguội (Cooldown 60s).
 
-### Bảng 7.3. Kết quả so sánh khả năng triệt tiêu báo động giả
+### Bảng 7.3. Kết quả so sánh khả năng giảm thiểu và loại trừ báo động giả
 
 | Kịch bản đánh giá | Tổng số cảnh báo sinh ra | Số vụ vi phạm chốt lưu DB | Tỷ lệ giảm báo giả/spam |
 | :--- | :---: | :---: | :---: |

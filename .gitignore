@@ -46,4 +46,5 @@ datasets/v8/test/
 # Log & Temp
 *.log
 *.tmp
+*.zip
 scratch/

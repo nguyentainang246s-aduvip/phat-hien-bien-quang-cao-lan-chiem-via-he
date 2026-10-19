@@ -32,7 +32,7 @@ class TemporalVerifier:
     Nguyên lý: Chỉ kết luận và phát cảnh báo vi phạm khi một đối tượng (track_id)
     duy trì hành vi lấn chiếm vỉa hè liên tục trong tối thiểu N GIÂY THỰC.
 
-    Loại bỏ triệt để:
+    Cơ chế sàng lọc:
       - Người đi bộ bê biển đi ngang qua vỉa hè (sliding window displacement).
       - Xe cộ vô tình che khuất chớp nhoáng (Flickering) với tolerance_seconds.
       - Cảnh báo trùng lặp (Spam Alert) nhờ cơ chế Cooldown Timer.
@@ -47,8 +47,8 @@ class TemporalVerifier:
 
     def __init__(
         self,
-        confirm_frames: int = 15,
-        confirm_seconds: float = 0.5,
+        confirm_frames: int = 20,
+        confirm_seconds: float = 3.0,
         cooldown_seconds: float = 60.0,
         max_missing_frames: int = 30,
         tolerance_frames: int = 2,
@@ -109,7 +109,9 @@ class TemporalVerifier:
     # ------------------------------------------------------------------
 
     def _elapsed_viol_seconds(self, record: dict, now: float) -> float:
-        """Trả về số giây vi phạm liên tiếp kể từ lần đầu bắt đầu."""
+        """Trả về số giây vi phạm liên tiếp kể từ lần đầu bắt đầu của chuỗi quan sát hiện tại."""
+        if not record.get("viol_confs"):
+            return 0.0
         start = record.get("viol_start_time")
         if start is None:
             return 0.0
@@ -148,7 +150,7 @@ class TemporalVerifier:
         Ưu tiên: giây thực nếu có thể tính được (viol_start_time tồn tại),
         fallback về số frame.
         """
-        if record.get("viol_start_time") is not None:
+        if record.get("viol_start_time") is not None and record.get("viol_confs"):
             return self._elapsed_viol_seconds(record, now) >= self.confirm_seconds
         return record["count"] >= self.confirm_frames
 
@@ -217,11 +219,12 @@ class TemporalVerifier:
                 self.track_records[track_id] = {
                     "count": 0,
                     "viol_start_time": None,
+                    "last_viol_timestamp": None,
                     "status": TrackState.NORMAL,
                     "last_seen": self.current_frame_index,
                     "last_alert_time": 0.0,
                     "non_viol_streak": 0,
-                    "conf_sum": 0.0,
+                    "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
                     "pos_window": deque(maxlen=200),   # ~6.7 giây ở 30 FPS
                 }
 
@@ -233,23 +236,35 @@ class TemporalVerifier:
 
             # 3. Cập nhật bộ đếm thời gian
             is_new_alert = False
-
             suspect_reason = ""
 
             if is_spatial_viol:
-                record["count"] += 1
-                record["non_viol_streak"] = 0
-                record["conf_sum"] += conf
+                # Kiểm tra gián đoạn chuỗi vi phạm (gap lớn hơn dung sai liên tục)
+                frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
+                max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval * 3)
+                if record["last_viol_timestamp"] is not None:
+                    gap = current_timestamp - record["last_viol_timestamp"]
+                    if gap > max_allowed_gap:
+                        # Gián đoạn quá lâu -> reset chuỗi quan sát liên tục
+                        record["viol_confs"].clear()
+                        record["viol_start_time"] = current_timestamp
+                        record["count"] = 0
 
-                # Ghi nhận thời điểm bắt đầu chuỗi vi phạm (chỉ lần đầu)
                 if record["viol_start_time"] is None:
                     record["viol_start_time"] = current_timestamp
 
+                record["last_viol_timestamp"] = current_timestamp
+                record["viol_confs"].append((current_timestamp, conf))
+                record["count"] = len(record["viol_confs"])
+                record["non_viol_streak"] = 0
+
+                # Tính confidence trung bình trên chuỗi quan sát thực tế (không bị thổi phồng khi decay)
+                confs = [c for t, c in record["viol_confs"]]
+                avg_conf = (sum(confs) / len(confs)) if confs else 0.0
+
                 # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
                 if self._confirm_threshold_reached(record, current_timestamp):
-                    avg_conf = record["conf_sum"] / record["count"] if record["count"] > 0 else 0.0
-
-                    # Stationary check (sliding window – sửa lỗi cũ)
+                    # Stationary check (sliding window)
                     is_stationary = self._is_stationary(record, current_timestamp)
 
                     if not is_stationary:
@@ -288,7 +303,8 @@ class TemporalVerifier:
                                 if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
                             ]
                 else:
-                    record["status"] = TrackState.SUSPECTED
+                    if record["status"] != TrackState.CONFIRMED:
+                        record["status"] = TrackState.SUSPECTED
                     suspect_reason = ""
 
             else:
@@ -297,14 +313,18 @@ class TemporalVerifier:
                 if record["non_viol_streak"] > self.tolerance_frames:
                     # Vượt ngưỡng dung sai → reset hoàn toàn
                     record["count"] = 0
-                    record["conf_sum"] = 0.0
+                    record["viol_confs"].clear()
                     record["viol_start_time"] = None
+                    record["last_viol_timestamp"] = None
                     record["status"] = TrackState.NORMAL
                 else:
-                    # Trong ngưỡng dung sai (1–2 frame flicker)
-                    record["count"] = max(0, record["count"] - 1)
+                    # Trong ngưỡng dung sai (1–2 frame flicker): trừ conf tương ứng khi decay
+                    if record["viol_confs"]:
+                        record["viol_confs"].popleft()
+                    record["count"] = len(record["viol_confs"])
                     if record["count"] == 0:
                         record["viol_start_time"] = None
+                        record["last_viol_timestamp"] = None
                         record["status"] = TrackState.NORMAL
 
             enriched_results.append({
@@ -324,9 +344,12 @@ class TemporalVerifier:
             if tid not in active_ids:
                 missing_streak = self.current_frame_index - r["last_seen"]
                 if missing_streak > self.tolerance_frames:
-                    r["count"] = max(0, r["count"] - 1)
+                    if r["viol_confs"]:
+                        r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
+                    r["count"] = len(r["viol_confs"])
                     if r["count"] == 0:
                         r["viol_start_time"] = None
+                        r["last_viol_timestamp"] = None
                         r["status"] = TrackState.NORMAL
 
         # 5. Garbage Collection – xóa track cũ khỏi RAM
