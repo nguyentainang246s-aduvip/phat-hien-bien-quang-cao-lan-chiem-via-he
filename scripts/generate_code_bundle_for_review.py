@@ -8,6 +8,16 @@ if sys.stdout.encoding != 'utf-8':
         pass
 
 items = {
+    'NHOM_0': {
+        'title': 'NHÓM 0: TỔNG QUAN ĐỀ TÀI, CẤU HÌNH HỆ THỐNG & ĐIỂM VÀO ĐIỀU HÀNH',
+        'description': 'Tóm tắt bài toán, căn cứ pháp lý Nghị định 168/2024/NĐ-CP, kiến trúc 5 tầng, cấu hình chuẩn settings.yaml, điểm vào điều hành main.py và module suy luận YOLO ONNX detector.py.',
+        'files': [
+            ('PROJECT_ESSENTIALS_FOR_AI.txt', 'Hồ sơ bản chất kỹ thuật, cơ sở toán học, kiến trúc 5 tầng và ground truth chuẩn 16 đối tượng'),
+            ('configs/settings.yaml', 'Tệp cấu hình hệ thống trung tâm (ngưỡng tin cậy, model path, frame skip, camera, vỉa hè)'),
+            ('main.py', 'Điểm vào điều hành trung tâm (Unified Entry Point) hỗ trợ cả 4 chế độ: Monitor, Dashboard, ROI, Benchmark'),
+            ('detection/detector.py', 'Tầng suy luận mô hình phát hiện vật thể YOLOv8 ONNX Runtime CPU')
+        ]
+    },
     'NHOM_1': {
         'title': 'NHÓM 1: BẮT BUỘC (ĐỂ CHỐT ĐIỂM TIÊU CHÍ 2 VÀ 4)',
         'description': 'Kiểm tra logic check_multi, chân đế tiếp đất, dung sai 15px, đa giác ROI, kịch bản đánh giá video, ground truth và ByteTrack wrapper.',
@@ -66,12 +76,13 @@ out_n3 = 'MA_NGUON_NHOM_3_BO_SUNG.txt'
 
 def generate_header():
     return '''# ==============================================================================
-# HỒ SƠ TỔNG HỢP MÃ NGUỒN PHỤC VỤ ĐÁNH GIÁ & PHẢN BIỆN ĐỒ ÁN TỐT NGHIỆP
+# HỒ SƠ TỔNG HỢP TOÀN BỘ MÃ NGUỒN PHỤC VỤ ĐÁNH GIÁ & CHẤM ĐIỂM ĐỒ ÁN TỐT NGHIỆP
 # Đề tài: Hệ thống giám sát và phát hiện biển quảng cáo/biển hiệu lấn chiếm vỉa hè
 # Sinh viên: Nguyễn Đức Tài Năng — MSSV: 20224083
-# Ngành: Công nghệ Thông tin / Khoa học Máy tính
+# Ngành: Công nghệ Thông tin / Khoa học Máy tính (Đại học Bách Khoa Hà Nội)
 #
 # DANH MỤC CÁC PHẦN:
+# - NHÓM 0: TỔNG QUAN ĐỀ TÀI, CẤU HÌNH TOÀN CỤC & ĐIỂM VÀO ĐIỀU HÀNH (main.py, settings.yaml, detector.py, essentials)
 # - NHÓM 1: BẮT BUỘC (Logic Overlap, Chân đế tiếp đất, Temporal Verifier, Hungarian Evaluation, GT)
 # - NHÓM 2: QUAN TRỌNG (RTSP StreamReader, ROIManager, Evidence Saver, SQLite DB, Benchmark)
 # - NHÓM 3: BỔ SUNG (Web Dashboard Human-in-the-Loop, 10 Bộ Unit Tests, Training config, Reports)
@@ -106,6 +117,7 @@ def dump_group(group_key):
 
 def main():
     print('[*] Đang xuất mã nguồn ra các tệp phục vụ kiểm tra...')
+    c0 = dump_group('NHOM_0')
     c1 = dump_group('NHOM_1')
     c2 = dump_group('NHOM_2')
     c3 = dump_group('NHOM_3')
@@ -122,9 +134,9 @@ def main():
     with open(out_n3, 'w', encoding='utf-8') as f:
         f.write(generate_header() + c3)
 
-    # 4. Ghi tệp gộp tất cả
+    # 4. Ghi tệp gộp tất cả (Bao gồm cả Nhóm 0 + Nhóm 1 + Nhóm 2 + Nhóm 3)
     with open(out_all, 'w', encoding='utf-8') as f:
-        f.write(generate_header() + c1 + '\n\n' + c2 + '\n\n' + c3)
+        f.write(generate_header() + c0 + '\n\n' + c1 + '\n\n' + c2 + '\n\n' + c3)
 
     print('[OK] Đã hoàn thành xuất tất cả các tệp!')
     for p in [out_n1, out_n2, out_n3, out_all]:

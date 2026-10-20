@@ -1,10 +1,11 @@
 # ==============================================================================
-# HỒ SƠ TỔNG HỢP MÃ NGUỒN PHỤC VỤ ĐÁNH GIÁ & PHẢN BIỆN ĐỒ ÁN TỐT NGHIỆP
+# HỒ SƠ TỔNG HỢP TOÀN BỘ MÃ NGUỒN PHỤC VỤ ĐÁNH GIÁ & CHẤM ĐIỂM ĐỒ ÁN TỐT NGHIỆP
 # Đề tài: Hệ thống giám sát và phát hiện biển quảng cáo/biển hiệu lấn chiếm vỉa hè
 # Sinh viên: Nguyễn Đức Tài Năng — MSSV: 20224083
-# Ngành: Công nghệ Thông tin / Khoa học Máy tính
+# Ngành: Công nghệ Thông tin / Khoa học Máy tính (Đại học Bách Khoa Hà Nội)
 #
 # DANH MỤC CÁC PHẦN:
+# - NHÓM 0: TỔNG QUAN ĐỀ TÀI, CẤU HÌNH TOÀN CỤC & ĐIỂM VÀO ĐIỀU HÀNH (main.py, settings.yaml, detector.py, essentials)
 # - NHÓM 1: BẮT BUỘC (Logic Overlap, Chân đế tiếp đất, Temporal Verifier, Hungarian Evaluation, GT)
 # - NHÓM 2: QUAN TRỌNG (RTSP StreamReader, ROIManager, Evidence Saver, SQLite DB, Benchmark)
 # - NHÓM 3: BỔ SUNG (Web Dashboard Human-in-the-Loop, 10 Bộ Unit Tests, Training config, Reports)
