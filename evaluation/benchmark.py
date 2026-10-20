@@ -74,7 +74,14 @@ class SystemBenchmark:
         else:
             self.config_path = config_path
 
-        self.model_path = model_path if os.path.exists(model_path) else "yolov8n.pt"
+        if model_path and os.path.exists(model_path):
+            self.model_path = model_path
+        elif os.path.exists("models/best.onnx"):
+            self.model_path = "models/best.onnx"
+        elif os.path.exists("models/best.pt"):
+            self.model_path = "models/best.pt"
+        else:
+            self.model_path = "yolov8n.pt"
         self.num_frames = num_frames
 
     def get_hardware_info(self) -> dict:
@@ -148,12 +155,17 @@ class SystemBenchmark:
             print(f"   • Số khung hình đo   : {self.num_frames} frames")
             print("=" * 78)
 
-        # Khởi tạo các module
+        # Khởi tạo các module đồng bộ chuẩn settings.yaml
         reader = StreamReader(self.source)
         roi_mgr = ROIManager(self.config_path)
-        tracker = ObjectTracker(model_path=self.model_path, conf_threshold=0.20)
+        tracker = ObjectTracker(model_path=self.model_path, conf_threshold=0.25, imgsz=640)
         checker = ViolationChecker(threshold=0.30)
-        verifier = TemporalVerifier(confirm_frames=15, cooldown_seconds=60.0)
+        verifier = TemporalVerifier(
+            confirm_frames=20,
+            confirm_seconds=3.0,
+            cooldown_seconds=60.0,
+            source_fps=reader.fps
+        )
 
         # ISSUE 01 FIX: Validate & auto-scale ROI theo resolution video thực tế
         roi_mgr.validate_resolution(reader.width, reader.height)

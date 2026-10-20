@@ -73,19 +73,30 @@ class EvidenceSaver:
         os.makedirs(full_dir, exist_ok=True)
         os.makedirs(crop_dir, exist_ok=True)
 
-        # 2. Xử lý ảnh toàn cảnh (Full Frame with Watermark Stamp)
+        h, w = frame.shape[:2]
+        x1, y1, x2, y2 = [int(v) for v in box]
+        x1_clamped, y1_clamped = max(0, x1), max(0, y1)
+        x2_clamped, y2_clamped = min(w, x2), min(h, y2)
+
+        # 1. Cắt ảnh cận cảnh (Cropped Target Sign) từ frame sạch trước khi vẽ đè
+        cropped_img = frame[y1_clamped:y2_clamped, x1_clamped:x2_clamped].copy()
+        crop_filename = f"crop_id{track_id}_{time_str}.jpg"
+        crop_path = os.path.join(crop_dir, crop_filename)
+        if cropped_img.size > 0:
+            cv2.imwrite(crop_path, cropped_img)
+        else:
+            crop_path = ""
+
+        # 2. Xử lý ảnh toàn cảnh (Full Frame with Target Highlight & Watermark Stamp)
         stamped_frame = frame.copy()
-        h, w = stamped_frame.shape[:2]
 
         # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
         if self._face_cascade is not None:
             try:
                 gray = cv2.cvtColor(stamped_frame, cv2.COLOR_BGR2GRAY)
                 faces = self._face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=4, minSize=(30, 30))
-                bx1, by1, bx2, by2 = box
                 for (fx, fy, fw_box, fh_box) in faces:
-                    # Không làm mờ nếu khuôn mặt nằm bên trong biển hiệu (hình vẽ người mẫu trên biển)
-                    is_inside_sign = (fx >= bx1 and fx + fw_box <= bx2 and fy >= by1 and fy + fh_box <= by2)
+                    is_inside_sign = (fx >= x1_clamped and fx + fw_box <= x2_clamped and fy >= y1_clamped and fy + fh_box <= y2_clamped)
                     if not is_inside_sign:
                         f_roi = stamped_frame[fy:fy+fh_box, fx:fx+fw_box]
                         if f_roi.size > 0:
@@ -95,9 +106,17 @@ class EvidenceSaver:
             except Exception:
                 pass
 
+        # Vẽ khung đỏ đánh dấu đối tượng vi phạm trên ảnh bằng chứng toàn cảnh
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.rectangle(stamped_frame, (x1_clamped, y1_clamped), (x2_clamped, y2_clamped), (0, 0, 255), 2)
+        box_label = f"VI PHAM ID:#{track_id} ({overlap_pct:.1f}%)"
+        (bw, bh), _ = cv2.getTextSize(box_label, font, 0.55, 2)
+        lbl_top = max(0, y1_clamped - bh - 8)
+        cv2.rectangle(stamped_frame, (x1_clamped, lbl_top), (x1_clamped + bw + 10, y1_clamped), (0, 0, 255), -1)
+        cv2.putText(stamped_frame, box_label, (x1_clamped + 5, max(15, y1_clamped - 4)), font, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
+
         # Đóng dấu tem pháp lý (Legal Stamp) ở góc dưới khung hình
         stamp_text = f"BANG CHUNG CCTV | Cam: {camera_id} | ID: #{track_id} | Lan chiem: {overlap_pct:.1f}% | {iso_timestamp}"
-        font = cv2.FONT_HERSHEY_SIMPLEX
         (tw, th), _ = cv2.getTextSize(stamp_text, font, 0.55, 1)
         cv2.rectangle(stamped_frame, (10, h - th - 20), (20 + tw, h - 5), (0, 0, 0), -1)
         cv2.putText(stamped_frame, stamp_text, (15, h - 10), font, 0.55, (0, 255, 255), 1, cv2.LINE_AA)
@@ -105,23 +124,6 @@ class EvidenceSaver:
         full_filename = f"violation_id{track_id}_{time_str}.jpg"
         full_path = os.path.join(full_dir, full_filename)
         cv2.imwrite(full_path, stamped_frame)
-
-        # 3. Xử lý ảnh cận cảnh (Cropped Target Sign)
-        x1, y1, x2, y2 = box
-        # Đảm bảo không vượt quá biên ảnh
-        x1_clamped = max(0, x1)
-        y1_clamped = max(0, y1)
-        x2_clamped = min(w, x2)
-        y2_clamped = min(h, y2)
-
-        cropped_img = frame[y1_clamped:y2_clamped, x1_clamped:x2_clamped]
-        crop_filename = f"crop_id{track_id}_{time_str}.jpg"
-        crop_path = os.path.join(crop_dir, crop_filename)
-
-        if cropped_img.size > 0:
-            cv2.imwrite(crop_path, cropped_img)
-        else:
-            crop_path = ""
 
         return {
             "full_path": full_path.replace("\\", "/"),

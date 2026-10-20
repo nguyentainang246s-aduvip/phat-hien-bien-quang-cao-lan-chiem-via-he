@@ -8,18 +8,18 @@ opencv-python>=4.8.0
 numpy>=1.24.0,<=2.3.5
 Pillow>=9.5.0
 
-# 2. Học sâu & Phát hiện vật thể (Deep Learning & YOLO)
+# 2. Học sâu, Suy luận Biên (Edge ONNX Runtime) & Bám vết (YOLO + ByteTrack)
 torch>=2.0.0
 torchvision>=0.15.0
 ultralytics>=8.1.0
+onnxruntime>=1.16.0
 
-# 3. Tính toán Hình học không gian & Phán quyết vi phạm
+# 3. Tính toán Hình học không gian & Ghép cặp tối ưu Hungarian (Bipartite Matching)
 shapely>=2.0.0
+scipy>=1.10.0
 
-# 4. Thu thập & Quản lý Dataset
+# 4. Thu thập dữ liệu, Cấu hình hệ thống & Đo đạc tài nguyên phần cứng
 roboflow>=1.1.0
 PyYAML>=6.0
-
-# 5. Giao diện Giám sát & Quản trị Dashboard
-streamlit>=1.30.0
-pandas>=2.0.0
+psutil>=5.9.0
+python-docx>=1.1.0

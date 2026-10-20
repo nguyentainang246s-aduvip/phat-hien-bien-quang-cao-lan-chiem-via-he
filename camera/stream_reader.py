@@ -63,13 +63,24 @@ class StreamReader:
         # Khởi động kết nối ban đầu
         self._connect()
 
+    def _stop_worker_thread(self):
+        """Dừng an toàn luồng đọc nền trước khi giải phóng VideoCapture."""
+        self._stop_event.set()
+        if self._thread is not None and self._thread.is_alive():
+            if threading.current_thread() != self._thread:
+                self._thread.join(timeout=1.5)
+        self._thread = None
+
     def _connect(self) -> bool:
-        """Tạo kết nối tới nguồn camera."""
+        """Tạo kết nối tới nguồn camera an toàn đa luồng."""
+        self._stop_worker_thread()
+
         if self.cap is not None:
             try:
                 self.cap.release()
             except Exception:
                 pass
+            self.cap = None
 
         if not self.is_live_stream and isinstance(self.source, str) and not os.path.exists(self.source):
             print(f"[LỖI] Tệp video không tồn tại trên đĩa: {self.source}")
@@ -90,6 +101,9 @@ class StreamReader:
         
         # Nếu là live stream / RTSP: Kích hoạt background thread để flush buffer liên tục
         if self.is_live_stream:
+            with self._lock:
+                self._latest_frame = None
+                self._latest_ret = False
             self._stop_event.clear()
             self._thread = threading.Thread(target=self._capture_worker, daemon=True)
             self._thread.start()
@@ -184,9 +198,7 @@ class StreamReader:
 
     def release(self):
         """Giải phóng bộ nhớ phần cứng camera và dừng background thread."""
-        self._stop_event.set()
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=1.0)
+        self._stop_worker_thread()
         if self.cap is not None and self.cap.isOpened():
             self.cap.release()
             print("[OK] Đã giải phóng tài nguyên camera.")

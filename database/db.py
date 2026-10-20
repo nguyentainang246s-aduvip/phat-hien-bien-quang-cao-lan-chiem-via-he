@@ -52,6 +52,9 @@ class ViolationDatabase:
                     bbox_y2 INTEGER,
                     sidewalk_index INTEGER DEFAULT 1,
                     status TEXT DEFAULT 'pending',
+                    reviewed_by TEXT DEFAULT NULL,
+                    dismiss_reason TEXT DEFAULT NULL,
+                    reviewed_at DATETIME DEFAULT NULL,
                     full_image_path TEXT,
                     crop_image_path TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP

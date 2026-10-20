@@ -18,12 +18,16 @@ class ViolationChecker:
       1. Tọa độ chân đế tiếp xúc mặt đất (Ground Contact Point) nằm trong vỉa hè.
       2. Tỷ lệ diện tích giao nhau 2D (Overlap Ratio) >= Ngưỡng Threshold (mặc định 30%).
     """
-    def __init__(self, threshold: float = 0.30):
+    def __init__(self, threshold: float = 0.30, ground_contact_rule: bool = True, base_margin: float = 15.0):
         """
         Args:
             threshold (float): Tỷ lệ diện tích lấn chiếm tối thiểu để cảnh báo (0.30 = 30%).
+            ground_contact_rule (bool): Bắt buộc điểm chân đế phải tiếp đất trong ROI vỉa hè.
+            base_margin (float): Dung sai tiếp đất tính bằng pixels (mặc định 15.0px).
         """
         self.threshold = threshold
+        self.ground_contact_rule = ground_contact_rule
+        self.base_margin = base_margin
 
     def check(self, box: tuple, polygon_points: list) -> dict:
         """
@@ -66,14 +70,13 @@ class ViolationChecker:
         base_point = pt_center
 
         pts_array = np.array(polygon_points, dtype=np.int32)
-        # Dung sai tiếp đất: cho phép lệch tối đa 15px (do người dùng click mép dưới cùng màn hình thường hụt 2-6px)
-        base_margin = 15.0
-        left_inside = cv2.pointPolygonTest(pts_array, pt_left, measureDist=True) >= -base_margin
-        center_inside = cv2.pointPolygonTest(pts_array, pt_center, measureDist=True) >= -base_margin
-        right_inside = cv2.pointPolygonTest(pts_array, pt_right, measureDist=True) >= -base_margin
+        # Dung sai tiếp đất: cho phép lệch tối đa self.base_margin px (do click mép màn hình)
+        left_inside = cv2.pointPolygonTest(pts_array, pt_left, measureDist=True) >= -self.base_margin
+        center_inside = cv2.pointPolygonTest(pts_array, pt_center, measureDist=True) >= -self.base_margin
+        right_inside = cv2.pointPolygonTest(pts_array, pt_right, measureDist=True) >= -self.base_margin
 
         # Thỏa mãn nếu BẤT KỲ điểm nào trong 3 điểm (Chân trái / Giữa / Chân phải) tiếp đất trên vỉa hè
-        is_base_inside = left_inside or center_inside or right_inside
+        is_base_inside = bool(left_inside or center_inside or right_inside)
 
         # ---------------------------------------------------------------------
         # ĐIỀU KIỆN 2: TỶ LỆ DIỆN TÍCH GIAO NHAU (OVERLAP RATIO VỚI SHAPELY)
@@ -88,22 +91,16 @@ class ViolationChecker:
         overlap_ratio = 0.0
         if box_poly.area > 0:
             intersection = sidewalk_poly.intersection(box_poly)
-            # ISSUE 07: Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
-            # Lý do khoa học:
-            #   - Phản ánh đúng câu hỏi pháp lý: "Bao nhiêu % CỦA BIỂN nằm trên vỉa hè?"
-            #   - Nếu dùng IoU: biển nhỏ nằm gọn ROI lớn → IoU rất thấp → bỏ sót vi phạm rõ ràng
-            #   - Nếu dùng ROI area: kết quả phụ thuộc kích thước vỉa hè, không phản ánh mức độ lấn chiếm
+            # Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
             overlap_ratio = float(intersection.area / box_poly.area)
 
         # ---------------------------------------------------------------------
         # RA QUYẾT ĐỊNH (DECISION RULE)
         # ---------------------------------------------------------------------
-        # Vi phạm khi CẢ HAI điều kiện đồng thời thỏa mãn:
-        #   1. Chân đế (Ground Contact Point) nằm trong vùng vỉa hè
-        #   2. Tỷ lệ diện tích bounding box giao vỉa hè >= ngưỡng threshold
-        # Lý do: Chỉ dùng overlap sẽ báo sai cho biển treo cao trên tầng 2/3
-        #         có bounding box trùm xuống ROI nhưng không thực sự chạm đất.
-        is_violation = (is_base_inside and overlap_ratio >= self.threshold)
+        if self.ground_contact_rule:
+            is_violation = (is_base_inside and overlap_ratio >= self.threshold)
+        else:
+            is_violation = (overlap_ratio >= self.threshold)
 
         
         overlap_pct = round(overlap_ratio * 100, 1)

@@ -7,8 +7,12 @@
 # !pip install ultralytics roboflow
 
 # 2. Tải Dataset Version 8 từ Roboflow
+import os
 from roboflow import Roboflow
-rf = Roboflow(api_key="mm2WOhL7NRUJjs5pn3h1")
+
+# Bảo mật API Key qua biến môi trường (tránh hardcode khóa cá nhân trong mã nguồn)
+api_key = os.environ.get("ROBOFLOW_API_KEY", "YOUR_ROBOFLOW_API_KEY")
+rf = Roboflow(api_key=api_key)
 project = rf.workspace("tai-nang-nguyen-duc").project("sidewalk-signboard-detection-1")
 version = project.version(8)
 dataset = version.download("yolov8")

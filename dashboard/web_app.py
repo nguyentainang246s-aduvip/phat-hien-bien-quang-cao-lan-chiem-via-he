@@ -2406,7 +2406,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <script>
         let currentStatusFilter = 'all';
-        let currentDateFilter = '2026-10-19'; // Mặc định hiển thị hồ sơ ngày 19 theo yêu cầu
+        let currentDateFilter = 'all'; // Mặc định hiển thị tất cả hồ sơ để vi phạm mới phát sinh luôn hiển thị ngay
         let allAvailableDates = [];
         let activeViolIdForDismiss = null;
         let activeViolIdForConfirm = null;
@@ -4292,16 +4292,19 @@ def _eval_worker_func(mode: str, video_name: str):
 # HỆ THỐNG TRUYỀN PHÁT LUỒNG VIDEO AI TRỰC TIẾP (LIVE AI STREAMING SERVER)
 # ==============================================================================
 _STREAM_LOCK = threading.Lock()
+_TRACKER_INFER_LOCK = threading.Lock()
 _ACTIVE_STREAM_TOKENS = {}
 _STREAM_TELEMETRY = {}
 _CACHED_TRACKER = None
 
 
-def get_shared_tracker(conf_threshold: float = 0.15, imgsz: int = 960):
+def get_shared_tracker(conf_threshold: float = 0.25, imgsz: int = 640):
     global _CACHED_TRACKER
-    if _CACHED_TRACKER is None:
-        from tracking import ObjectTracker
-        _CACHED_TRACKER = ObjectTracker(model_path="models/best.onnx", conf_threshold=conf_threshold, imgsz=imgsz)
+    with _TRACKER_INFER_LOCK:
+        if _CACHED_TRACKER is None:
+            from tracking import ObjectTracker
+            model_file = "models/best.onnx" if os.path.exists("models/best.onnx") else "models/best.pt"
+            _CACHED_TRACKER = ObjectTracker(model_path=model_file, conf_threshold=conf_threshold, imgsz=imgsz)
     return _CACHED_TRACKER
 
 
@@ -4400,10 +4403,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
         roi_manager = ROIManager(config_path if os.path.exists(config_path) else "configs/roi_camera1.json")
         camera_clean_id = roi_manager.camera_id or os.path.splitext(video_name)[0]
         checker = ViolationChecker(threshold=0.30)
-        min_avg_c = max(0.20, min(0.35, conf * 1.5))
-        verifier = TemporalVerifier(confirm_frames=15, confirm_seconds=0.5, source_fps=fps_source, min_avg_confidence=min_avg_c)
+        min_avg_c = max(0.25, min(0.40, conf * 1.6))
+        verifier = TemporalVerifier(
+            confirm_frames=20,
+            confirm_seconds=3.0,
+            source_fps=fps_source,
+            min_avg_confidence=min_avg_c
+        )
         fps_tracker = FPSTracker(alpha=0.15)
         tracker = get_shared_tracker(conf_threshold=conf, imgsz=imgsz)
+        with _TRACKER_INFER_LOCK:
+            tracker.reset()
         evidence_saver = EvidenceSaver(base_dir="evidence", blur_faces=True)
 
         frame_idx = 0
@@ -4424,6 +4434,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     frame_idx = 0
                     verifier.reset()
+                    with _TRACKER_INFER_LOCK:
+                        tracker.reset()
                     ret, frame = cap.read()
                     if not ret or frame is None:
                         break
@@ -4439,8 +4451,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 is_infer = (frame_skip <= 0) or (frame_idx % (frame_skip + 1) == 1)
 
                 if is_infer:
-                    tracked_objs = tracker.track(frame, conf=conf, imgsz=imgsz)
-                    last_results = verifier.process_frame(tracked_objs, checker, roi_manager.polygons)
+                    with _TRACKER_INFER_LOCK:
+                        tracked_objs = tracker.track(frame, conf=conf, imgsz=imgsz)
+                    sim_ts = frame_idx / fps_source
+                    last_results = verifier.process_frame(
+                        tracked_objs, checker, roi_manager.polygons, current_timestamp=sim_ts
+                    )
 
                     events = []
                     viol_count = 0

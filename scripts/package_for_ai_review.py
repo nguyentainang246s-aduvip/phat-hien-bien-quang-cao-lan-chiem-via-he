@@ -51,8 +51,11 @@ ROOT_FILES = [
     ".gitignore",
     "FULL_PROJECT_REVIEW.txt",
     "PROJECT_ESSENTIALS_FOR_AI.txt",
+    "PROMPT_REVIEW_AI_CHO_FILE_ZIP.md",
     "export_word.py",
-    "HO_SO_SUA_LOI_VA_MA_NGUON_DATN_20224083.docx"
+    "export_word_full.py",
+    "HO_SO_SUA_LOI_VA_MA_NGUON_DATN_20224083.docx",
+    "HO_SO_MA_NGUON_VA_SUA_LOI_TOAN_DIEN_DATN_20224083.docx"
 ]
 
 # Một số ảnh crop bằng chứng tiêu biểu và ma trận nhầm lẫn để AI có thể phân tích
