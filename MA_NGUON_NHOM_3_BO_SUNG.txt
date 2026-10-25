@@ -2484,8 +2484,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             const pillsHtml = allAvailableDates.slice(0, 5).map(item => {
                 const isAct = (currentDateFilter === item.date) ? 'active' : '';
-                const isToday = isTodayDate(item.date) || item.date === '2026-10-19';
-                const label = isToday ? `Hôm nay (${formatDateVN(item.date)})` : formatDateVN(item.date);
+                const label = formatDateVN(item.date);
                 return `
                     <button class="date-pill-btn ${isAct}" onclick="filterByDate('${item.date}')" title="Chỉ xem hồ sơ ngày ${formatDateVN(item.date)}">
                         <i class="fa-solid fa-calendar-day"></i> ${label}
@@ -2671,13 +2670,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 // Nếu chọn một ngày cụ thể (Ví dụ: Ngày 19)
                 if (currentDateFilter !== 'all') {
-                    const isToday = isTodayDate(currentDateFilter) || currentDateFilter === '2026-10-19';
                     const headerHtml = `
                         <div class="date-group-header">
                             <div class="date-group-title">
                                 <i class="fa-solid fa-calendar-check" style="color: var(--primary);"></i>
                                 <span>Hồ sơ vi phạm ngày: <strong>${formatDateVN(currentDateFilter)}</strong></span>
-                                ${isToday ? '<span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; margin-left: 6px;">HÔM NAY</span>' : ''}
                             </div>
                             <div class="date-group-badge">
                                 ${viols.length} Hồ Sơ Trong Ngày
@@ -2696,13 +2693,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                     let finalHtml = '';
                     for (const [d, items] of Object.entries(groups)) {
-                        const isToday = isTodayDate(d) || d === '2026-10-19';
                         finalHtml += `
                             <div class="date-group-header">
                                 <div class="date-group-title">
                                     <i class="fa-solid fa-calendar-days" style="color: var(--primary);"></i>
                                     <span>Ngày: <strong>${formatDateVN(d)}</strong></span>
-                                    ${isToday ? '<span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; margin-left: 6px;">HÔM NAY</span>' : ''}
                                 </div>
                                 <div class="date-group-badge">
                                     ${items.length} Hồ Sơ Vi Phạm
