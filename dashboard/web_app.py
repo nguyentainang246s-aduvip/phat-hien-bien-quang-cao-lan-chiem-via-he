@@ -288,12 +288,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             right: 8px;
             width: 76px;
             height: 76px;
-            object-fit: cover;
+            object-fit: contain;
             border-radius: 6px;
             border: 2px solid var(--danger);
             box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-            background: #111;
+            background: rgba(15, 23, 42, 0.95);
             cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card-crop-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.45);
         }
         
         /* Status Badges */

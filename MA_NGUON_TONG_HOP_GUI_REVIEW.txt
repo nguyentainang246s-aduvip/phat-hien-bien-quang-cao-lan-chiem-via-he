@@ -3679,7 +3679,7 @@ class TemporalVerifier:
                     "last_viol_timestamp": None,
                     "status": TrackState.NORMAL,
                     "last_seen": self.current_frame_index,
-                    "last_alert_time": 0.0,
+                    "last_alert_time": None,
                     "non_viol_streak": 0,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
                     "pos_window": deque(maxlen=200),   # deque lưu (timestamp, cx, cy, box_diag)
@@ -3743,7 +3743,9 @@ class TemporalVerifier:
                             and (current_timestamp - c["time"]) < self.cooldown_seconds
                             for c in self.confirmed_locations
                         )
-                        time_ok = (current_timestamp - record["last_alert_time"]) >= self.cooldown_seconds
+                        time_ok = (record.get("last_alert_time") is None) or (
+                            (current_timestamp - record["last_alert_time"]) >= self.cooldown_seconds
+                        )
 
                         if not is_spatially_cooldown and time_ok:
                             is_new_alert = True
@@ -5439,12 +5441,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             right: 8px;
             width: 76px;
             height: 76px;
-            object-fit: cover;
+            object-fit: contain;
             border-radius: 6px;
             border: 2px solid var(--danger);
             box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-            background: #111;
+            background: rgba(15, 23, 42, 0.95);
             cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card-crop-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.45);
         }
         
         /* Status Badges */
@@ -10191,7 +10198,7 @@ def test_temporal_verifier():
     # -----------------------------------------------------------------------
     print("\n1. Kiem tra doi tuong dung yen lan chiem via he (ID #1):")
     alert_triggered_count = 0
-    base_ts = 1000.0   # timestamp co dinh de co the lap lai duoc
+    base_ts = 0.0   # bat dau tu timestamp 0.0s (kiem tra bien bat dau tu dau video clip)
 
     for frame_idx in range(1, 8):
         tracked_objs = [{

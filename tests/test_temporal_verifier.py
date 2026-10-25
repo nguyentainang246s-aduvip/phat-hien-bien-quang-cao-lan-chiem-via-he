@@ -43,7 +43,7 @@ def test_temporal_verifier():
     # -----------------------------------------------------------------------
     print("\n1. Kiem tra doi tuong dung yen lan chiem via he (ID #1):")
     alert_triggered_count = 0
-    base_ts = 1000.0   # timestamp co dinh de co the lap lai duoc
+    base_ts = 0.0   # bat dau tu timestamp 0.0s (kiem tra bien bat dau tu dau video clip)
 
     for frame_idx in range(1, 8):
         tracked_objs = [{
