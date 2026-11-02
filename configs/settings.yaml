@@ -1,11 +1,11 @@
 # ==============================================================================
 # HỆ THỐNG GIÁM SÁT & PHÁT HIỆN BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
-# File cấu hình tham số tập trung (Settings Configuration v12.0)
+# File cấu hình tham số tập trung (Settings Configuration v13.0 Final)
 # ==============================================================================
 
 system:
   project_name: "DATN20224083"
-  version: "12.0"
+  version: "13.0"
   description: "Phát hiện biển hiệu lấn chiếm vỉa hè qua CCTV cố định"
 
 camera:
@@ -15,8 +15,8 @@ camera:
   buffer_flush: true           # Kích hoạt background thread flush buffer (Zero Latency)
 
 detector:
-  model_path: "models/best.pt" # Trọng số YOLOv8n Version 12 đã huấn luyện (6.65 MB, mAP50 90.09%)
-  onnx_path: "models/best.onnx" # Bản xuất tối ưu ONNX Runtime Version 12 (13.05 MB, Opset 12)
+  model_path: "models/best.pt" # Trọng số YOLOv8n Version 13 Final đã huấn luyện (6.61 MB, mAP50 89.6%)
+  onnx_path: "models/best.onnx" # Bản xuất tối ưu ONNX Runtime Version 13 Final (12.4 MB, Dynamic Shape)
   imgsz: 640                   # Kích thước ảnh chuẩn khi suy luận (640x640 tối ưu cho CPU)
   conf_threshold: 0.25         # Ngưỡng tin cậy tối thiểu cho bounding box
   iou_threshold: 0.50          # Ngưỡng Non-Maximum Suppression (NMS)

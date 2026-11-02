@@ -979,12 +979,12 @@ MỤC ĐÍCH KIỂM TRA: Tệp cấu hình hệ thống trung tâm (ngưỡng ti
 
 # ==============================================================================
 # HỆ THỐNG GIÁM SÁT & PHÁT HIỆN BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
-# File cấu hình tham số tập trung (Settings Configuration v12.0)
+# File cấu hình tham số tập trung (Settings Configuration v13.0 Final)
 # ==============================================================================
 
 system:
   project_name: "DATN20224083"
-  version: "12.0"
+  version: "13.0"
   description: "Phát hiện biển hiệu lấn chiếm vỉa hè qua CCTV cố định"
 
 camera:
@@ -994,8 +994,8 @@ camera:
   buffer_flush: true           # Kích hoạt background thread flush buffer (Zero Latency)
 
 detector:
-  model_path: "models/best.pt" # Trọng số YOLOv8n Version 12 đã huấn luyện (6.65 MB, mAP50 90.09%)
-  onnx_path: "models/best.onnx" # Bản xuất tối ưu ONNX Runtime Version 12 (13.05 MB, Opset 12)
+  model_path: "models/best.pt" # Trọng số YOLOv8n Version 13 Final đã huấn luyện (6.61 MB, mAP50 89.6%)
+  onnx_path: "models/best.onnx" # Bản xuất tối ưu ONNX Runtime Version 13 Final (12.4 MB, Dynamic Shape)
   imgsz: 640                   # Kích thước ảnh chuẩn khi suy luận (640x640 tối ưu cho CPU)
   conf_threshold: 0.25         # Ngưỡng tin cậy tối thiểu cho bounding box
   iou_threshold: 0.50          # Ngưỡng Non-Maximum Suppression (NMS)
@@ -11540,7 +11540,7 @@ def test_images_batch(
     model_path: str = "models/best.pt",
     conf_thresh: float = 0.25,
     imgsz: int = 1280,
-    output_dir: str = "data/images/output_v12",
+    output_dir: str = "data/images/output_v13",
     roi_path: str = None
 ):
     """Chạy kiểm thử hàng loạt trên toàn bộ ảnh trong thư mục và lưu ảnh kết quả."""
@@ -11556,7 +11556,7 @@ def test_images_batch(
         return False
 
     print("=" * 75)
-    print("      KIỂM THỬ MÔ HÌNH NHẬN DIỆN BIỂN QUẢNG CÁO (YOLOv8n v12)")
+    print("      KIỂM THỬ MÔ HÌNH NHẬN DIỆN BIỂN QUẢNG CÁO (YOLOv8n v13 Final)")
     print("=" * 75)
     print(f"[+] Trọng số mô hình : {model_path}")
     print(f"[+] Thư mục ảnh      : {os.path.abspath(img_dir)} ({len(images)} ảnh)")
@@ -11614,7 +11614,7 @@ def test_images_batch(
             print(f"      • Biển #{d['idx']}: Box={d['box']} | Chân={d['base_pt']} | Conf={d['conf']*100:.1f}% | Nhãn: {d['status_text']}")
 
         # Lưu ảnh kết quả
-        clean_name = f"v12_result_{idx}_{img_name.replace(' ', '_')}"
+        clean_name = f"v13_result_{idx}_{img_name.replace(' ', '_')}"
         out_path = os.path.join(output_dir, clean_name)
         cv2.imwrite(out_path, vis)
         print(f"    Đã lưu kết quả tại: {out_path}")
@@ -11639,7 +11639,7 @@ def test_single_image(
     model_path: str = "models/best.pt",
     conf_thresh: float = 0.25,
     imgsz: int = 1280,
-    output_dir: str = "data/images/output_v12",
+    output_dir: str = "data/images/output_v13",
     roi_path: str = None,
     show_gui: bool = False
 ):
@@ -11824,13 +11824,13 @@ def browse_images_interactively(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Kiểm thử mô hình YOLOv8n v12 & Quản lý ROI vỉa hè trên ảnh")
+    parser = argparse.ArgumentParser(description="Kiểm thử mô hình YOLOv8n v13 Final & Quản lý ROI vỉa hè trên ảnh")
     parser.add_argument("--dir", type=str, default="data/images", help="Thư mục chứa ảnh cần kiểm thử")
     parser.add_argument("--image", type=str, default=None, help="Đường dẫn đến một ảnh cụ thể")
     parser.add_argument("--model", type=str, default="models/best.pt", help="Đường dẫn trọng số mô hình")
     parser.add_argument("--conf", type=float, default=0.25, help="Ngưỡng độ tin cậy Confidence (0.0 - 1.0)")
     parser.add_argument("--imgsz", type=int, default=1280, help="Kích thước cạnh ảnh suy luận (mặc định 1280)")
-    parser.add_argument("--output-dir", type=str, default="data/images/output_v12", help="Thư mục lưu ảnh kết quả")
+    parser.add_argument("--output-dir", type=str, default="data/images/output_v13", help="Thư mục lưu ảnh kết quả")
     parser.add_argument("--roi", type=str, default=None, help="Tùy chọn file JSON cấu hình ROI vỉa hè để kiểm tra vi phạm")
     parser.add_argument("--gui", action="store_true", help="Bật giao diện xem tương tác bằng phím bấm")
 
@@ -12032,7 +12032,7 @@ metrics_test = model.val(
 )
 
 # 5. Xuất mô hình sang định dạng ONNX
-model.export(format="onnx", imgsz=1280, dynamic=False, simplify=True)
+model.export(format="onnx", imgsz=1280, dynamic=True, simplify=True)
 
 # 6. Nén kết quả và tải về máy
 # !zip -r training_results_v13.zip runs/detect/train_v13 runs/detect/test_v13

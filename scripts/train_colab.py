@@ -52,7 +52,7 @@ metrics_test = model.val(
 )
 
 # 5. Xuất mô hình sang định dạng ONNX
-model.export(format="onnx", imgsz=1280, dynamic=False, simplify=True)
+model.export(format="onnx", imgsz=1280, dynamic=True, simplify=True)
 
 # 6. Nén kết quả và tải về máy
 # !zip -r training_results_v13.zip runs/detect/train_v13 runs/detect/test_v13

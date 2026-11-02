@@ -3,31 +3,31 @@
 
 * **Sinh viên thực hiện:** Nguyễn Đức Tài Năng — MSSV: 20224083
 * **Giai đoạn báo cáo:** Tuần 9 – Tuần 11
-* **Chủ đề:** Huấn luyện, Đánh giá & Tinh chỉnh mô hình nhận diện trên dữ liệu tự thu thập (YOLOv8n Version 12)
+* **Chủ đề:** Huấn luyện, Đánh giá & Tinh chỉnh mô hình nhận diện trên dữ liệu tự thu thập (YOLOv8n Version 13 Final)
 * **Tham chiếu thực nghiệm:** Hệ thống 14 Bảng kết quả đề xuất ĐATN CCTV (`Bang_ket_qua_de_xuat_DATN_CCTV`)
 
 ---
 
 ## TỔNG QUAN KẾT QUẢ ĐẠT ĐƯỢC
-1. **Huấn luyện mô hình YOLOv8n Version 12:** Đạt $mAP@0.5 = 90.09\%$ (vượt mục tiêu 90%), Precision $= 91.65\%$, Recall $= 83.16\%$ trên tập 2,410 ảnh tự thu thập từ Roboflow.
-2. **Kiểm thử trên ảnh hiện trường (`data/images/`):** Mô hình v12 phát hiện chính xác **19/19 biển hiệu** (17 vi phạm vỉa hè, 2 mép vỉa hè) với độ tin cậy lên tới 92.6%.
-3. **Thực nghiệm toàn diện trên 3 video CCTV thực tế Hà Nội:** Hệ thống đạt Precision $85.71\%$, Recall $85.71\%$, F1-score $85.71\%$ với tốc độ thời gian thực $39.7 - 60.5\text{ FPS}$ trên CPU.
+1. **Huấn luyện mô hình YOLOv8n Version 13 Final:** Đạt $mAP@0.5 = 89.60\%$ (xấp xỉ $90\%$), Precision $= 87.70\%$, Recall $= 85.40\%$ trên tập 2,674 ảnh tự thu thập từ Roboflow (đánh giá độc lập trên 151 ảnh Test chưa từng học).
+2. **Kiểm thử trên ảnh hiện trường (`data/images/`):** Mô hình v13 phát hiện chính xác **21 biển hiệu** (18 vi phạm vỉa hè, 2 mép vỉa hè, 1 hợp lệ) với độ tin cậy lên tới 90.8%.
+3. **Thực nghiệm toàn diện trên 3 video CCTV thực tế Hà Nội:** Hệ thống đạt Precision $85.71\%$, Recall $85.71\%$, F1-score $85.71\%$ với tốc độ thời gian thực $41.8 - 61.4\text{ FPS}$ trên CPU Intel.
 4. **Sản phẩm bàn giao:**
-   - Trọng số mô hình v12: [`models/best.pt`](file:///c:/Users/Admin/Downloads/DATN20224083/models/best.pt) (6.65 MB) và [`models/best.onnx`](file:///c:/Users/Admin/Downloads/DATN20224083/models/best.onnx) (13.05 MB).
-   - Thư mục ảnh xuất kết quả thực nghiệm v12: [`data/images/output_v12/`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_v12).
+   - Trọng số mô hình v13: [`models/best.pt`](file:///c:/Users/Admin/Downloads/DATN20224083/models/best.pt) (6.61 MB) và [`models/best.onnx`](file:///c:/Users/Admin/Downloads/DATN20224083/models/best.onnx) (12.4 MB - Dynamic Shape).
+   - Thư mục ảnh xuất kết quả thực nghiệm v13: [`data/images/output_v13/`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_v13).
    - Báo cáo Word chính thức: [`reports/Bao_cao_tien_do_Tuan_9_11_DATN_20224083.docx`](file:///c:/Users/Admin/Downloads/DATN20224083/reports/Bao_cao_tien_do_Tuan_9_11_DATN_20224083.docx).
 
 ---
 
-## DANH MỤC ẢNH MINH CHỨNG THỰC TẾ (OUTPUT V12)
+## DANH MỤC ẢNH MINH CHỨNG THỰC TẾ (OUTPUT V13)
 
-Toàn bộ ảnh minh chứng trong báo cáo được trích xuất trực tiếp từ mô hình YOLOv8n Version 12:
+Toàn bộ ảnh minh chứng trong báo cáo được trích xuất trực tiếp từ mô hình YOLOv8n Version 13 Final:
 
-| Ký hiệu | Tình huống thực nghiệm | Tệp xuất kết quả (output_v12) | Kết quả nhận diện mô hình v12 |
+| Ký hiệu | Tình huống thực nghiệm | Tệp xuất kết quả (output_v13) | Kết quả nhận diện mô hình v13 Final |
 | :---: | :--- | :--- | :--- |
-| **Hình 1** | Phố Hàng Bạc (1598×984) | [`v12_detected_1.png`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_v12/v12_detected_1.png) | Phát hiện chính xác 8/8 biển hiệu vi phạm vỉa hè (Conf 55.9% – 92.6%) |
-| **Hình 2** | Phố cổ Hà Nội (1529×1028) | [`v12_detected_2.png`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_v12/v12_detected_2.png) | Phân định chuẩn 6 biển: 4 VI PHẠM (98-100%), 2 MÉP VỈA HÈ (2-18%) |
-| **Hình 3** | Tuyến phố đi bộ (1084×615) | [`v12_detected_3.png`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_v12/v12_detected_3.png) | Phát hiện chuẩn xác 5/5 biển hiệu vi phạm vỉa hè (Conf 68.2% – 91.4%) |
+| **Hình 1** | Phố Hàng Bạc (1598×984) | [`v13_detected_1.png`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_v13/v13_detected_1.png) | Phát hiện 10 biển hiệu (9 vi phạm vỉa hè, 1 hợp lệ, Conf lên đến 90.8%) |
+| **Hình 2** | Phố cổ Hà Nội (1529×1028) | [`v13_detected_2.png`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_v13/v13_detected_2.png) | Phân định chuẩn 6 biển: 4 VI PHẠM (97-100%), 2 MÉP VỈA HÈ (2-19%) |
+| **Hình 3** | Tuyến phố đi bộ (1084×615) | [`v13_detected_3.png`](file:///c:/Users/Admin/Downloads/DATN20224083/data/images/output_v13/v13_detected_3.png) | Phát hiện chuẩn xác 5/5 biển hiệu vi phạm vỉa hè (Conf 76.3% – 85.9%) |
 
 ---
 
@@ -38,7 +38,7 @@ Toàn bộ ảnh minh chứng trong báo cáo được trích xuất trực ti�
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | YOLOv8n pretrained (COCO 80 classes) | 32.5% | 26.8% | 29.4% | 28.2% | 18.5% |
 | YOLOv8n checkpoint khởi tạo ban đầu | 80.12% | 77.40% | 78.74% | 79.15% | 52.30% |
-| **YOLOv8n best checkpoint (Version 12 - 2,410 ảnh)** | **91.65%** | **83.16%** | **87.20%** | **90.09%** | **62.43%** |
+| **YOLOv8n best checkpoint (Version 13 Final - 2,674 ảnh)** | **87.70%** | **85.40%** | **86.53%** | **89.60%** | **60.50%** |
 
 ### Bảng 2. Kết quả theo kích thước đối tượng (Tập Test v12 - 137 ảnh)
 | Phân nhóm đối tượng | Số mẫu (GT) | True Pos (TP) | False Pos (FP) | False Neg (FN) | Precision | Recall | F1-score | mAP@0.5 |

@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_at": "2026-11-01 17:42:54",
+    "generated_at": "2026-11-02 19:01:38",
     "generator_script": "evaluation/evaluate_videos.py",
     "ground_truth_file": "configs/video_ground_truth.json",
     "hardware_platform": "Windows-11-10.0.26200-SP0",
@@ -38,11 +38,11 @@
   },
   "metrics_version_b_official": {
     "description": "Phiên bản B (Chính thức - Vùng ROI vỉa hè bao trọn vỉa hè thực tế gồm Standee #3)",
-    "total_tracks": 17,
+    "total_tracks": 18,
     "true_positives": 12,
     "false_positives": 2,
     "false_negatives": 2,
-    "true_negatives": 1,
+    "true_negatives": 2,
     "precision": 0.8571,
     "precision_wilson_95_ci": [
       0.6006,
@@ -55,15 +55,15 @@
     ],
     "f1_score": 0.8571,
     "false_alarms_in_sample": 2,
-    "standee_3_v1_avg_overlap": 76.0,
+    "standee_3_v1_avg_overlap": 100.0,
     "standee_3_v1_status": "CONFIRMED",
-    "pipeline_throughput_fps_min": 39.7,
-    "pipeline_throughput_fps_max": 60.5,
-    "pipeline_steady_state_fps_min": 58.2,
-    "pipeline_steady_state_fps_max": 62.3,
-    "estimated_inference_rate_hz": "~13.2 - 20.2 Hz",
-    "measured_tracker_mean_ms": 40.19,
-    "measured_inferred_frame_mean_ms": 44.55,
+    "pipeline_throughput_fps_min": 41.8,
+    "pipeline_throughput_fps_max": 61.4,
+    "pipeline_steady_state_fps_min": 60.7,
+    "pipeline_steady_state_fps_max": 63.9,
+    "estimated_inference_rate_hz": "~13.9 - 20.5 Hz",
+    "measured_tracker_mean_ms": 38.23,
+    "measured_inferred_frame_mean_ms": 42.6,
     "item_evaluations": [
       {
         "object_id": "V1_OBJ_1",
@@ -79,10 +79,10 @@
         "system_status": "CONFIRMED",
         "eval_result": "TP",
         "justification": "Biển bạt lớn dựng cố định trên hè phố trước cửa hàng, chiếm dụng hoàn toàn không gian vỉa hè dành cho người đi bộ.",
-        "total_detections": 78,
-        "avg_conf": 0.813,
-        "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/video_test/track_1_conf85.jpg"
+        "total_detections": 80,
+        "avg_conf": 0.868,
+        "avg_overlap": 78.9,
+        "best_crop_path": "reports/video_eval_crops/video_test/track_1_conf87.jpg"
       },
       {
         "object_id": "V1_OBJ_2",
@@ -91,7 +91,7 @@
         "expected_track_id": 2,
         "match_method": "direct_id",
         "match_confidence": 1.0,
-        "spatial_iou": 0.045,
+        "spatial_iou": 0.04,
         "temporal_iou": 0.988,
         "description": "Biển hiệu dạng hộp đứng sát vách cửa hàng",
         "gt_label": "VIOLATION",
@@ -99,9 +99,9 @@
         "eval_result": "TP",
         "justification": "Biển hiệu dạng hộp đứng trực tiếp trên mặt vỉa hè sát vách cửa hàng, cản trở lối lưu thông của người đi bộ.",
         "total_detections": 80,
-        "avg_conf": 0.827,
+        "avg_conf": 0.862,
         "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/video_test/track_2_conf84.jpg"
+        "best_crop_path": "reports/video_eval_crops/video_test/track_2_conf87.jpg"
       },
       {
         "object_id": "V1_OBJ_3",
@@ -110,7 +110,7 @@
         "expected_track_id": 3,
         "match_method": "direct_id",
         "match_confidence": 1.0,
-        "spatial_iou": 0.906,
+        "spatial_iou": 0.0,
         "temporal_iou": 0.988,
         "description": "Biển Standee chữ A chân sắt đặt trên lối đi bộ",
         "gt_label": "VIOLATION",
@@ -118,8 +118,8 @@
         "eval_result": "TP",
         "justification": "Biển Standee chữ A khung sắt đặt trực tiếp trên lối đi lát gạch của vỉa hè, chiếm dụng không gian lưu thông công cộng.",
         "total_detections": 80,
-        "avg_conf": 0.814,
-        "avg_overlap": 76.0,
+        "avg_conf": 0.801,
+        "avg_overlap": 100.0,
         "best_crop_path": "reports/video_eval_crops/video_test/track_3_conf82.jpg"
       },
       {
@@ -130,15 +130,15 @@
         "match_method": "direct_id",
         "match_confidence": 1.0,
         "spatial_iou": 0.0,
-        "temporal_iou": 0.988,
+        "temporal_iou": 0.925,
         "description": "Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè",
         "gt_label": "VIOLATION",
-        "system_status": "NORMAL",
-        "eval_result": "FN",
+        "system_status": "CONFIRMED",
+        "eval_result": "TP",
         "justification": "Biển quảng cáo dạng tấm dọc dựng sát gốc cây trên vỉa hè, cản trở lối đi bộ.",
-        "total_detections": 80,
-        "avg_conf": 0.76,
-        "avg_overlap": 9.6,
+        "total_detections": 75,
+        "avg_conf": 0.739,
+        "avg_overlap": 100.0,
         "best_crop_path": "reports/video_eval_crops/video_test/track_4_conf78.jpg"
       },
       {
@@ -149,16 +149,16 @@
         "match_method": "direct_id",
         "match_confidence": 1.0,
         "spatial_iou": 0.0,
-        "temporal_iou": 0.863,
+        "temporal_iou": 0.988,
         "description": "Biển hiệu treo thụt sâu trong lòng nhà",
         "gt_label": "NORMAL",
-        "system_status": "CONFIRMED",
-        "eval_result": "FP",
+        "system_status": "NORMAL",
+        "eval_result": "TN",
         "justification": "Biển hiệu treo sâu bên trong khuôn viên nhà dân, không cắm chân hay đặt trên mặt vỉa hè dành cho người đi bộ.",
-        "total_detections": 69,
-        "avg_conf": 0.67,
-        "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/video_test/track_5_conf75.jpg"
+        "total_detections": 80,
+        "avg_conf": 0.596,
+        "avg_overlap": 22.3,
+        "best_crop_path": "reports/video_eval_crops/video_test/track_5_conf68.jpg"
       },
       {
         "object_id": "V2_OBJ_1",
@@ -175,9 +175,9 @@
         "eval_result": "TP",
         "justification": "Biển hộp đèn lớn cắm chân cố định trên mặt vỉa hè trước cửa hàng, cản trở lối đi bộ.",
         "total_detections": 80,
-        "avg_conf": 0.844,
-        "avg_overlap": 72.1,
-        "best_crop_path": "reports/video_eval_crops/videotesst2/track_1_conf85.jpg"
+        "avg_conf": 0.845,
+        "avg_overlap": 74.9,
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_1_conf87.jpg"
       },
       {
         "object_id": "V2_OBJ_2",
@@ -193,10 +193,10 @@
         "system_status": "CONFIRMED",
         "eval_result": "TP",
         "justification": "Biển quảng cáo di động chân bánh xe đặt trên vỉa hè trước cửa hàng, chiếm dụng lối lưu thông.",
-        "total_detections": 79,
-        "avg_conf": 0.741,
+        "total_detections": 80,
+        "avg_conf": 0.715,
         "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/videotesst2/track_2_conf85.jpg"
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_2_conf81.jpg"
       },
       {
         "object_id": "V2_OBJ_3",
@@ -205,7 +205,7 @@
         "expected_track_id": 3,
         "match_method": "direct_id",
         "match_confidence": 1.0,
-        "spatial_iou": 0.037,
+        "spatial_iou": 0.039,
         "temporal_iou": 0.988,
         "description": "Biển bạt nhỏ kê trước bậc thềm",
         "gt_label": "VIOLATION",
@@ -213,47 +213,47 @@
         "eval_result": "TP",
         "justification": "Biển bạt nhỏ kê trước bậc thềm chiếm dụng mặt cắt vỉa hè công cộng.",
         "total_detections": 80,
-        "avg_conf": 0.653,
+        "avg_conf": 0.638,
         "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/videotesst2/track_3_conf72.jpg"
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_3_conf68.jpg"
       },
       {
         "object_id": "V2_OBJ_7",
         "video_id": "videotesst2",
-        "matched_track_id": 5,
+        "matched_track_id": 23,
         "expected_track_id": 7,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 0.503,
+        "match_confidence": 0.291,
         "spatial_iou": 0.0,
-        "temporal_iou": 0.903,
+        "temporal_iou": 0.275,
         "description": "Biển hiệu dạng khung sắt tầm thấp ven đường",
         "gt_label": "VIOLATION",
-        "system_status": "CONFIRMED",
-        "eval_result": "TP",
+        "system_status": "SUSPECTED",
+        "eval_result": "FN",
         "justification": "Biển hiệu dạng khung sắt tầm thấp cắm chân trên vỉa hè ven đường trước cửa hàng.",
-        "total_detections": 54,
-        "avg_conf": 0.476,
-        "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/videotesst2/track_5_conf74.jpg"
+        "total_detections": 19,
+        "avg_conf": 0.307,
+        "avg_overlap": 91.9,
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_23_conf37.jpg"
       },
       {
         "object_id": "V2_OBJ_8",
         "video_id": "videotesst2",
-        "matched_track_id": 12,
+        "matched_track_id": 33,
         "expected_track_id": 8,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 0.381,
+        "match_confidence": 0.168,
         "spatial_iou": 0.0,
-        "temporal_iou": 0.731,
+        "temporal_iou": 0.0,
         "description": "Biển hiệu cửa hàng ở góc phải khung hình",
         "gt_label": "VIOLATION",
         "system_status": "SUSPECTED",
         "eval_result": "FN",
         "justification": "Biển hiệu đặt trên vỉa hè xuất hiện ở phần cuối đoạn video, chiếm dụng lối đi bộ.",
-        "total_detections": 17,
-        "avg_conf": 0.316,
-        "avg_overlap": 91.1,
-        "best_crop_path": "reports/video_eval_crops/videotesst2/track_12_conf38.jpg"
+        "total_detections": 1,
+        "avg_conf": 0.369,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_33_conf36.jpg"
       },
       {
         "object_id": "V3_OBJ_1",
@@ -270,9 +270,9 @@
         "eval_result": "TP",
         "justification": "Biển quảng cáo pano lớn đặt chiếm dụng phần lớn bề rộng vỉa hè trước cửa hàng.",
         "total_detections": 80,
-        "avg_conf": 0.85,
+        "avg_conf": 0.898,
         "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/video_test3/track_1_conf86.jpg"
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_1_conf90.jpg"
       },
       {
         "object_id": "V3_OBJ_2",
@@ -289,9 +289,9 @@
         "eval_result": "TP",
         "justification": "Biển hộp đèn đứng đặt trên vỉa hè chiếm dụng lối đi bộ.",
         "total_detections": 80,
-        "avg_conf": 0.822,
-        "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/video_test3/track_2_conf83.jpg"
+        "avg_conf": 0.884,
+        "avg_overlap": 66.7,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_2_conf88.jpg"
       },
       {
         "object_id": "V3_OBJ_3",
@@ -308,9 +308,9 @@
         "eval_result": "TP",
         "justification": "Biển vẫy thấp đặt cạnh gốc cây trên vỉa hè chiếm dụng lối đi bộ.",
         "total_detections": 80,
-        "avg_conf": 0.726,
+        "avg_conf": 0.855,
         "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/video_test3/track_3_conf76.jpg"
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_3_conf87.jpg"
       },
       {
         "object_id": "V3_OBJ_4",
@@ -320,16 +320,16 @@
         "match_method": "direct_id",
         "match_confidence": 1.0,
         "spatial_iou": 0.0,
-        "temporal_iou": 0.8,
+        "temporal_iou": 0.988,
         "description": "Biển bạt chữ nhật kê ngoài thềm",
         "gt_label": "VIOLATION",
         "system_status": "CONFIRMED",
         "eval_result": "TP",
         "justification": "Biển bạt chữ nhật kê ngoài thềm chiếm dụng vỉa hè công cộng.",
-        "total_detections": 61,
-        "avg_conf": 0.684,
-        "avg_overlap": 96.7,
-        "best_crop_path": "reports/video_eval_crops/video_test3/track_4_conf73.jpg"
+        "total_detections": 80,
+        "avg_conf": 0.805,
+        "avg_overlap": 97.7,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_4_conf83.jpg"
       },
       {
         "object_id": "V3_OBJ_11",
@@ -337,66 +337,85 @@
         "matched_track_id": 5,
         "expected_track_id": 11,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 0.356,
+        "match_confidence": 0.368,
         "spatial_iou": 0.0,
-        "temporal_iou": 0.494,
+        "temporal_iou": 0.481,
         "description": "Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố",
         "gt_label": "VIOLATION",
         "system_status": "CONFIRMED",
         "eval_result": "TP",
         "justification": "Biển hiệu nhỏ ở cự ly xa đặt trên vỉa hè trước cửa hàng.",
-        "total_detections": 74,
-        "avg_conf": 0.657,
-        "avg_overlap": 66.3,
+        "total_detections": 80,
+        "avg_conf": 0.698,
+        "avg_overlap": 100.0,
         "best_crop_path": "reports/video_eval_crops/video_test3/track_5_conf75.jpg"
       },
       {
         "object_id": "V3_OBJ_14",
         "video_id": "video_test3",
-        "matched_track_id": 22,
+        "matched_track_id": 8,
         "expected_track_id": 14,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 0.109,
+        "match_confidence": 0.224,
         "spatial_iou": 0.0,
-        "temporal_iou": 0.0,
+        "temporal_iou": 0.013,
         "description": "Biển gắn tường tầng thấp phía bên phải",
         "gt_label": "NORMAL",
-        "system_status": "SUSPECTED",
+        "system_status": "NORMAL",
         "eval_result": "TN",
         "justification": "Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè.",
-        "total_detections": 23,
-        "avg_conf": 0.635,
-        "avg_overlap": 95.9,
-        "best_crop_path": "reports/video_eval_crops/video_test3/track_22_conf72.jpg"
+        "total_detections": 77,
+        "avg_conf": 0.491,
+        "avg_overlap": 0.0,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_8_conf64.jpg"
       },
       {
-        "object_id": "UNMATCHED_videotesst2_T4",
-        "video_id": "videotesst2",
-        "matched_track_id": 4,
+        "object_id": "UNMATCHED_video_test3_T6",
+        "video_id": "video_test3",
+        "matched_track_id": 6,
         "expected_track_id": null,
         "match_method": "unmatched_false_positive",
         "match_confidence": 0.0,
         "spatial_iou": 0.0,
         "temporal_iou": 0.0,
-        "description": "Track #4 ngoài Ground Truth bị kết luận nhầm là vi phạm",
+        "description": "Track #6 ngoài Ground Truth bị kết luận nhầm là vi phạm",
         "gt_label": "BACKGROUND",
         "system_status": "CONFIRMED",
         "eval_result": "FP",
         "justification": "Báo động giả (False Positive) từ vật thể ngoài tập nhãn chuẩn.",
-        "total_detections": 79,
-        "avg_conf": 0.554,
-        "avg_overlap": 94.3,
-        "best_crop_path": "reports/video_eval_crops/videotesst2/track_4_conf67.jpg"
+        "total_detections": 80,
+        "avg_conf": 0.596,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_6_conf64.jpg"
+      },
+      {
+        "object_id": "UNMATCHED_video_test3_T7",
+        "video_id": "video_test3",
+        "matched_track_id": 7,
+        "expected_track_id": null,
+        "match_method": "unmatched_false_positive",
+        "match_confidence": 0.0,
+        "spatial_iou": 0.0,
+        "temporal_iou": 0.0,
+        "description": "Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm",
+        "gt_label": "BACKGROUND",
+        "system_status": "CONFIRMED",
+        "eval_result": "FP",
+        "justification": "Báo động giả (False Positive) từ vật thể ngoài tập nhãn chuẩn.",
+        "total_detections": 76,
+        "avg_conf": 0.415,
+        "avg_overlap": 100.0,
+        "best_crop_path": "reports/video_eval_crops/video_test3/track_7_conf56.jpg"
       }
     ]
   },
   "metrics_version_a_baseline": {
     "description": "Phiên bản A (Trước khi mở rộng ROI - Standee #3 nằm ngoài mép chân đế được xếp NORMAL)",
-    "total_tracks": 17,
+    "total_tracks": 18,
     "true_positives": 11,
     "false_positives": 2,
     "false_negatives": 3,
-    "true_negatives": 1,
+    "true_negatives": 2,
     "precision": 0.8462,
     "precision_wilson_95_ci": [
       0.5777,
@@ -408,13 +427,13 @@
       0.9243
     ],
     "f1_score": 0.8148,
-    "standee_3_v1_avg_overlap": 63.5,
-    "standee_3_v1_status": "NORMAL"
+    "standee_3_v1_avg_overlap": 100.0,
+    "standee_3_v1_status": "CONFIRMED"
   },
   "stability_analysis": {
     "num_trials": 3,
-    "total_ground_truth_objects": 17,
-    "stable_status_count": 17,
+    "total_ground_truth_objects": 18,
+    "stable_status_count": 18,
     "classification_consistency_rate_pct": 100.0,
     "metric_consistency": {
       "tp_across_trials": [
@@ -433,9 +452,9 @@
         2
       ],
       "tn_across_trials": [
-        1,
-        1,
-        1
+        2,
+        2,
+        2
       ],
       "recall_across_trials": [
         85.71,
@@ -451,27 +470,27 @@
     "throughput_across_trials": [
       {
         "trial": 1,
-        "fps_min": 39.7,
-        "fps_max": 60.5,
-        "fps_mean": 52.2,
-        "steady_fps_min": 58.2,
-        "steady_fps_max": 62.3
+        "fps_min": 41.8,
+        "fps_max": 61.4,
+        "fps_mean": 53.9,
+        "steady_fps_min": 60.7,
+        "steady_fps_max": 63.9
       },
       {
         "trial": 2,
-        "fps_min": 54.0,
-        "fps_max": 59.5,
-        "fps_mean": 56.0,
-        "steady_fps_min": 55.6,
-        "steady_fps_max": 61.4
+        "fps_min": 54.7,
+        "fps_max": 60.9,
+        "fps_mean": 58.6,
+        "steady_fps_min": 56.4,
+        "steady_fps_max": 63.0
       },
       {
         "trial": 3,
-        "fps_min": 49.9,
-        "fps_max": 52.1,
-        "fps_mean": 51.3,
-        "steady_fps_min": 51.2,
-        "steady_fps_max": 53.6
+        "fps_min": 51.3,
+        "fps_max": 56.3,
+        "fps_mean": 53.2,
+        "steady_fps_min": 52.6,
+        "steady_fps_max": 58.1
       }
     ],
     "object_stability_details": [
@@ -559,14 +578,14 @@
           4
         ],
         "trial_system_statuses": [
-          "NORMAL",
-          "NORMAL",
-          "NORMAL"
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
         ],
         "trial_eval_results": [
-          "FN",
-          "FN",
-          "FN"
+          "TP",
+          "TP",
+          "TP"
         ],
         "is_status_stable": true,
         "is_eval_stable": true
@@ -583,14 +602,14 @@
           5
         ],
         "trial_system_statuses": [
-          "CONFIRMED",
-          "CONFIRMED",
-          "CONFIRMED"
+          "NORMAL",
+          "NORMAL",
+          "NORMAL"
         ],
         "trial_eval_results": [
-          "FP",
-          "FP",
-          "FP"
+          "TN",
+          "TN",
+          "TN"
         ],
         "is_status_stable": true,
         "is_eval_stable": true
@@ -674,19 +693,19 @@
         "gt_label": "VIOLATION",
         "expected_track_id": 7,
         "trial_matched_track_ids": [
-          5,
-          5,
-          5
+          23,
+          23,
+          23
         ],
         "trial_system_statuses": [
-          "CONFIRMED",
-          "CONFIRMED",
-          "CONFIRMED"
+          "SUSPECTED",
+          "SUSPECTED",
+          "SUSPECTED"
         ],
         "trial_eval_results": [
-          "TP",
-          "TP",
-          "TP"
+          "FN",
+          "FN",
+          "FN"
         ],
         "is_status_stable": true,
         "is_eval_stable": true
@@ -698,9 +717,9 @@
         "gt_label": "VIOLATION",
         "expected_track_id": 8,
         "trial_matched_track_ids": [
-          12,
-          12,
-          12
+          33,
+          33,
+          33
         ],
         "trial_system_statuses": [
           "SUSPECTED",
@@ -842,14 +861,14 @@
         "gt_label": "NORMAL",
         "expected_track_id": 14,
         "trial_matched_track_ids": [
-          22,
-          22,
-          22
+          8,
+          8,
+          8
         ],
         "trial_system_statuses": [
-          "SUSPECTED",
-          "SUSPECTED",
-          "SUSPECTED"
+          "NORMAL",
+          "NORMAL",
+          "NORMAL"
         ],
         "trial_eval_results": [
           "TN",
@@ -860,15 +879,39 @@
         "is_eval_stable": true
       },
       {
-        "object_id": "UNMATCHED_videotesst2_T4",
-        "video_id": "videotesst2",
-        "description": "Track #4 ngoài Ground Truth bị kết luận nhầm là vi phạm",
+        "object_id": "UNMATCHED_video_test3_T6",
+        "video_id": "video_test3",
+        "description": "Track #6 ngoài Ground Truth bị kết luận nhầm là vi phạm",
         "gt_label": "BACKGROUND",
         "expected_track_id": null,
         "trial_matched_track_ids": [
-          4,
-          4,
-          4
+          6,
+          6,
+          6
+        ],
+        "trial_system_statuses": [
+          "CONFIRMED",
+          "CONFIRMED",
+          "CONFIRMED"
+        ],
+        "trial_eval_results": [
+          "FP",
+          "FP",
+          "FP"
+        ],
+        "is_status_stable": true,
+        "is_eval_stable": true
+      },
+      {
+        "object_id": "UNMATCHED_video_test3_T7",
+        "video_id": "video_test3",
+        "description": "Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm",
+        "gt_label": "BACKGROUND",
+        "expected_track_id": null,
+        "trial_matched_track_ids": [
+          7,
+          7,
+          7
         ],
         "trial_system_statuses": [
           "CONFIRMED",
@@ -895,66 +938,82 @@
       "roi_sha256": "8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 39.7,
+      "fps_throughput": 41.8,
       "latency_stats": {
-        "warmup_frame_ms": 2115.21,
-        "steady_state_fps": 60.8,
-        "overall_fps": 39.7,
-        "tracker_mean_ms": 39.51,
-        "tracker_p50_ms": 37.28,
-        "tracker_p95_ms": 50.05,
-        "verifier_mean_ms": 1.29,
-        "verifier_p50_ms": 1.26,
-        "verifier_p95_ms": 1.72,
-        "inferred_frame_mean_ms": 44.01,
-        "inferred_frame_p50_ms": 41.7,
-        "inferred_frame_p95_ms": 54.62,
-        "skipped_frame_mean_ms": 2.42
+        "warmup_frame_ms": 1949.27,
+        "steady_state_fps": 63.0,
+        "overall_fps": 41.8,
+        "tracker_mean_ms": 36.67,
+        "tracker_p50_ms": 35.69,
+        "tracker_p95_ms": 41.21,
+        "verifier_mean_ms": 1.58,
+        "verifier_p50_ms": 1.32,
+        "verifier_p95_ms": 1.55,
+        "inferred_frame_mean_ms": 41.43,
+        "inferred_frame_p50_ms": 40.25,
+        "inferred_frame_p95_ms": 47.32,
+        "skipped_frame_mean_ms": 2.6
       },
-      "tracks_count": 5,
+      "tracks_count": 7,
       "confirmed_count": 4,
-      "suspected_count": 0,
-      "normal_count": 1,
+      "suspected_count": 1,
+      "normal_count": 2,
       "tracks": [
         {
           "track_id": 1,
-          "detections": 78,
-          "avg_conf": 0.813,
-          "avg_overlap": 100.0,
+          "detections": 80,
+          "avg_conf": 0.868,
+          "avg_overlap": 78.9,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\video_test\\track_1_conf85.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_1_conf87.jpg"
         },
         {
           "track_id": 2,
           "detections": 80,
-          "avg_conf": 0.827,
+          "avg_conf": 0.862,
           "avg_overlap": 100.0,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\video_test\\track_2_conf84.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_2_conf87.jpg"
         },
         {
           "track_id": 3,
           "detections": 80,
-          "avg_conf": 0.814,
-          "avg_overlap": 76.0,
+          "avg_conf": 0.801,
+          "avg_overlap": 100.0,
           "status": "CONFIRMED",
           "best_crop_path": "reports/video_eval_crops\\video_test\\track_3_conf82.jpg"
         },
         {
           "track_id": 4,
-          "detections": 80,
-          "avg_conf": 0.76,
-          "avg_overlap": 9.6,
-          "status": "NORMAL",
+          "detections": 75,
+          "avg_conf": 0.739,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
           "best_crop_path": "reports/video_eval_crops\\video_test\\track_4_conf78.jpg"
         },
         {
           "track_id": 5,
-          "detections": 69,
-          "avg_conf": 0.67,
+          "detections": 80,
+          "avg_conf": 0.596,
+          "avg_overlap": 22.3,
+          "status": "NORMAL",
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_5_conf68.jpg"
+        },
+        {
+          "track_id": 6,
+          "detections": 39,
+          "avg_conf": 0.5,
+          "avg_overlap": 9.4,
+          "status": "NORMAL",
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_6_conf57.jpg"
+        },
+        {
+          "track_id": 7,
+          "detections": 1,
+          "avg_conf": 0.615,
           "avg_overlap": 100.0,
-          "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\video_test\\track_5_conf75.jpg"
+          "status": "SUSPECTED",
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_7_conf61.jpg"
         }
       ]
     },
@@ -966,90 +1025,66 @@
       "roi_sha256": "79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 60.5,
+      "fps_throughput": 61.4,
       "latency_stats": {
-        "warmup_frame_ms": 131.63,
-        "steady_state_fps": 62.3,
-        "overall_fps": 60.5,
-        "tracker_mean_ms": 38.82,
-        "tracker_p50_ms": 37.22,
-        "tracker_p95_ms": 44.24,
-        "verifier_mean_ms": 1.29,
-        "verifier_p50_ms": 1.24,
-        "verifier_p95_ms": 1.59,
-        "inferred_frame_mean_ms": 42.96,
-        "inferred_frame_p50_ms": 41.28,
-        "inferred_frame_p95_ms": 49.31,
-        "skipped_frame_mean_ms": 2.2
+        "warmup_frame_ms": 166.83,
+        "steady_state_fps": 63.9,
+        "overall_fps": 61.4,
+        "tracker_mean_ms": 38.5,
+        "tracker_p50_ms": 35.31,
+        "tracker_p95_ms": 42.68,
+        "verifier_mean_ms": 0.87,
+        "verifier_p50_ms": 0.8,
+        "verifier_p95_ms": 1.06,
+        "inferred_frame_mean_ms": 42.18,
+        "inferred_frame_p50_ms": 38.97,
+        "inferred_frame_p95_ms": 46.3,
+        "skipped_frame_mean_ms": 2.15
       },
-      "tracks_count": 8,
-      "confirmed_count": 5,
+      "tracks_count": 5,
+      "confirmed_count": 3,
       "suspected_count": 2,
-      "normal_count": 1,
+      "normal_count": 0,
       "tracks": [
         {
           "track_id": 1,
           "detections": 80,
-          "avg_conf": 0.844,
-          "avg_overlap": 72.1,
+          "avg_conf": 0.845,
+          "avg_overlap": 74.9,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_1_conf85.jpg"
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_1_conf87.jpg"
         },
         {
           "track_id": 2,
-          "detections": 79,
-          "avg_conf": 0.741,
+          "detections": 80,
+          "avg_conf": 0.715,
           "avg_overlap": 100.0,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_2_conf85.jpg"
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_2_conf81.jpg"
         },
         {
           "track_id": 3,
           "detections": 80,
-          "avg_conf": 0.653,
+          "avg_conf": 0.638,
           "avg_overlap": 100.0,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_3_conf72.jpg"
-        },
-        {
-          "track_id": 4,
-          "detections": 79,
-          "avg_conf": 0.554,
-          "avg_overlap": 94.3,
-          "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_4_conf67.jpg"
-        },
-        {
-          "track_id": 5,
-          "detections": 54,
-          "avg_conf": 0.476,
-          "avg_overlap": 100.0,
-          "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_5_conf74.jpg"
-        },
-        {
-          "track_id": 12,
-          "detections": 17,
-          "avg_conf": 0.316,
-          "avg_overlap": 91.1,
-          "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_12_conf38.jpg"
-        },
-        {
-          "track_id": 20,
-          "detections": 6,
-          "avg_conf": 0.293,
-          "avg_overlap": 0.0,
-          "status": "NORMAL",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_20_conf31.jpg"
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_3_conf68.jpg"
         },
         {
           "track_id": 23,
-          "detections": 2,
-          "avg_conf": 0.354,
-          "avg_overlap": 91.5,
+          "detections": 19,
+          "avg_conf": 0.307,
+          "avg_overlap": 91.9,
           "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_23_conf35.jpg"
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_23_conf37.jpg"
+        },
+        {
+          "track_id": 33,
+          "detections": 1,
+          "avg_conf": 0.369,
+          "avg_overlap": 100.0,
+          "status": "SUSPECTED",
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_33_conf36.jpg"
         }
       ]
     },
@@ -1061,82 +1096,114 @@
       "roi_sha256": "529ee774742c5d8b5f6a7730dec484f85f0a72755f323e3f9e626b5ae00b9fd9",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 56.4,
+      "fps_throughput": 58.5,
       "latency_stats": {
-        "warmup_frame_ms": 143.92,
-        "steady_state_fps": 58.2,
-        "overall_fps": 56.4,
-        "tracker_mean_ms": 42.23,
-        "tracker_p50_ms": 38.16,
-        "tracker_p95_ms": 51.52,
-        "verifier_mean_ms": 1.37,
-        "verifier_p50_ms": 1.35,
-        "verifier_p95_ms": 1.69,
-        "inferred_frame_mean_ms": 46.69,
-        "inferred_frame_p50_ms": 42.11,
-        "inferred_frame_p95_ms": 56.04,
-        "skipped_frame_mean_ms": 2.16
+        "warmup_frame_ms": 164.28,
+        "steady_state_fps": 60.7,
+        "overall_fps": 58.5,
+        "tracker_mean_ms": 39.53,
+        "tracker_p50_ms": 36.35,
+        "tracker_p95_ms": 51.6,
+        "verifier_mean_ms": 1.92,
+        "verifier_p50_ms": 1.91,
+        "verifier_p95_ms": 2.27,
+        "inferred_frame_mean_ms": 44.2,
+        "inferred_frame_p50_ms": 41.06,
+        "inferred_frame_p95_ms": 56.71,
+        "skipped_frame_mean_ms": 2.07
       },
-      "tracks_count": 7,
-      "confirmed_count": 5,
-      "suspected_count": 2,
-      "normal_count": 0,
+      "tracks_count": 11,
+      "confirmed_count": 7,
+      "suspected_count": 3,
+      "normal_count": 1,
       "tracks": [
         {
           "track_id": 1,
           "detections": 80,
-          "avg_conf": 0.85,
+          "avg_conf": 0.898,
           "avg_overlap": 100.0,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_1_conf86.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_1_conf90.jpg"
         },
         {
           "track_id": 2,
           "detections": 80,
-          "avg_conf": 0.822,
-          "avg_overlap": 100.0,
+          "avg_conf": 0.884,
+          "avg_overlap": 66.7,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_2_conf83.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_2_conf88.jpg"
         },
         {
           "track_id": 3,
           "detections": 80,
-          "avg_conf": 0.726,
+          "avg_conf": 0.855,
           "avg_overlap": 100.0,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_3_conf76.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_3_conf87.jpg"
         },
         {
           "track_id": 4,
-          "detections": 61,
-          "avg_conf": 0.684,
-          "avg_overlap": 96.7,
+          "detections": 80,
+          "avg_conf": 0.805,
+          "avg_overlap": 97.7,
           "status": "CONFIRMED",
-          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_4_conf73.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_4_conf83.jpg"
         },
         {
           "track_id": 5,
-          "detections": 74,
-          "avg_conf": 0.657,
-          "avg_overlap": 66.3,
+          "detections": 80,
+          "avg_conf": 0.698,
+          "avg_overlap": 100.0,
           "status": "CONFIRMED",
           "best_crop_path": "reports/video_eval_crops\\video_test3\\track_5_conf75.jpg"
         },
         {
-          "track_id": 17,
-          "detections": 8,
-          "avg_conf": 0.314,
+          "track_id": 6,
+          "detections": 80,
+          "avg_conf": 0.596,
           "avg_overlap": 100.0,
-          "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_17_conf33.jpg"
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_6_conf64.jpg"
         },
         {
-          "track_id": 22,
+          "track_id": 7,
+          "detections": 76,
+          "avg_conf": 0.415,
+          "avg_overlap": 100.0,
+          "status": "CONFIRMED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_7_conf56.jpg"
+        },
+        {
+          "track_id": 8,
+          "detections": 77,
+          "avg_conf": 0.491,
+          "avg_overlap": 0.0,
+          "status": "NORMAL",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_8_conf64.jpg"
+        },
+        {
+          "track_id": 9,
           "detections": 23,
-          "avg_conf": 0.635,
-          "avg_overlap": 95.9,
+          "avg_conf": 0.292,
+          "avg_overlap": 100.0,
           "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_22_conf72.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_9_conf34.jpg"
+        },
+        {
+          "track_id": 15,
+          "detections": 12,
+          "avg_conf": 0.449,
+          "avg_overlap": 100.0,
+          "status": "SUSPECTED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_15_conf54.jpg"
+        },
+        {
+          "track_id": 18,
+          "detections": 4,
+          "avg_conf": 0.313,
+          "avg_overlap": 100.0,
+          "status": "SUSPECTED",
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_18_conf33.jpg"
         }
       ]
     }

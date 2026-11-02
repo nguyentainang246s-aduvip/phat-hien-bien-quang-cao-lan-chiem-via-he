@@ -2,7 +2,7 @@
 ==============================================================================
 ĐỒ ÁN TỐT NGHIỆP: PHÁT HIỆN BIỂN HIỆU/BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
 Script xuất Báo cáo tiến độ Tuần 9 - 11 ra file Microsoft Word (.docx)
-SỬ DỤNG 100% ẢNH THỰC NGHIỆM ĐƯỢC MÔ HÌNH V12 XUẤT RA TỪ data/images/output_v12/
+SỬ DỤNG 100% ẢNH THỰC NGHIỆM ĐƯỢC MÔ HÌNH V13 FINAL XUẤT RA TỪ data/images/output_v13/
 Tham chiếu toàn diện: Bang_ket_qua_de_xuat_DATN_CCTV (14 Bảng kết quả thực nghiệm)
 Sinh viên thực hiện: Nguyễn Đức Tài Năng - MSSV: 20224083
 ==============================================================================
@@ -178,7 +178,7 @@ def add_image_with_caption(doc, img_path, caption, asset_path=None, width=Inches
         p_src.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_src.paragraph_format.space_before = Pt(0)
         p_src.paragraph_format.space_after = Pt(6)
-        r_src = p_src.add_run(f"📍 Tệp kết quả xuất từ mô hình v12: {asset_path}")
+        r_src = p_src.add_run(f"📍 Tệp kết quả xuất từ mô hình v13: {asset_path}")
         r_src.font.name = "Consolas"
         r_src.font.size = Pt(8.0)
         r_src.font.color.rgb = COLOR_MUTED
@@ -230,8 +230,8 @@ def build_tuan_9_11_report():
         ("Sinh viên thực hiện:", "Nguyễn Đức Tài Năng — MSSV: 20224083 — Lớp: ĐATN K67"),
         ("Đơn vị đào tạo:", "Đại học Bách Khoa Hà Nội"),
         ("Giảng viên hướng dẫn:", "Thầy/Cô Cán bộ Hướng dẫn ĐATN"),
-        ("Kế hoạch Tuần 9 - 11:", "• Train YOLOv8n trên tập dữ liệu tự thu thập (Roboflow Version 12: 2,410 ảnh).\n• Đánh giá định lượng (Precision, Recall, mAP50, mAP50-95), bổ sung dữ liệu âm.\n• Đo đạc thực nghiệm toàn diện theo 14 Bảng kết quả đề xuất."),
-        ("Sản phẩm nghiệm thu:", "• Trọng số mô hình tốt nhất: models/best.pt (6.65 MB) & models/best.onnx (13.05 MB).\n• Thư mục kết quả nhận diện thực tế: data/images/output_v12/ (19 biển phát hiện).\n• Báo cáo đầy đủ 14 Bảng số liệu thực nghiệm trên 3 video CCTV thực tế Hà Nội.")
+        ("Kế hoạch Tuần 9 - 11:", "• Train YOLOv8n trên tập dữ liệu tự thu thập (Roboflow Version 13 Final: 2,674 ảnh).\n• Đánh giá định lượng (Precision, Recall, mAP50, mAP50-95), bổ sung dữ liệu âm.\n• Đo đạc thực nghiệm toàn diện theo 14 Bảng kết quả đề xuất."),
+        ("Sản phẩm nghiệm thu:", "• Trọng số mô hình tốt nhất: models/best.pt (6.61 MB) & models/best.onnx (12.4 MB).\n• Thư mục kết quả nhận diện thực tế: data/images/output_v13/ (21 biển phát hiện).\n• Báo cáo đầy đủ 14 Bảng số liệu thực nghiệm trên 3 video CCTV thực tế Hà Nội.")
     ]
     
     for i, (k, v) in enumerate(meta_data):
@@ -260,10 +260,10 @@ def build_tuan_9_11_report():
     # =========================================================================
     # DANH MỤC HÌNH ẢNH MINH HỌA XUẤT TỪ MÔ HÌNH V12
     # =========================================================================
-    doc.add_heading("DANH MỤC HÌNH ẢNH MINH CHỨNG THỰC NGHIỆM MÔ HÌNH V12", level=1)
+    doc.add_heading("DANH MỤC HÌNH ẢNH MINH CHỨNG THỰC NGHIỆM MÔ HÌNH V13 FINAL", level=1)
     doc.add_paragraph(
-        "Toàn bộ hình ảnh minh chứng trong báo cáo này được chạy trực tiếp bằng mô hình YOLOv8n Version 12 "
-        "(models/best.pt) trên tập ảnh hiện trường đường phố tại data/images/ và xuất ra thư mục data/images/output_v12/:"
+        "Toàn bộ hình ảnh minh chứng trong báo cáo này được chạy trực tiếp bằng mô hình YOLOv8n Version 13 Final "
+        "(models/best.pt) trên tập ảnh hiện trường đường phố tại data/images/ và xuất ra thư mục data/images/output_v13/:"
     )
 
     tbl_asset_guide = doc.add_table(rows=4, cols=4)
@@ -272,14 +272,14 @@ def build_tuan_9_11_report():
     
     format_table_header(
         tbl_asset_guide.rows[0],
-        ["Ký hiệu", "Tên ảnh & Tình huống thực nghiệm", "Tệp xuất kết quả (output_v12)", "Kết quả phát hiện của mô hình v12"],
+        ["Ký hiệu", "Tên ảnh & Tình huống thực nghiệm", "Tệp xuất kết quả (output_v13)", "Kết quả phát hiện của mô hình v13 Final"],
         [Inches(0.8), Inches(2.2), Inches(2.1), Inches(1.4)]
     )
 
     asset_guide_rows = [
-        ("Hình 1", "Ảnh thực nghiệm 1: Phố Hàng Bạc (1598×984)", "data/images/output_v12/v12_detected_1.png", "Phát hiện 8/8 biển vi phạm vỉa hè (Conf 55.9% - 92.6%)"),
-        ("Hình 2", "Ảnh thực nghiệm 2: Phố cổ Hà Nội (1529×1028)", "data/images/output_v12/v12_detected_2.png", "Phát hiện 6 biển: 4 vi phạm (98-100%), 2 mép vỉa hè (2-18%)"),
-        ("Hình 3", "Ảnh thực nghiệm 3: Tuyến phố đi bộ (1084×615)", "data/images/output_v12/v12_detected_3.png", "Phát hiện 5/5 biển vi phạm vỉa hè (Conf 68.2% - 91.4%)")
+        ("Hình 1", "Ảnh thực nghiệm 1: Phố Hàng Bạc (1598×984)", "data/images/output_v13/v13_detected_1.png", "Phát hiện 10 biển hiệu (9 vi phạm, 1 hợp lệ, Conf lên đến 90.8%)"),
+        ("Hình 2", "Ảnh thực nghiệm 2: Phố cổ Hà Nội (1529×1028)", "data/images/output_v13/v13_detected_2.png", "Phát hiện 6 biển: 4 vi phạm (97-100%), 2 mép vỉa hè (2-19%)"),
+        ("Hình 3", "Ảnh thực nghiệm 3: Tuyến phố đi bộ (1084×615)", "data/images/output_v13/v13_detected_3.png", "Phát hiện 5/5 biển vi phạm vỉa hè (Conf 76.3% - 85.9%)")
     ]
 
     for idx, (fig_id, name, path_val, desc) in enumerate(asset_guide_rows):
@@ -369,12 +369,12 @@ def build_tuan_9_11_report():
     r_n1.font.size = Pt(9.0)
     r_n1.font.italic = True
 
-    # HÌNH 1: Ảnh output v12 thực tế 1
+    # HÌNH 1: Ảnh output v13 thực tế 1
     add_image_with_caption(
         doc,
-        "data/images/output_v12/v12_detected_1.png",
-        "Hình 1. Kết quả nhận diện & phát hiện vi phạm lấn chiếm vỉa hè của mô hình YOLOv8n v12 trên ảnh thực nghiệm số 1 (Phát hiện chuẩn xác 8/8 biển hiệu)",
-        "data/images/output_v12/v12_detected_1.png",
+        "data/images/output_v13/v13_detected_1.png",
+        "Hình 1. Kết quả nhận diện & phát hiện vi phạm lấn chiếm vỉa hè của mô hình YOLOv8n v13 Final trên ảnh thực nghiệm số 1 (Phát hiện 10 biển hiệu, 9 vi phạm, 1 hợp lệ)",
+        "data/images/output_v13/v13_detected_1.png",
         width=Inches(6.2)
     )
 
@@ -486,12 +486,12 @@ def build_tuan_9_11_report():
             r.font.size = Pt(9.0)
             if idx == 3: r.font.bold = True
 
-    # HÌNH 2: Ảnh output v12 thực tế 2 (Phân loại vi phạm vs mép vỉa hè)
+    # HÌNH 2: Ảnh output v13 thực tế 2 (Phân loại vi phạm vs mép vỉa hè)
     add_image_with_caption(
         doc,
-        "data/images/output_v12/v12_detected_2.png",
-        "Hình 2. Kết quả nhận diện & phân định mức độ lấn chiếm của mô hình v12 trên ảnh thực nghiệm số 2 (Phân định 4 biển VI PHẠM và 2 biển MEP VIA HE)",
-        "data/images/output_v12/v12_detected_2.png",
+        "data/images/output_v13/v13_detected_2.png",
+        "Hình 2. Kết quả nhận diện & phân định mức độ lấn chiếm của mô hình v13 Final trên ảnh thực nghiệm số 2 (Phân định 4 biển VI PHẠM và 2 biển MEP VIA HE)",
+        "data/images/output_v13/v13_detected_2.png",
         width=Inches(6.2)
     )
 
@@ -673,12 +673,12 @@ def build_tuan_9_11_report():
             r.font.size = Pt(9.0)
             if idx == 3: r.font.bold = True
 
-    # HÌNH 3: Ảnh output v12 thực tế 3
+    # HÌNH 3: Ảnh output v13 thực tế 3
     add_image_with_caption(
         doc,
-        "data/images/output_v12/v12_detected_3.png",
-        "Hình 3. Kết quả nhận diện & phát hiện vi phạm của mô hình YOLOv8n v12 trên ảnh thực nghiệm số 3 (Phát hiện chuẩn xác 5/5 biển hiệu vi phạm)",
-        "data/images/output_v12/v12_detected_3.png",
+        "data/images/output_v13/v13_detected_3.png",
+        "Hình 3. Kết quả nhận diện & phát hiện vi phạm của mô hình YOLOv8n v13 Final trên ảnh thực nghiệm số 3 (Phát hiện chuẩn xác 5/5 biển hiệu vi phạm)",
+        "data/images/output_v13/v13_detected_3.png",
         width=Inches(6.2)
     )
 
