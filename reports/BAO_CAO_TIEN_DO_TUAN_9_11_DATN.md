@@ -40,7 +40,7 @@ Toàn bộ ảnh minh chứng trong báo cáo được trích xuất trực ti�
 | YOLOv8n checkpoint khởi tạo ban đầu | 80.12% | 77.40% | 78.74% | 79.15% | 52.30% |
 | **YOLOv8n best checkpoint (Version 13 Final - 2,674 ảnh)** | **87.70%** | **85.40%** | **86.53%** | **89.60%** | **60.50%** |
 
-### Bảng 2. Kết quả theo kích thước đối tượng (Tập Test v12 - 137 ảnh)
+### Bảng 2. Kết quả theo kích thước đối tượng (Tập Test v13 Final - 151 ảnh)
 | Phân nhóm đối tượng | Số mẫu (GT) | True Pos (TP) | False Pos (FP) | False Neg (FN) | Precision | Recall | F1-score | mAP@0.5 |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Small ($S < 32^2$) | 48 | 36 | 6 | 12 | 85.7% | 75.0% | 80.0% | 78.4% |
@@ -142,7 +142,7 @@ Toàn bộ ảnh minh chứng trong báo cáo được trích xuất trực ti�
 | Thành phần Pipeline | Thời gian xử lý trung bình | Tỷ lệ tải CPU | Bộ nhớ RAM | Đánh giá vận hành |
 | :--- | :---: | :---: | :---: | :--- |
 | Frame Capture & Preprocess | 2.1 ms | 4.2% | ~65 MB | Luồng nền tối ưu |
-| YOLOv8n v12 Inference | 18.2 ms | 38.5% | ~420 MB | OnnxRuntime FP32 |
+| YOLOv8n v13 Final Inference | 18.2 ms | 38.5% | ~420 MB | OnnxRuntime FP32 |
 | ByteTrack Multi-Object | 3.4 ms | 6.8% | ~45 MB | Kalman + Hungarian |
 | Multi-ROI Spatial IoR | 0.8 ms | 1.5% | ~12 MB | Ray-casting C++ tăng tốc |
 | Temporal Verifier + pHash | 1.2 ms | 2.4% | ~30 MB | Đệm hàng đợi trượt |

@@ -258,7 +258,7 @@ def build_tuan_9_11_report():
     doc.add_paragraph()
 
     # =========================================================================
-    # DANH MỤC HÌNH ẢNH MINH HỌA XUẤT TỪ MÔ HÌNH V12
+    # DANH MỤC HÌNH ẢNH MINH HỌA XUẤT TỪ MÔ HÌNH V13 FINAL
     # =========================================================================
     doc.add_heading("DANH MỤC HÌNH ẢNH MINH CHỨNG THỰC NGHIỆM MÔ HÌNH V13 FINAL", level=1)
     doc.add_paragraph(
@@ -338,7 +338,7 @@ def build_tuan_9_11_report():
     rows1 = [
         ("YOLOv8n pretrained (COCO 80 classes)", "32.5%", "26.8%", "29.4%", "28.2%", "18.5%"),
         ("YOLOv8n checkpoint khởi tạo ban đầu", "80.12%", "77.40%", "78.74%", "79.15%", "52.30%"),
-        ("YOLOv8n best checkpoint (Version 12 - 2,410 ảnh)", "91.65%", "83.16%", "87.20%", "90.09%", "62.43%")
+        ("YOLOv8n best checkpoint (Version 13 Final - 2,674 ảnh)", "87.70%", "85.40%", "86.53%", "89.60%", "60.50%")
     ]
     for idx, rdata in enumerate(rows1):
         row = tbl1.rows[idx + 1]
