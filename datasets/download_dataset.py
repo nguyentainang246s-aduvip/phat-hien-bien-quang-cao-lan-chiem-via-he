@@ -1,7 +1,7 @@
 """
 ==============================================================================
 ĐỒ ÁN TỐT NGHIỆP: PHÁT HIỆN BIỂN HIỆU/BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
-Chủ đề: Roboflow Dataset Downloader (Hỗ trợ Dataset Version 12 Mới Nhất)
+Chủ đề: Roboflow Dataset Downloader (Hỗ trợ Dataset Version 13 Mới Nhất)
 ==============================================================================
 """
 
@@ -17,7 +17,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 DEFAULT_API_KEY = os.environ.get("ROBOFLOW_API_KEY")
 
-def download_signboard_dataset(version_num: int = 12, api_key: str = None, location: str = None, overwrite: bool = False):
+def download_signboard_dataset(version_num: int = 13, api_key: str = None, location: str = None, overwrite: bool = False):
     key = api_key or os.environ.get("ROBOFLOW_API_KEY") or DEFAULT_API_KEY
     if not key:
         print("[LỖI BẢO MẬT] Chưa có API key Roboflow!")
@@ -44,7 +44,7 @@ def download_signboard_dataset(version_num: int = 12, api_key: str = None, locat
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tải tập dữ liệu từ Roboflow")
-    parser.add_argument("--version", type=int, default=12, help="Phiên bản dataset (mặc định: 12)")
+    parser.add_argument("--version", type=int, default=13, help="Phiên bản dataset (mặc định: 13)")
     parser.add_argument("--api-key", type=str, default=DEFAULT_API_KEY, help="Roboflow API Key")
     parser.add_argument("--location", type=str, default=None, help="Thư mục lưu trữ")
     parser.add_argument("--overwrite", action="store_true", help="Ghi đè dữ liệu nếu đã tồn tại")

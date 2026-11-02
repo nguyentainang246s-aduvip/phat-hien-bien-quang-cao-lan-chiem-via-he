@@ -63,7 +63,7 @@ items = {
             ('utils/fps_tracker.py', 'Bộ tính toán FPS làm mượt thời gian thực'),
             ('utils/visualizer.py', 'Bộ vẽ bounding box, trạng thái và tem vi phạm'),
             ('scripts/train_colab.py', 'Script huấn luyện mô hình YOLOv8 trên Google Colab'),
-            ('datasets/v12/data.yaml', 'Cấu hình tập dữ liệu YOLOv8n Version 12 (train/val/test: 2,410 ảnh, 1 class billboard)'),
+            ('datasets/v13/data.yaml', 'Cấu hình tập dữ liệu YOLOv8n Version 13 Final (train/val/test: 2,674 ảnh, 1 class billboard)'),
             ('reports/threshold_sweep_report.md', 'Báo cáo khoa học phân tích số liệu thực nghiệm chọn ngưỡng 30%')
         ]
     }
