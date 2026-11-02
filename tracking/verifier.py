@@ -315,7 +315,13 @@ class TemporalVerifier:
             else:
                 # Không vi phạm ở frame này
                 record["non_viol_streak"] += 1
-                if record["non_viol_streak"] > self.tolerance_frames:
+                tolerance_time = (self.tolerance_frames / self.source_fps) if (self.source_fps and self.source_fps > 0) else None
+                if tolerance_time is not None and record["last_viol_timestamp"] is not None:
+                    streak_exceeded = (current_timestamp - record["last_viol_timestamp"]) > tolerance_time
+                else:
+                    streak_exceeded = record["non_viol_streak"] > self.tolerance_frames
+
+                if streak_exceeded:
                     # Vượt ngưỡng dung sai -> reset hoàn toàn
                     record["count"] = 0
                     record["viol_confs"].clear()
@@ -350,7 +356,13 @@ class TemporalVerifier:
         for tid, r in self.track_records.items():
             if tid not in active_ids:
                 missing_streak = self.current_frame_index - r["last_seen"]
-                if missing_streak > self.tolerance_frames:
+                tolerance_time = (self.tolerance_frames / self.source_fps) if (self.source_fps and self.source_fps > 0) else None
+                if tolerance_time is not None and r["last_viol_timestamp"] is not None:
+                    missing_exceeded = (current_timestamp - r["last_viol_timestamp"]) > tolerance_time
+                else:
+                    missing_exceeded = missing_streak > self.tolerance_frames
+
+                if missing_exceeded:
                     if r["viol_confs"]:
                         r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
                     r["count"] = len(r["viol_confs"])

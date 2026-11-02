@@ -223,23 +223,30 @@ def run_monitor_mode(args):
                 sw_idx = sp.get("sidewalk_index", 1)
                 lbl = f"NGHI VAN VH#{sw_idx}: {sp['overlap_pct']}% (Anh tinh)"
                 status = TrackState.SUSPECTED
-                ev_res = evidence_saver.save_evidence(
-                    clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
-                    roi_frame=frame
-                )
-                if ev_res:
-                    rec_id = db.insert_violation(
-                        camera_id=roi_manager.camera_id,
-                        track_id=track_id,
-                        timestamp=ev_res["timestamp"],
-                        confidence=conf,
-                        overlap_pct=sp["overlap_pct"],
-                        full_image_path=ev_res["full_path"],
-                        crop_image_path=ev_res.get("crop_path", ""),
-                        bbox=box,
-                        sidewalk_index=sw_idx
+
+                # Kiểm tra khử trùng lặp trước khi ghi nhận bằng chứng
+                if db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5):
+                    print(f"   [BỎ QUA] Vi phạm ID #{track_id} tại vị trí này đã được ghi nhận trong 5 phút qua.")
+                else:
+                    ev_res = evidence_saver.save_evidence(
+                        clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
+                        roi_frame=frame
                     )
-                print(f"   [BẰNG CHỨNG #{confirmed_count}] Đã ghi nhận vi phạm ID #{track_id} -> DB record #{rec_id}")
+                    if ev_res:
+                        rec_id = db.insert_violation(
+                            camera_id=roi_manager.camera_id,
+                            track_id=track_id,
+                            timestamp=ev_res["timestamp"],
+                            confidence=conf,
+                            overlap_pct=sp["overlap_pct"],
+                            full_image_path=ev_res["full_path"],
+                            crop_image_path=ev_res.get("crop_path", ""),
+                            bbox=box,
+                            sidewalk_index=sw_idx
+                        )
+                        print(f"   [BẰNG CHỨNG #{confirmed_count}] Đã ghi nhận vi phạm ID #{track_id} -> DB record #{rec_id}")
+                    else:
+                        print(f"   [CẢNH BÁO] Không thể lưu bằng chứng cho vi phạm ID #{track_id}, bỏ qua chèn DB.")
             else:
                 lbl = f"HOP LE: {sp['overlap_pct']}%"
                 status = TrackState.NORMAL
@@ -260,33 +267,39 @@ def run_monitor_mode(args):
         return True
 
     # 5. XỬ LÝ LUỒNG VIDEO / RTSP / WEBCAM LIÊN TỤC
-    reader = StreamReader(source=source)
-    verifier.source_fps = reader.fps if hasattr(reader, 'fps') and reader.fps > 0 else None
-    fps_tracker = FPSTracker(alpha=0.15)
-    window_name = "CCTV Sidewalk Surveillance 2.0 (ByteTrack + Temporal Verifier)"
-
-    if not args.headless:
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(window_name, min(reader.width, 1024), min(reader.height, 768))
-
-    print(">> ĐANG GIÁM SÁT TRỰC TUYẾN 24/7. Nhấn 'q' hoặc 'ESC' để dừng.")
+    loop_video = getattr(args, "loop", False)
+    reader = None
     frame_count = 0
     total_confirmed_events = 0
-    roi_validated = False
-
-    last_verified_render = []
-    last_confirmed_count = 0
-    last_suspected_count = 0
-    last_object_count = 0
-
-    target_frame_interval = 1.0 / target_fps if target_fps > 0 else 0.04167
-
-    fail_count = 0
+    fps_tracker = FPSTracker(alpha=0.15)
     try:
+        reader = StreamReader(source=source, loop=loop_video)
+        effective_fps = (reader.fps / (frame_skip + 1)) if (hasattr(reader, 'fps') and reader.fps > 0) else 30.0
+        verifier.source_fps = effective_fps
+        window_name = "CCTV Sidewalk Surveillance 2.0 (ByteTrack + Temporal Verifier)"
+
+        if not args.headless:
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(window_name, min(reader.width, 1024), min(reader.height, 768))
+
+        print(">> ĐANG GIÁM SÁT TRỰC TUYẾN 24/7. Nhấn 'q' hoặc 'ESC' để dừng.")
+        roi_validated = False
+
+        last_verified_render = []
+        last_confirmed_count = 0
+        last_suspected_count = 0
+        last_object_count = 0
+
+        target_frame_interval = 1.0 / target_fps if target_fps > 0 else 0.04167
+
+        fail_count = 0
         while True:
             loop_start_time = time.perf_counter()
             ret, frame = reader.read()
             if not ret or frame is None:
+                if not getattr(reader, 'is_live_stream', False) and not loop_video:
+                    print(">> Đã đọc hết tệp video, kết thúc giám sát.")
+                    break
                 fail_count += 1
                 max_fails = 5 if getattr(reader, 'is_live_stream', False) else 150
                 if fail_count > max_fails:
@@ -423,13 +436,15 @@ def run_monitor_mode(args):
                     time.sleep(remaining_sleep)
 
     finally:
-        reader.release()
+        if reader is not None:
+            reader.release()
         if not args.headless:
             cv2.destroyAllWindows()
         print("-" * 78)
         print("TỔNG KẾT PHIÊN GIÁM SÁT:")
         print(f"  • Tổng số khung hình đã xử lý            : {frame_count}")
-        print(f"  • Tốc độ xử lý trung bình                : {fps_tracker.smoothed_fps:.1f} FPS")
+        avg_fps = fps_tracker.smoothed_fps if 'fps_tracker' in locals() else 0.0
+        print(f"  • Tốc độ xử lý trung bình                : {avg_fps:.1f} FPS")
         print(f"  • Tổng số sự kiện vi phạm được ghi nhận  : {total_confirmed_events}")
         print("[OK] Đã giải phóng tài nguyên an toàn.")
         print("=" * 78)
@@ -541,6 +556,8 @@ Ví dụ sử dụng:
                         help="Số frames bỏ qua giữa các lần infer (mặc định: 2, gợi ý: 1 hoặc 2)")
     parser.add_argument("--sync-fps", action="store_true",
                         help="Khóa nhịp FPS thời gian thực chuẩn 1.0x (tiết kiệm CPU, mặc định bật cho video)")
+    parser.add_argument("--loop", action="store_true",
+                        help="Tự động tua lại đầu video khi chạy hết (mặc định tắt: dừng khi hết video)")
     parser.add_argument("--no-sync", action="store_true",
                         help="Tắt khóa nhịp FPS để chạy hết công suất phần cứng (Benchmark mode)")
     parser.add_argument("--target-fps", type=float, default=None,

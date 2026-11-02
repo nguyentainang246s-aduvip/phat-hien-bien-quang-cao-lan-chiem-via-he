@@ -6,11 +6,14 @@ TASK: 23 - Xây dựng Module evidence/saver.py (Lưu trữ ảnh bằng chứng
 ==============================================================================
 """
 
+import datetime
+import logging
 import os
 import time
-import datetime
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_imwrite(path: str, img: np.ndarray) -> bool:
@@ -47,8 +50,10 @@ class EvidenceSaver:
                 cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
                 if os.path.exists(cascade_path):
                     self._face_cascade = cv2.CascadeClassifier(cascade_path)
-            except Exception:
-                pass
+                else:
+                    logger.warning("[EVIDENCE] Không tìm thấy file Haar cascade tại %s. Tính năng face blur bị tắt.", cascade_path)
+            except Exception as e:
+                logger.warning("[EVIDENCE] Lỗi khi nạp Haar cascade: %s. Tính năng face blur bị tắt.", e)
         os.makedirs(self.base_dir, exist_ok=True)
 
     def save_evidence(self, frame: np.ndarray, box: tuple, track_id: int, 
@@ -103,6 +108,7 @@ class EvidenceSaver:
 
         # 2. Xử lý ảnh toàn cảnh (Full Frame with Target Highlight & Watermark Stamp)
         stamped_frame = roi_frame.copy() if roi_frame is not None else frame.copy()
+        privacy_blurred = False
 
         # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
         if self._face_cascade is not None:
@@ -117,8 +123,9 @@ class EvidenceSaver:
                             k_w = max(15, (fw_box // 2) * 2 + 1)
                             k_h = max(15, (fh_box // 2) * 2 + 1)
                             stamped_frame[fy:fy+fh_box, fx:fx+fw_box] = cv2.GaussianBlur(f_roi, (k_w, k_h), 20)
-            except Exception:
-                pass
+                            privacy_blurred = True
+            except Exception as e:
+                logger.warning("[EVIDENCE] Lỗi khi làm mờ khuôn mặt: %s", e)
 
         # Vẽ khung đỏ đánh dấu đối tượng vi phạm trên ảnh bằng chứng toàn cảnh
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -147,5 +154,6 @@ class EvidenceSaver:
             "timestamp": iso_timestamp,
             "camera_id": camera_id,
             "track_id": track_id,
-            "overlap_pct": overlap_pct
+            "overlap_pct": overlap_pct,
+            "privacy_blurred": privacy_blurred
         }

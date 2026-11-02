@@ -25,12 +25,13 @@ class StreamReader:
       - Chạy luồng đọc nền (Background Thread) để làm rỗng bộ đệm (Buffer Flush),
         đảm bảo frame đưa vào AI luôn là khung hình mới nhất (Zero Latency).
     """
-    def __init__(self, source, reconnect_delay: float = 2.0, max_retries: int = 10):
+    def __init__(self, source, reconnect_delay: float = 2.0, max_retries: int = 10, loop: bool = False):
         """
         Args:
             source: Nguồn dữ liệu (int nếu là webcam, str nếu là video/RTSP)
             reconnect_delay: Thời gian chờ (giây) trước khi thử kết nối lại
             max_retries: Số lần thử kết nối lại tối đa
+            loop: Tự động tua lại khi đọc hết tệp video (mặc định False: dừng khi hết file)
         """
         # Xử lý nếu source là chuỗi số ("0", "1")
         if isinstance(source, str) and source.isdigit():
@@ -45,6 +46,7 @@ class StreamReader:
 
         self.reconnect_delay = reconnect_delay
         self.max_retries = max_retries
+        self.loop = loop
 
         self.cap = None
         self.width = 1280
@@ -128,10 +130,16 @@ class StreamReader:
         """Worker chạy ngầm đọc frame liên tục cho live stream để tránh nghẽn buffer OpenCV."""
         while not self._stop_event.is_set():
             with self._cap_lock:
-                if self.cap is None or not self.cap.isOpened():
+                cap = self.cap
+                if cap is None or not cap.isOpened():
                     time.sleep(0.05)
                     continue
-                ret, frame = self.cap.read()
+            
+            # Đọc frame ngoài _cap_lock để tránh deadlock khi luồng chính gọi release() / _reconnect()
+            ret, frame = cap.read()
+            if self._stop_event.is_set():
+                break
+
             with self._lock:
                 self._latest_ret = ret
                 if ret and frame is not None:
@@ -181,7 +189,9 @@ class StreamReader:
         ret, frame = self.cap.read()
 
         if not ret or frame is None:
-            # Hết video file -> Tua lại đầu
+            if not self.loop:
+                return False, None
+            # Hết video file -> Tua lại đầu nếu bật chế độ lặp
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             self.looped = True
             ret, frame = self.cap.read()

@@ -6,9 +6,12 @@ TASK: 24 - Xây dựng Module database/db.py (Quản lý CSDL SQLite)
 ==============================================================================
 """
 
+import logging
 import os
 import sqlite3
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class ViolationDatabase:
@@ -28,8 +31,8 @@ class ViolationDatabase:
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Không thể kích hoạt SQLite WAL mode (%s). Tiếp tục với chế độ mặc định.", e)
         return conn
 
     def init_tables(self):

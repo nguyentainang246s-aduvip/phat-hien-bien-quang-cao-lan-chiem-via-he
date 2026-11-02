@@ -48,7 +48,7 @@ class ViolationChecker:
                       "status_text": str
                   }
         """
-        if len(polygon_points) < 3:
+        if not polygon_points or len(polygon_points) < 3:
             return {
                 "is_violation": False,
                 "overlap_ratio": 0.0,
@@ -58,7 +58,10 @@ class ViolationChecker:
                 "status_text": "CHƯA CÓ VÙNG VỈA HÈ"
             }
 
-        x1, y1, x2, y2 = box
+        # Chuẩn hóa tọa độ Bounding Box (chống đảo ngược x1>x2 hoặc y1>y2)
+        bx1, by1, bx2, by2 = float(box[0]), float(box[1]), float(box[2]), float(box[3])
+        x1, x2 = min(bx1, bx2), max(bx1, bx2)
+        y1, y2 = min(by1, by2), max(by1, by2)
         
         # ---------------------------------------------------------------------
         # ĐIỀU KIỆN 1: TỌA ĐỘ CHÂN TIẾP ĐẤT (3-POINT GROUND CONTACT POINT)
@@ -81,18 +84,21 @@ class ViolationChecker:
         # ---------------------------------------------------------------------
         # ĐIỀU KIỆN 2: TỶ LỆ DIỆN TÍCH GIAO NHAU (OVERLAP RATIO VỚI SHAPELY)
         # ---------------------------------------------------------------------
-        box_poly = sg.box(x1, y1, x2, y2)
-        sidewalk_poly = sg.Polygon(polygon_points)
-        
-        # Sửa lỗi đa giác tự cắt nếu có
-        if not sidewalk_poly.is_valid:
-            sidewalk_poly = sidewalk_poly.buffer(0)
-
         overlap_ratio = 0.0
-        if box_poly.area > 0:
-            intersection = sidewalk_poly.intersection(box_poly)
-            # Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
-            overlap_ratio = float(intersection.area / box_poly.area)
+        try:
+            box_poly = sg.box(x1, y1, x2, y2)
+            sidewalk_poly = sg.Polygon(polygon_points)
+            
+            # Sửa lỗi đa giác tự cắt nếu có
+            if not sidewalk_poly.is_valid:
+                sidewalk_poly = sidewalk_poly.buffer(0)
+
+            if box_poly.area > 0 and sidewalk_poly.is_valid and not sidewalk_poly.is_empty:
+                intersection = sidewalk_poly.intersection(box_poly)
+                # Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
+                overlap_ratio = float(intersection.area / box_poly.area)
+        except Exception:
+            overlap_ratio = 0.0
 
         # ---------------------------------------------------------------------
         # RA QUYẾT ĐỊNH (DECISION RULE)

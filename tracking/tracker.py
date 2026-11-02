@@ -18,7 +18,7 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = "bytetrack.yaml", imgsz: int = 640):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = "bytetrack.yaml", imgsz: int = 640, allowed_classes: list = None):
         """
         Khởi tạo ObjectTracker.
         
@@ -27,11 +27,13 @@ class ObjectTracker:
             conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.25 = 25% theo chuẩn đánh giá hệ thống)
             tracker_type: File cấu hình tracker ('bytetrack.yaml' hoặc 'botsort.yaml')
             imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
+            allowed_classes: Danh sách class_id hoặc tên class được phép bám vết (None = tất cả)
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
         self.tracker_type = tracker_type
         self.imgsz = imgsz
+        self.allowed_classes = allowed_classes
         
         if not os.path.exists(model_path) and not model_path.endswith("yolov8n.pt"):
             raise FileNotFoundError(f"Không tìm thấy file trọng số mô hình: {model_path}")
@@ -64,15 +66,19 @@ class ObjectTracker:
         """
         target_conf = conf if conf is not None else self.conf_threshold
         target_imgsz = imgsz if imgsz is not None else self.imgsz
+        track_kwargs = {
+            "source": frame,
+            "persist": True,
+            "tracker": self.tracker_type,
+            "conf": target_conf,
+            "imgsz": target_imgsz,
+            "verbose": False
+        }
+        if self.allowed_classes is not None and all(isinstance(c, int) for c in self.allowed_classes):
+            track_kwargs["classes"] = self.allowed_classes
+
         # persist=True: Bắt buộc để ByteTrack nhớ trạng thái Kalman Filter giữa các frames liên tiếp
-        results = self.model.track(
-            source=frame,
-            persist=True,
-            tracker=self.tracker_type,
-            conf=target_conf,
-            imgsz=target_imgsz,
-            verbose=False
-        )
+        results = self.model.track(**track_kwargs)
 
         tracked_objects = []
         if len(results) == 0 or results[0].boxes is None:
@@ -80,10 +86,14 @@ class ObjectTracker:
 
         boxes = results[0].boxes
         for box in boxes:
-            xyxy = box.xyxy[0].cpu().numpy().astype(int)
-            conf = float(box.conf[0].cpu().numpy())
             cls_id = int(box.cls[0].cpu().numpy())
             cls_name = self.class_names.get(cls_id, f"class_{cls_id}")
+            if self.allowed_classes is not None:
+                if cls_id not in self.allowed_classes and cls_name not in self.allowed_classes:
+                    continue
+
+            xyxy = box.xyxy[0].cpu().numpy().astype(int)
+            conf = float(box.conf[0].cpu().numpy())
 
             # Lấy track_id do ByteTrack sinh ra
             if box.id is not None:
