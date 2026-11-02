@@ -179,12 +179,14 @@ class StreamReader:
         # 1. Đối với Live Stream / RTSP: Lấy frame mới nhất từ background thread
         if self.is_live_stream:
             start_wait = time.monotonic()
+            fps_val = getattr(self, "fps", 25.0) or 25.0
+            max_wait_new = max(0.15, 1.5 / max(1.0, fps_val))
             while not self._stop_event.is_set():
                 with self._lock:
                     is_new = (self._frame_seq != self._last_consumed_seq)
                     has_frame = self._latest_frame is not None and self._latest_ret
                     ts_fresh = (time.monotonic() - self._latest_ts) < 5.0
-                    if has_frame and ts_fresh and (is_new or (time.monotonic() - start_wait) > 0.05):
+                    if has_frame and ts_fresh and (is_new or (time.monotonic() - start_wait) > max_wait_new):
                         self._last_consumed_seq = self._frame_seq
                         return True, self._latest_frame.copy()
                 if (time.monotonic() - start_wait) > 0.5:

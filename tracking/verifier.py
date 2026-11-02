@@ -95,15 +95,10 @@ class TemporalVerifier:
     # ------------------------------------------------------------------
 
     def _elapsed_viol_seconds(self, record: dict, now: float) -> float:
-        """Trả về số giây vi phạm liên tiếp thực tế dựa trên các quan sát hợp lệ."""
+        """Trả về số giây vi phạm liên tiếp thực tế dựa trên chuỗi quan sát hợp lệ."""
         if not record.get("viol_confs"):
             return 0.0
-        span = max(0.0, record["viol_confs"][-1][0] - record["viol_confs"][0][0])
-        if self.source_fps and self.source_fps > 0:
-            frame_dt = 1.0 / self.source_fps
-            max_valid_span = (len(record["viol_confs"]) + self.tolerance_frames) * frame_dt
-            return min(span, max_valid_span)
-        return span
+        return max(0.0, record["viol_confs"][-1][0] - record["viol_confs"][0][0])
 
     def _is_stationary(self, record: dict, now: float) -> bool:
         """

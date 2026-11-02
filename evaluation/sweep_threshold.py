@@ -134,9 +134,9 @@ def run_threshold_sweep(
             "precision": precision,
             "recall": recall,
             "f1": f1,
-            "tp": metrics["TP"] if all_gt else 0,
-            "fp": metrics["FP"] if all_gt else 0,
-            "fn": metrics["FN"] if all_gt else 0
+            "tp": tp,
+            "fp": fp,
+            "fn": fn
         })
 
         print(f"  Threshold {int(th*100):>3}% | Violations: {total_violations:>3} | "

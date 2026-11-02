@@ -172,8 +172,12 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
                 dist_norm = max(0.0, 1.0 - (dist_px / 1000.0))
                 inside_bonus = 0.3 if inside else 0.0
 
-                affinity = 0.4 * s_iou + 0.3 * dist_norm + 0.3 * t_iou + inside_bonus
-                cost_matrix[i, j] = -affinity
+                if s_iou >= 0.05 or (inside and dist_px <= 150.0):
+                    affinity = 0.4 * s_iou + 0.3 * dist_norm + 0.3 * t_iou + inside_bonus
+                    cost_matrix[i, j] = -affinity
+                else:
+                    affinity = 0.0
+                    cost_matrix[i, j] = 1e6  # Cấm ghép các cặp không giao nhau về không gian
                 meta_matrix[(i, j)] = {
                     "affinity": affinity,
                     "object_id": oid,
@@ -1042,9 +1046,9 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write("* Để bảo đảm tính minh bạch và liêm chính học thuật, đề tài công bố công khai cả hai phiên bản trong bảng tổng hợp dưới đây.\n\n")
 
             mf.write("### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):\n")
-            mf.write("1. **Track #8 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #8):** Xuất hiện 22 detections liên tục từ Frame 175 (7.29s) đến cuối video tại Frame 238 (9.92s). Tổng thời gian tích lũy liên tục đạt 2.63 giây. Do video chỉ dài 10.0 giây, clip kết thúc trước khi đối tượng kịp chạm ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
-            mf.write("2. **Track #11 (Video 3 - Biển hiệu nhỏ ở xa, matched Track #13):** Xuất hiện 28 detections rải rác từ Frame 94 đến Frame 208 (~4.75s). Do cự ly xa và góc nghiêng, confidence dao động chập chờn quanh ngưỡng 0.25 (0.25 – 0.43), các frame mất dấu vượt quá dung sai khiến bộ đếm vi phạm liên tục bị decay/reset trước khi đạt chuỗi liên tục 3.0 giây, giữ ở trạng thái `SUSPECTED`.\n")
-            mf.write("3. **Track #7 (Video 2 - Biển hiệu khung sắt tầm thấp, matched Track #4):** Độ tin cậy trung bình trên toàn track đạt 0.359, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian (tính trung bình trên chuỗi quan sát thực tế và trừ confidence tương ứng khi decay), hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n\n")
+            mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #33):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
+            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #23):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
+            mf.write("3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).\n\n")
 
             mf.write("---\n\n")
 
@@ -1100,8 +1104,8 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write("### Bảng Lịch Sử Hiệu Chuẩn Vùng ROI Video 1:\n")
             mf.write("| Phiên bản | Tên file cấu hình | Số đỉnh | Mã băm toàn vẹn (SHA-256) | Thời điểm ghi nhận | Kết quả đối sánh | Ghi chú kỹ thuật |\n")
             mf.write("| :--- | :--- | :---: | :--- | :--- | :---: | :--- |\n")
-            mf.write(f"| **Version A** | `configs/roi_video_test_version_a.json` | 7 đỉnh | `{tracked_hashes.get('configs/roi_video_test_version_a.json', '')}` | Tái dựng 11/10 (từ ghi chép 05/10) | Recall 71.43% (10/14) | Thử nghiệm sơ khai: vẽ hẹp sát mép tường, Standee #3 rơi điểm chân ra ngoài ROI -> bỏ sót (False Negative). |\n")
-            mf.write(f"| **Version B** | `configs/roi_video_test_version_b.json` & `roi_video_test.json` | 8 đỉnh | `{tracked_hashes.get('configs/roi_video_test_version_b.json', '')}` | 2026-10-08 22:23:56 (Đóng băng) | Recall 78.57% (11/14) | **Bản chuẩn hóa chính thức**: bao trùm toàn bộ không gian vỉa hè thực tế, Standee #3 đạt Overlap {standee_3_v1_ov_b}% -> CONFIRMED (True Positive). |\n")
+            mf.write(f"| **Version A** | `configs/roi_video_test_version_a.json` | 7 đỉnh | `{tracked_hashes.get('configs/roi_video_test_version_a.json', '')}` | Tái dựng 11/10 (từ ghi chép 05/10) | Recall {metrics_a['recall']*100:.2f}% ({metrics_a['true_positives']}/{metrics_a['true_positives']+metrics_a['false_negatives']}) | Thử nghiệm sơ khai: vẽ hẹp sát mép tường, Standee #3 rơi điểm chân ra ngoài ROI -> bỏ sót (False Negative). |\n")
+            mf.write(f"| **Version B** | `configs/roi_video_test_version_b.json` & `roi_video_test.json` | 8 đỉnh | `{tracked_hashes.get('configs/roi_video_test_version_b.json', '')}` | 2026-10-08 22:23:56 (Đóng băng) | Recall {metrics_b['recall']*100:.2f}% ({metrics_b['true_positives']}/{metrics_b['true_positives']+metrics_b['false_negatives']}) | **Bản chuẩn hóa chính thức**: bao trùm toàn bộ không gian vỉa hè thực tế, Standee #3 đạt Overlap {standee_3_v1_ov_b}% -> CONFIRMED (True Positive). |\n")
             mf.write(f"| **Version C** | `configs/roi_video_test_version_c.json` | 6 đỉnh | `{tracked_hashes.get('configs/roi_video_test_version_c.json', '')}` | 2026-10-12 14:27:30 (Thử nghiệm Web) | Overlap giảm còn 63.1% | Thử nghiệm rút gọn đỉnh trên Web Studio; đã lưu trữ độc lập và loại bỏ để đóng băng vĩnh viễn Version B. |\n\n")
 
             mf.write("### Các file cấu hình chuẩn hóa khác:\n")
