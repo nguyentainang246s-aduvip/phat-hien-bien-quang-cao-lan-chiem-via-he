@@ -95,10 +95,10 @@ class TemporalVerifier:
     # ------------------------------------------------------------------
 
     def _elapsed_viol_seconds(self, record: dict, now: float) -> float:
-        """Trả về số giây vi phạm liên tiếp thực tế dựa trên chuỗi quan sát hợp lệ."""
-        if not record.get("viol_confs"):
+        """Trả về số giây vi phạm liên tiếp thực tế dựa trên mốc bắt đầu vi phạm."""
+        if not record.get("viol_confs") or record.get("viol_start_time") is None:
             return 0.0
-        return max(0.0, record["viol_confs"][-1][0] - record["viol_confs"][0][0])
+        return max(0.0, now - record["viol_start_time"])
 
     def _is_stationary(self, record: dict, now: float) -> bool:
         """
@@ -241,10 +241,11 @@ class TemporalVerifier:
                 if record["last_viol_timestamp"] is not None:
                     gap = current_timestamp - record["last_viol_timestamp"]
                     if gap > max_allowed_gap:
-                        # Gián đoạn quá lâu -> reset chuỗi quan sát liên tục
+                        # Gián đoạn quá lâu -> reset chuỗi quan sát liên tục và hạ trạng thái về SUSPECTED
                         record["viol_confs"].clear()
                         record["viol_start_time"] = current_timestamp
                         record["count"] = 0
+                        record["status"] = TrackState.SUSPECTED
 
                 if record["viol_start_time"] is None:
                     record["viol_start_time"] = current_timestamp
@@ -372,6 +373,9 @@ class TemporalVerifier:
                             r["status"] = TrackState.NORMAL
                         else:
                             r["viol_start_time"] = r["viol_confs"][0][0]
+                            # Nếu thời gian vi phạm hoặc số frame tụt dưới ngưỡng xác nhận, hạ từ CONFIRMED về SUSPECTED
+                            if r["status"] == TrackState.CONFIRMED and not self._confirm_threshold_reached(r, current_timestamp):
+                                r["status"] = TrackState.SUSPECTED
 
         # 5. Garbage Collection – xóa track cũ khỏi RAM
         stale_ids = [

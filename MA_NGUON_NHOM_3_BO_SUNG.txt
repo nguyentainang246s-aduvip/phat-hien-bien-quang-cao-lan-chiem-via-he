@@ -2260,24 +2260,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                             <!-- Độ nhạy (Confidence) -->
                             <select id="player-conf-select" class="eval-select" style="width: auto; padding: 6px 10px; font-size: 0.8rem;" onchange="onPlayerSettingChange()" title="Độ nhạy AI (Confidence Threshold)">
+                                <option value="0.25" selected>Độ nhạy: Chuẩn (25% - settings.yaml)</option>
                                 <option value="0.10">Độ nhạy: Rất cao (10% - Bắt tối đa)</option>
-                                <option value="0.15" selected>Độ nhạy: Cao (15% - Bắt biển nhỏ)</option>
+                                <option value="0.15">Độ nhạy: Cao (15% - Bắt biển nhỏ)</option>
                                 <option value="0.20">Độ nhạy: Trung bình (20%)</option>
                                 <option value="0.30">Độ nhạy: Khắt khe (30%)</option>
                             </select>
 
                             <!-- Độ phân giải AI (Imgsz) -->
                             <select id="player-imgsz-select" class="eval-select" style="width: auto; padding: 6px 10px; font-size: 0.8rem;" onchange="onPlayerSettingChange()" title="Độ phân giải nạp vào AI">
+                                <option value="640" selected>Độ nét: 640px (Chuẩn - settings.yaml)</option>
+                                <option value="960">Độ nét: 960px (Cân bằng Tốc độ/Nét)</option>
                                 <option value="1280">Độ nét: 1280px (Cực nét - Bắt xa)</option>
-                                <option value="960" selected>Độ nét: 960px (Cân bằng Tốc độ/Nét)</option>
-                                <option value="640">Độ nét: 640px (Tốc độ cao nhất)</option>
                             </select>
 
                             <!-- Lựa chọn Frame Skip -->
                             <select id="player-skip-select" class="eval-select" style="width: auto; padding: 6px 10px; font-size: 0.8rem;" onchange="onPlayerSkipChange()" title="Bỏ qua khung hình">
+                                <option value="2" selected>Siêu tốc độ (Skip 2 - settings.yaml)</option>
                                 <option value="1">Tần suất: Chuẩn (Skip 1 - Mượt)</option>
                                 <option value="0">Tất cả khung hình (Skip 0)</option>
-                                <option value="2">Siêu tốc độ (Skip 2 - Edge AI)</option>
                             </select>
                         </div>
                     </div>
@@ -3310,9 +3311,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let currentStreamVideo = null;
         let currentStreamToken = null;
         let streamTelemetryInterval = null;
-        let currentFrameSkip = 1;
-        let currentConfidence = 0.15;
-        let currentImgsz = 960;
+        let currentFrameSkip = 2;
+        let currentConfidence = 0.25;
+        let currentImgsz = 640;
         let currentPlayerMode = 'ai'; // 'ai' or 'raw'
         let allPlayerVideos = [];
 
@@ -3527,8 +3528,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function onPlayerSettingChange() {
             const confSelect = document.getElementById('player-conf-select');
             const imgszSelect = document.getElementById('player-imgsz-select');
-            if (confSelect) currentConfidence = parseFloat(confSelect.value) || 0.15;
-            if (imgszSelect) currentImgsz = parseInt(imgszSelect.value) || 960;
+            if (confSelect) currentConfidence = parseFloat(confSelect.value) || 0.25;
+            if (imgszSelect) currentImgsz = parseInt(imgszSelect.value) || 640;
             if (currentStreamVideo && currentPlayerMode === 'ai') {
                 currentStreamToken = Date.now();
                 updatePlayerSource();
@@ -4392,7 +4393,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
 
-    def stream_ai_video(self, video_name, token, frame_skip=1, overlay=True, conf=0.15, imgsz=960):
+    def stream_ai_video(self, video_name, token, frame_skip=2, overlay=True, conf=0.25, imgsz=640):
         """Truyền phát trực tiếp luồng video AI (MJPEG Stream) kèm nhận diện YOLO & bám vết ByteTrack."""
         video_name = os.path.basename(video_name)
         video_path = os.path.abspath(os.path.join("data", "videos", video_name))
@@ -4690,18 +4691,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
             except Exception:
                 token = 0
             try:
-                frame_skip = int(query_params.get("skip", [1])[0])
+                frame_skip = int(query_params.get("skip", [2])[0])
             except Exception:
-                frame_skip = 1
+                frame_skip = 2
             overlay = query_params.get("overlay", ["1"])[0] == "1"
             try:
-                conf = float(query_params.get("conf", [0.15])[0])
+                conf = float(query_params.get("conf", [0.25])[0])
             except Exception:
-                conf = 0.15
+                conf = 0.25
             try:
-                imgsz = int(query_params.get("imgsz", [960])[0])
+                imgsz = int(query_params.get("imgsz", [640])[0])
             except Exception:
-                imgsz = 960
+                imgsz = 640
             if not video_name:
                 self.send_response(400)
                 self.end_headers()

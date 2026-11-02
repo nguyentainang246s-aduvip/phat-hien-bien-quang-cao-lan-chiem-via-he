@@ -362,7 +362,7 @@ def run_monitor_mode(args):
                         label = f"VI PHAM VH#{sw_idx} ({sp['overlap_pct']}%)"
 
                         if is_new_alert:
-                            is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5) if getattr(reader, 'is_live_stream', False) else False
+                            is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5)
                             if is_dup:
                                 print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi tương tự trong 5 phút gần đây)")
                             else:

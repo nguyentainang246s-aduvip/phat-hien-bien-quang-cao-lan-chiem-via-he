@@ -73,8 +73,8 @@ def build_essentials():
     p("  - Tối ưu hóa suy luận bằng ONNX Runtime 1.30 (CPUExecutionProvider), imgsz=640x640, Frame-Skip=2.")
     p()
 
-    # MỤC 2: KIẾN TRÚC ĐƯỜNG ỐNG 4 TẦNG
-    p("## 2. KIẾN TRÚC ĐƯỜNG ỐNG XỬ LÝ 4 TẦNG (FOUR-STAGE PIPELINE ARCHITECTURE)")
+    # MỤC 2: KIẾN TRÚC ĐƯỜNG ỐNG 5 TẦNG
+    p("## 2. KIẾN TRÚC ĐƯỜNG ỐNG XỬ LÝ 5 TẦNG (FIVE-STAGE PIPELINE ARCHITECTURE)")
     p("-" * 80)
     p("Hệ thống giải quyết triệt để bài toán thị giác máy tính bằng nguyên lý Phân tách Trách nhiệm (Separation of Concerns):")
     p()
@@ -87,7 +87,7 @@ def build_essentials():
     p("                │")
     p("                ▼")
     p("  [Tầng 2: Perception Layer - YOLOv8n ONNX]")
-    p("  • Mô hình: YOLOv8n Version 8 (6.4 MB PyTorch -> 11.7 MB ONNX Runtime).")
+    p("  • Mô hình: YOLOv8n Version 13 Final (6.61 MB PyTorch -> 12.4 MB ONNX Runtime, mAP50 89.6%).")
     p("  • Class mục tiêu: 1 class duy nhất 'bien_quang_cao' (Conf >= 0.25).")
     p("  • Nhiệm vụ: Chỉ phát hiện mọi ứng viên mang hình thái biển hiệu, KHÔNG kết luận vi phạm tại tầng này.")
     p("                │")
@@ -112,7 +112,14 @@ def build_essentials():
     p("       Loại trừ 100% người đi bộ bê biển đi ngang mà không từ chối oan biển vừa được đặt xuống rồi đứng yên.")
     p("    3. Ngưỡng tin cậy trung bình min_avg_confidence = 0.40: Loại trừ nhiễu chập chờn ở cự ly xa.")
     p("    4. Máy trạng thái (State Machine): NORMAL -> SUSPECTED -> CONFIRMED.")
-    p("       Chỉ khi đạt CONFIRMED mới kích hoạt trích xuất ảnh Crop cận cảnh, ảnh toàn cảnh Watermark và ghi CSDL.")
+    p("       Chỉ khi đạt CONFIRMED mới kích hoạt trích xuất bằng chứng sang Tầng 5.")
+    p("                │")
+    p("                ▼")
+    p("  [Tầng 5: Evidence Storage, SQLite Database & Human-in-the-Loop Web Dashboard]")
+    p("  • Lưu trữ bằng chứng số: Tự động trích xuất ảnh Crop cận cảnh biển hiệu và ảnh toàn cảnh Full-HD có đóng dấu vi phạm.")
+    p("  • Cơ sở dữ liệu SQLite: Ghi nhận lịch sử vi phạm, chống trùng lặp theo cửa sổ thời gian (5 phút), bảo đảm tính toàn vẹn.")
+    p("  • Web Dashboard & ROI Studio: Giao diện trực quan hóa thời gian thực, quản lý phân quyền và kiểm duyệt bằng chứng số")
+    p("    cho cán bộ trật tự đô thị trước khi ra quyết định xử phạt hành chính.")
     p()
 
     # MỤC 3: KẾT QUẢ ĐÁNH GIÁ HỆ THỐNG CHUẨN (SINGLE SOURCE OF TRUTH)

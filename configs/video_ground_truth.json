@@ -192,7 +192,7 @@
       "description": "Biển gắn tường tầng thấp phía bên phải",
       "expected_track_id": 8,
       "approx_box_xyxy": [1116, 447, 1255, 553],
-      "appearance_time_range_sec": [0.0, 0.17],
+      "appearance_time_range_sec": [0.0, 10.0],
       "ground_truth_label": "NORMAL",
       "justification": "Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè."
     }

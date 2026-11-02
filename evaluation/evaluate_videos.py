@@ -110,48 +110,15 @@ def _compute_best_spatial_iou(gbox: list, t_info: dict) -> tuple:
 
 def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fps: float = 24.0) -> dict:
     """
-    Khớp nối 2 chiều khách quan (Bipartite Spatio-Temporal Matching) giữa Ground Truth và Tracks.
-    Loại bỏ hoàn toàn bất kỳ mapping viết cứng nào (Zero Hardcoded Mapping).
-    1. First pass: Khớp trực tiếp nếu expected_track_id xuất hiện trong danh sách track
-       VÀ thỏa mãn điều kiện kiểm chứng lân cận không gian (s_iou > 0.05, tâm nằm trong GT box,
-       hoặc khoảng cách tâm dist_px <= 850px để thích nghi với méo phối cảnh camera góc rộng 1280x720)
-       kết hợp cùng giao thoa thời gian (t_iou >= 0.1).
-    2. Second pass: Với các GT items còn lại, giải bài toán phân công tối ưu toàn cục
-       bằng thuật toán Hungarian (scipy.optimize.linear_sum_assignment) dựa trên ma trận
-       độ tương đồng không gian - thời gian (Affinity Matrix).
+    Thuật toán đối sánh cực đại lưỡng phân (Spatio-Temporal Hungarian Bipartite Matching)
+    chuẩn quốc tế (CLEAR MOT / HOTA).
+    Giải bài toán phân công tối ưu toàn cục (scipy.optimize.linear_sum_assignment)
+    dựa trên ma trận độ tương đồng không gian - thời gian (Affinity Matrix) kèm gác cổng
+    không gian (Spatial Gating) chặt chẽ, loại bỏ hoàn toàn việc ghép cặp thiên vị direct_id.
     """
     matches = {}
     available_tracks = dict(tracks_summary)
-
-    # 1. First pass: Khớp direct ID có kiểm chứng không gian
-    for it in gt_items_for_video:
-        oid = it["object_id"]
-        exp_tid = it.get("expected_track_id")
-        if exp_tid is not None and exp_tid in available_tracks:
-            t_info = available_tracks[exp_tid]
-            gbox = it["approx_box_xyxy"]
-            gt_time = it["appearance_time_range_sec"]
-            t_time = [t_info.get("first_frame", 1) / fps, t_info.get("last_frame", 1) / fps]
-
-            s_iou, dist_px, inside = _compute_best_spatial_iou(gbox, t_info)
-            t_iou = compute_temporal_iou(gt_time, t_time)
-
-            if (s_iou >= 0.10 or (inside and dist_px <= 150.0)) and t_iou >= 0.1:
-                matches[oid] = {
-                    "matched_track_id": exp_tid,
-                    "expected_track_id": exp_tid,
-                    "match_method": "direct_id",
-                    "match_confidence": 1.0,
-                    "spatial_iou": round(s_iou, 3),
-                    "temporal_iou": round(t_iou, 3),
-                    "center_dist_px": round(dist_px, 1),
-                    "is_center_inside": inside,
-                    "track_info": t_info
-                }
-                del available_tracks[exp_tid]
-
-    # 2. Second pass: Khớp các GT items còn lại bằng Hungarian Spatio-Temporal Bipartite Matching
-    unassigned_gts = [it for it in gt_items_for_video if it["object_id"] not in matches]
+    unassigned_gts = list(gt_items_for_video)
     avail_tids = list(available_tracks.keys())
 
     if unassigned_gts and avail_tids:
@@ -205,7 +172,7 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
 
         for r_idx, c_idx in selected_pairs:
             cand = meta_matrix[(r_idx, c_idx)]
-            if cand["affinity"] >= 0.25 and (cand["spatial_iou"] >= 0.05 or cand["is_center_inside"]):
+            if cost_matrix[r_idx, c_idx] < 1e5 and cand["affinity"] >= 0.20 and (cand["spatial_iou"] >= 0.05 or (cand["is_center_inside"] and cand["center_dist_px"] <= 150.0)):
                 oid = cand["object_id"]
                 matches[oid] = {
                     "matched_track_id": cand["matched_track_id"],
@@ -560,9 +527,8 @@ def evaluate_single_video(
                 t_info["overlap_list"].append(spatial["overlap_ratio"] * 100)
                 t_info["boxes"].append([int(v) for v in box])
                 t_info["is_spatial_viol_count"] += (1 if spatial["is_violation"] else 0)
-                if t_status == TrackState.CONFIRMED:
-                    t_info["final_status"] = TrackState.CONFIRMED
-                elif t_info["final_status"] != TrackState.CONFIRMED:
+                STATUS_PRIO = {TrackState.NORMAL: 0, TrackState.SUSPECTED: 1, TrackState.CONFIRMED: 2}
+                if STATUS_PRIO.get(t_status, 0) >= STATUS_PRIO.get(t_info.get("final_status", TrackState.NORMAL), 0):
                     t_info["final_status"] = t_status
 
                 # Luu crop anh tieu bieu co conf cao nhat

@@ -80,8 +80,8 @@ class StreamReader:
         self._frame_seq = 0
         self._last_consumed_seq = -1
         
-        # Thiết lập timeout TCP cho FFmpeg để chống treo luồng C++ khi mất mạng
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;3000000"
+        # Thiết lập timeout TCP cho FFmpeg để chống treo luồng C++ khi mất mạng (2.0s)
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;2000000"
         
         # Luồng nền cho RTSP/Live Stream chống trễ hình (Zero Latency Buffer Flush)
         self._lock = threading.Lock()
@@ -100,7 +100,8 @@ class StreamReader:
         self._stop_event.set()
         if self._thread is not None and self._thread.is_alive():
             if threading.current_thread() != self._thread:
-                self._thread.join(timeout=2.5)
+                # Chờ timeout 3.5s (> timeout 2.0s của FFmpeg) để worker thread thoát an toàn khỏi cap.read()
+                self._thread.join(timeout=3.5)
         self._thread = None
 
     def _connect(self) -> bool:
@@ -108,7 +109,10 @@ class StreamReader:
         self._stop_worker_thread()
 
         with self._cap_lock:
-            if self.cap is not None:
+            # Kiểm tra nếu worker thread cũ vẫn còn sống thì detach tham chiếu thay vì release đồng thời (chống Segfault)
+            if self._thread is not None and self._thread.is_alive():
+                self.cap = None
+            elif self.cap is not None:
                 try:
                     self.cap.release()
                 except Exception:

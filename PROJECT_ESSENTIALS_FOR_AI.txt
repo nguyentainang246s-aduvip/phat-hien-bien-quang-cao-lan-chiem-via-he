@@ -18,7 +18,7 @@ Dành riêng cho các mô hình AI (Claude, ChatGPT, Gemini...) phân tích, ph�
   - CPU AVX2 phổ thông (Intel Core i5/i7, không yêu cầu GPU rời đắt tiền).
   - Tối ưu hóa suy luận bằng ONNX Runtime 1.30 (CPUExecutionProvider), imgsz=640x640, Frame-Skip=2.
 
-## 2. KIẾN TRÚC ĐƯỜNG ỐNG XỬ LÝ 4 TẦNG (FOUR-STAGE PIPELINE ARCHITECTURE)
+## 2. KIẾN TRÚC ĐƯỜNG ỐNG XỬ LÝ 5 TẦNG (FIVE-STAGE PIPELINE ARCHITECTURE)
 --------------------------------------------------------------------------------
 Hệ thống giải quyết triệt để bài toán thị giác máy tính bằng nguyên lý Phân tách Trách nhiệm (Separation of Concerns):
 
@@ -31,7 +31,7 @@ Hệ thống giải quyết triệt để bài toán thị giác máy tính bằ
                 │
                 ▼
   [Tầng 2: Perception Layer - YOLOv8n ONNX]
-  • Mô hình: YOLOv8n Version 8 (6.4 MB PyTorch -> 11.7 MB ONNX Runtime).
+  • Mô hình: YOLOv8n Version 13 Final (6.61 MB PyTorch -> 12.4 MB ONNX Runtime, mAP50 89.6%).
   • Class mục tiêu: 1 class duy nhất 'bien_quang_cao' (Conf >= 0.25).
   • Nhiệm vụ: Chỉ phát hiện mọi ứng viên mang hình thái biển hiệu, KHÔNG kết luận vi phạm tại tầng này.
                 │
@@ -56,7 +56,14 @@ Hệ thống giải quyết triệt để bài toán thị giác máy tính bằ
        Loại trừ 100% người đi bộ bê biển đi ngang mà không từ chối oan biển vừa được đặt xuống rồi đứng yên.
     3. Ngưỡng tin cậy trung bình min_avg_confidence = 0.40: Loại trừ nhiễu chập chờn ở cự ly xa.
     4. Máy trạng thái (State Machine): NORMAL -> SUSPECTED -> CONFIRMED.
-       Chỉ khi đạt CONFIRMED mới kích hoạt trích xuất ảnh Crop cận cảnh, ảnh toàn cảnh Watermark và ghi CSDL.
+       Chỉ khi đạt CONFIRMED mới kích hoạt trích xuất bằng chứng sang Tầng 5.
+                │
+                ▼
+  [Tầng 5: Evidence Storage, SQLite Database & Human-in-the-Loop Web Dashboard]
+  • Lưu trữ bằng chứng số: Tự động trích xuất ảnh Crop cận cảnh biển hiệu và ảnh toàn cảnh Full-HD có đóng dấu vi phạm.
+  • Cơ sở dữ liệu SQLite: Ghi nhận lịch sử vi phạm, chống trùng lặp theo cửa sổ thời gian (5 phút), bảo đảm tính toàn vẹn.
+  • Web Dashboard & ROI Studio: Giao diện trực quan hóa thời gian thực, quản lý phân quyền và kiểm duyệt bằng chứng số
+    cho cán bộ trật tự đô thị trước khi ra quyết định xử phạt hành chính.
 
 ## 3. SỐ LIỆU ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG (SINGLE SOURCE OF TRUTH)
 --------------------------------------------------------------------------------
@@ -83,21 +90,21 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 --------------------------------------------------------------------------------
 | Video | Ground Truth ID | ByteTrack ID | Tên biển hiệu / Đối tượng | Ghép nối (IoU/Conf) | Số frames | Conf TB | Overlap TB | Kết luận Hệ thống | Ground Truth | Đánh giá |
 | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- | :---: |
-| Video 1 | GT #1 | Track #1 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | direct_id | 80 | 86.8% | 78.9% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | direct_id | 80 | 86.2% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | direct_id | 80 | 80.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | direct_id | 75 | 73.9% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | direct_id | 80 | 59.6% | 22.3% | `NORMAL` | NORMAL | **TN** |
-| Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | direct_id | 80 | 84.5% | 74.9% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | direct_id | 80 | 71.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | direct_id | 80 | 63.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #23 | Track #23 | Biển hiệu dạng khung sắt tầm thấp ven đường | direct_id | 19 | 30.7% | 91.9% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 1 | GT #1 | Track #1 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | IoU:1.00 | 80 | 86.8% | 78.9% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | IoU:1.00 | 80 | 86.2% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | IoU:1.00 | 80 | 80.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | IoU:1.00 | 75 | 73.9% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | IoU:1.00 | 80 | 59.6% | 22.3% | `NORMAL` | NORMAL | **TN** |
+| Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | IoU:1.00 | 80 | 84.5% | 74.9% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | IoU:1.00 | 80 | 71.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | IoU:1.00 | 80 | 63.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #23 | Track #23 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:1.00 | 19 | 30.7% | 91.9% | `SUSPECTED` | VIOLATION | **FN** |
 | Video 2 | GT #33 | Track #33 | Biển hiệu cửa hàng ở góc phải khung hình | IoU:1.00 | 1 | 36.9% | 100.0% | `SUSPECTED` | VIOLATION | **FN** |
-| Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | direct_id | 80 | 89.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | direct_id | 80 | 88.4% | 66.7% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | direct_id | 80 | 85.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #4 | Track #4 | Biển bạt chữ nhật kê ngoài thềm | direct_id | 80 | 80.5% | 97.7% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #5 | Track #5 | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | direct_id | 80 | 69.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | IoU:1.00 | 80 | 89.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | IoU:1.00 | 80 | 88.4% | 66.7% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | IoU:1.00 | 80 | 85.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #4 | Track #4 | Biển bạt chữ nhật kê ngoài thềm | IoU:1.00 | 80 | 80.5% | 97.7% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #5 | Track #5 | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | IoU:1.00 | 80 | 69.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
 | Video 3 | GT #8 | Track #8 | Biển gắn tường tầng thấp phía bên phải | IoU:1.00 | 77 | 49.1% | 0.0% | `NORMAL` | NORMAL | **TN** |
 | Video 3 | GT #None | Track #6 | Track #6 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 59.6% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
 | Video 3 | GT #None | Track #7 | Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 76 | 41.5% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
@@ -152,7 +159,7 @@ Việc khoanh vùng ROI vỉa hè là bước hiệu chuẩn camera (Camera Cali
   - Thử nghiệm Web Studio ngày 12/10; giản lược bớt đỉnh làm sai lệch góc vỉa hè, overlap giảm còn 63.1%; đã lưu trữ độc lập để bảo toàn Version B.
 
 • Bảng mã băm toàn vẹn SHA-256 tính từ file vật lý tại thời điểm chạy:
-  - configs/video_ground_truth.json: 6f811c66f6f17686c79d8410273eb227a3a8a89bafa00418f4eef15dc6735d07
+  - configs/video_ground_truth.json: dd10831355221904c113e78de4a2d9e91da886707123e6cc1c00292b14afd8a2
   - configs/roi_video_test_version_b.json: 8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c
   - configs/roi_video_test.json: 8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c
   - configs/roi_videotesst2.json: 79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263
@@ -358,10 +365,10 @@ class TemporalVerifier:
     # ------------------------------------------------------------------
 
     def _elapsed_viol_seconds(self, record: dict, now: float) -> float:
-        """Trả về số giây vi phạm liên tiếp thực tế dựa trên chuỗi quan sát hợp lệ."""
-        if not record.get("viol_confs"):
+        """Trả về số giây vi phạm liên tiếp thực tế dựa trên mốc bắt đầu vi phạm."""
+        if not record.get("viol_confs") or record.get("viol_start_time") is None:
             return 0.0
-        return max(0.0, record["viol_confs"][-1][0] - record["viol_confs"][0][0])
+        return max(0.0, now - record["viol_start_time"])
 
     def _is_stationary(self, record: dict, now: float) -> bool:
         """
@@ -504,10 +511,11 @@ class TemporalVerifier:
                 if record["last_viol_timestamp"] is not None:
                     gap = current_timestamp - record["last_viol_timestamp"]
                     if gap > max_allowed_gap:
-                        # Gián đoạn quá lâu -> reset chuỗi quan sát liên tục
+                        # Gián đoạn quá lâu -> reset chuỗi quan sát liên tục và hạ trạng thái về SUSPECTED
                         record["viol_confs"].clear()
                         record["viol_start_time"] = current_timestamp
                         record["count"] = 0
+                        record["status"] = TrackState.SUSPECTED
 
                 if record["viol_start_time"] is None:
                     record["viol_start_time"] = current_timestamp
@@ -635,6 +643,9 @@ class TemporalVerifier:
                             r["status"] = TrackState.NORMAL
                         else:
                             r["viol_start_time"] = r["viol_confs"][0][0]
+                            # Nếu thời gian vi phạm hoặc số frame tụt dưới ngưỡng xác nhận, hạ từ CONFIRMED về SUSPECTED
+                            if r["status"] == TrackState.CONFIRMED and not self._confirm_threshold_reached(r, current_timestamp):
+                                r["status"] = TrackState.SUSPECTED
 
         # 5. Garbage Collection – xóa track cũ khỏi RAM
         stale_ids = [
@@ -701,48 +712,15 @@ def _compute_best_spatial_iou(gbox: list, t_info: dict) -> tuple:
 
 def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fps: float = 24.0) -> dict:
     """
-    Khớp nối 2 chiều khách quan (Bipartite Spatio-Temporal Matching) giữa Ground Truth và Tracks.
-    Loại bỏ hoàn toàn bất kỳ mapping viết cứng nào (Zero Hardcoded Mapping).
-    1. First pass: Khớp trực tiếp nếu expected_track_id xuất hiện trong danh sách track
-       VÀ thỏa mãn điều kiện kiểm chứng lân cận không gian (s_iou > 0.05, tâm nằm trong GT box,
-       hoặc khoảng cách tâm dist_px <= 850px để thích nghi với méo phối cảnh camera góc rộng 1280x720)
-       kết hợp cùng giao thoa thời gian (t_iou >= 0.1).
-    2. Second pass: Với các GT items còn lại, giải bài toán phân công tối ưu toàn cục
-       bằng thuật toán Hungarian (scipy.optimize.linear_sum_assignment) dựa trên ma trận
-       độ tương đồng không gian - thời gian (Affinity Matrix).
+    Thuật toán đối sánh cực đại lưỡng phân (Spatio-Temporal Hungarian Bipartite Matching)
+    chuẩn quốc tế (CLEAR MOT / HOTA).
+    Giải bài toán phân công tối ưu toàn cục (scipy.optimize.linear_sum_assignment)
+    dựa trên ma trận độ tương đồng không gian - thời gian (Affinity Matrix) kèm gác cổng
+    không gian (Spatial Gating) chặt chẽ, loại bỏ hoàn toàn việc ghép cặp thiên vị direct_id.
     """
     matches = {}
     available_tracks = dict(tracks_summary)
-
-    # 1. First pass: Khớp direct ID có kiểm chứng không gian
-    for it in gt_items_for_video:
-        oid = it["object_id"]
-        exp_tid = it.get("expected_track_id")
-        if exp_tid is not None and exp_tid in available_tracks:
-            t_info = available_tracks[exp_tid]
-            gbox = it["approx_box_xyxy"]
-            gt_time = it["appearance_time_range_sec"]
-            t_time = [t_info.get("first_frame", 1) / fps, t_info.get("last_frame", 1) / fps]
-
-            s_iou, dist_px, inside = _compute_best_spatial_iou(gbox, t_info)
-            t_iou = compute_temporal_iou(gt_time, t_time)
-
-            if (s_iou >= 0.10 or (inside and dist_px <= 150.0)) and t_iou >= 0.1:
-                matches[oid] = {
-                    "matched_track_id": exp_tid,
-                    "expected_track_id": exp_tid,
-                    "match_method": "direct_id",
-                    "match_confidence": 1.0,
-                    "spatial_iou": round(s_iou, 3),
-                    "temporal_iou": round(t_iou, 3),
-                    "center_dist_px": round(dist_px, 1),
-                    "is_center_inside": inside,
-                    "track_info": t_info
-                }
-                del available_tracks[exp_tid]
-
-    # 2. Second pass: Khớp các GT items còn lại bằng Hungarian Spatio-Temporal Bipartite Matching
-    unassigned_gts = [it for it in gt_items_for_video if it["object_id"] not in matches]
+    unassigned_gts = list(gt_items_for_video)
     avail_tids = list(available_tracks.keys())
 
     if unassigned_gts and avail_tids:
@@ -796,7 +774,7 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
 
         for r_idx, c_idx in selected_pairs:
             cand = meta_matrix[(r_idx, c_idx)]
-            if cand["affinity"] >= 0.25 and (cand["spatial_iou"] >= 0.05 or cand["is_center_inside"]):
+            if cost_matrix[r_idx, c_idx] < 1e5 and cand["affinity"] >= 0.20 and (cand["spatial_iou"] >= 0.05 or (cand["is_center_inside"] and cand["center_dist_px"] <= 150.0)):
                 oid = cand["object_id"]
                 matches[oid] = {
                     "matched_track_id": cand["matched_track_id"],
