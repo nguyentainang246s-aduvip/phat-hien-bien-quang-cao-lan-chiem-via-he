@@ -48,6 +48,7 @@ items = {
         'description': 'Kiểm tra Web Dashboard Human-in-the-Loop, 10 bài unit test tự động, công cụ ROI Drawer, cấu hình huấn luyện và báo cáo ngưỡng.',
         'files': [
             ('dashboard/web_app.py', 'Web Dashboard giám sát, duyệt hồ sơ Human-in-the-Loop, lọc vi phạm theo ngày, bind host an toàn'),
+            ('dashboard/app.py', 'Web Dashboard Streamlit giám sát trực quan, bộ lọc đa ngày và điều khiển luồng an toàn'),
             ('tests/test_violation_checker.py', 'Unit test thuật toán kiểm tra vi phạm đa giác & chân đế'),
             ('tests/test_temporal_verifier.py', 'Unit test bộ xác minh chuỗi thời gian & thích ứng phối cảnh'),
             ('tests/test_stream_reader.py', 'Unit test StreamReader xử lý lỗi RTSP'),

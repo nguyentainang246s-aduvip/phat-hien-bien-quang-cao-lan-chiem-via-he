@@ -48,12 +48,13 @@ class StreamReader:
       - Chạy luồng đọc nền (Background Thread) để làm rỗng bộ đệm (Buffer Flush),
         đảm bảo frame đưa vào AI luôn là khung hình mới nhất (Zero Latency).
     """
-    def __init__(self, source, reconnect_delay: float = 2.0, max_retries: int = 10):
+    def __init__(self, source, reconnect_delay: float = 2.0, max_retries: int = 10, loop: bool = False):
         """
         Args:
             source: Nguồn dữ liệu (int nếu là webcam, str nếu là video/RTSP)
             reconnect_delay: Thời gian chờ (giây) trước khi thử kết nối lại
             max_retries: Số lần thử kết nối lại tối đa
+            loop: Tự động tua lại khi đọc hết tệp video (mặc định False: dừng khi hết file)
         """
         # Xử lý nếu source là chuỗi số ("0", "1")
         if isinstance(source, str) and source.isdigit():
@@ -68,6 +69,7 @@ class StreamReader:
 
         self.reconnect_delay = reconnect_delay
         self.max_retries = max_retries
+        self.loop = loop
 
         self.cap = None
         self.width = 1280
@@ -151,10 +153,16 @@ class StreamReader:
         """Worker chạy ngầm đọc frame liên tục cho live stream để tránh nghẽn buffer OpenCV."""
         while not self._stop_event.is_set():
             with self._cap_lock:
-                if self.cap is None or not self.cap.isOpened():
+                cap = self.cap
+                if cap is None or not cap.isOpened():
                     time.sleep(0.05)
                     continue
-                ret, frame = self.cap.read()
+            
+            # Đọc frame ngoài _cap_lock để tránh deadlock khi luồng chính gọi release() / _reconnect()
+            ret, frame = cap.read()
+            if self._stop_event.is_set():
+                break
+
             with self._lock:
                 self._latest_ret = ret
                 if ret and frame is not None:
@@ -204,7 +212,9 @@ class StreamReader:
         ret, frame = self.cap.read()
 
         if not ret or frame is None:
-            # Hết video file -> Tua lại đầu
+            if not self.loop:
+                return False, None
+            # Hết video file -> Tua lại đầu nếu bật chế độ lặp
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             self.looped = True
             ret, frame = self.cap.read()
@@ -453,11 +463,14 @@ TASK: 23 - Xây dựng Module evidence/saver.py (Lưu trữ ảnh bằng chứng
 ==============================================================================
 """
 
+import datetime
+import logging
 import os
 import time
-import datetime
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_imwrite(path: str, img: np.ndarray) -> bool:
@@ -494,8 +507,10 @@ class EvidenceSaver:
                 cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
                 if os.path.exists(cascade_path):
                     self._face_cascade = cv2.CascadeClassifier(cascade_path)
-            except Exception:
-                pass
+                else:
+                    logger.warning("[EVIDENCE] Không tìm thấy file Haar cascade tại %s. Tính năng face blur bị tắt.", cascade_path)
+            except Exception as e:
+                logger.warning("[EVIDENCE] Lỗi khi nạp Haar cascade: %s. Tính năng face blur bị tắt.", e)
         os.makedirs(self.base_dir, exist_ok=True)
 
     def save_evidence(self, frame: np.ndarray, box: tuple, track_id: int, 
@@ -550,6 +565,7 @@ class EvidenceSaver:
 
         # 2. Xử lý ảnh toàn cảnh (Full Frame with Target Highlight & Watermark Stamp)
         stamped_frame = roi_frame.copy() if roi_frame is not None else frame.copy()
+        privacy_blurred = False
 
         # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
         if self._face_cascade is not None:
@@ -564,8 +580,9 @@ class EvidenceSaver:
                             k_w = max(15, (fw_box // 2) * 2 + 1)
                             k_h = max(15, (fh_box // 2) * 2 + 1)
                             stamped_frame[fy:fy+fh_box, fx:fx+fw_box] = cv2.GaussianBlur(f_roi, (k_w, k_h), 20)
-            except Exception:
-                pass
+                            privacy_blurred = True
+            except Exception as e:
+                logger.warning("[EVIDENCE] Lỗi khi làm mờ khuôn mặt: %s", e)
 
         # Vẽ khung đỏ đánh dấu đối tượng vi phạm trên ảnh bằng chứng toàn cảnh
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -594,7 +611,8 @@ class EvidenceSaver:
             "timestamp": iso_timestamp,
             "camera_id": camera_id,
             "track_id": track_id,
-            "overlap_pct": overlap_pct
+            "overlap_pct": overlap_pct,
+            "privacy_blurred": privacy_blurred
         }
 
 
@@ -611,9 +629,12 @@ TASK: 24 - Xây dựng Module database/db.py (Quản lý CSDL SQLite)
 ==============================================================================
 """
 
+import logging
 import os
 import sqlite3
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class ViolationDatabase:
@@ -633,8 +654,8 @@ class ViolationDatabase:
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Không thể kích hoạt SQLite WAL mode (%s). Tiếp tục với chế độ mặc định.", e)
         return conn
 
     def init_tables(self):

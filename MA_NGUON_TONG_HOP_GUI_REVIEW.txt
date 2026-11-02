@@ -92,7 +92,7 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 | **True Positives (TP)** | Bắt đúng vi phạm | 11 vụ | **12 vụ** | Bắt chính xác toàn bộ biển chiếm lối đi |
 | **False Positives (FP)** | Báo sai | 2 vụ | **2 vụ** | Không có cảnh báo rác từ người/xe máy |
 | **False Negatives (FN)** | Bỏ sót / Chưa đạt ngưỡng | 3 vụ | **2 vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |
-| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 1 biển | **1 biển** | Biển trong nhà (Track #5), biển gắn tường (Track #15) |
+| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Biển trong nhà (Track #5), biển gắn tường (Track #15) |
 | **System Precision** | TP / (TP + FP) | 84.62% | **85.71%** | **74.1% – 100.0%** (Wilson 95% CI) |
 | **System Recall** | TP / (TP + FN) | 78.57% (10/14) | **85.71% (11/14)** | **52.4% – 92.4%** (Wilson 95% CI) |
 | **System F1-Score** | 2*P*R / (P + R) | 81.48% | **85.71%** | Điểm cân bằng điều hòa tối ưu |
@@ -106,23 +106,24 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 --------------------------------------------------------------------------------
 | Video | Ground Truth ID | ByteTrack ID | Tên biển hiệu / Đối tượng | Ghép nối (IoU/Conf) | Số frames | Conf TB | Overlap TB | Kết luận Hệ thống | Ground Truth | Đánh giá |
 | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- | :---: |
-| Video 1 | GT #1 | Track #1 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | direct_id | 78 | 81.3% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | direct_id | 80 | 82.7% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | direct_id | 80 | 81.4% | 76.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | direct_id | 80 | 76.0% | 9.6% | `NORMAL` | VIOLATION | **FN** |
-| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | direct_id | 69 | 67.0% | 100.0% | `CONFIRMED` | NORMAL | **FP** |
-| Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | direct_id | 80 | 84.4% | 72.1% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | direct_id | 79 | 74.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | direct_id | 80 | 65.3% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #7 | Track #5 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:0.00 | 54 | 47.6% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #8 | Track #12 | Biển hiệu cửa hàng ở góc phải khung hình | IoU:0.00 | 17 | 31.6% | 91.1% | `SUSPECTED` | VIOLATION | **FN** |
-| Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | direct_id | 80 | 85.0% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | direct_id | 80 | 82.2% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | direct_id | 80 | 72.6% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #4 | Track #4 | Biển bạt chữ nhật kê ngoài thềm | direct_id | 61 | 68.4% | 96.7% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #11 | Track #5 | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | IoU:0.00 | 74 | 65.7% | 66.3% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #14 | Track #22 | Biển gắn tường tầng thấp phía bên phải | IoU:0.00 | 23 | 63.5% | 95.9% | `SUSPECTED` | NORMAL | **TN** |
-| Video 2 | GT #None | Track #4 | Track #4 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 79 | 55.4% | 94.3% | `CONFIRMED` | BACKGROUND | **FP** |
+| Video 1 | GT #1 | Track #1 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | direct_id | 80 | 86.8% | 78.9% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | direct_id | 80 | 86.2% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | direct_id | 80 | 80.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | direct_id | 75 | 73.9% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | direct_id | 80 | 59.6% | 22.3% | `NORMAL` | NORMAL | **TN** |
+| Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | direct_id | 80 | 84.5% | 74.9% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | direct_id | 80 | 71.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | direct_id | 80 | 63.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #7 | Track #23 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:0.00 | 19 | 30.7% | 91.9% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 2 | GT #8 | Track #33 | Biển hiệu cửa hàng ở góc phải khung hình | IoU:0.00 | 1 | 36.9% | 100.0% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | direct_id | 80 | 89.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | direct_id | 80 | 88.4% | 66.7% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | direct_id | 80 | 85.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #4 | Track #4 | Biển bạt chữ nhật kê ngoài thềm | direct_id | 80 | 80.5% | 97.7% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #11 | Track #5 | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | IoU:0.00 | 80 | 69.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #14 | Track #8 | Biển gắn tường tầng thấp phía bên phải | IoU:0.00 | 77 | 49.1% | 0.0% | `NORMAL` | NORMAL | **TN** |
+| Video 3 | GT #None | Track #6 | Track #6 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 59.6% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
+| Video 3 | GT #None | Track #7 | Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 76 | 41.5% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
 
 ### Phân tích sâu 3 trường hợp False Negative (FN) — Giữ an toàn ở diện Nghi vấn (SUSPECTED):
 1. Track #8 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #8):
@@ -604,7 +605,13 @@ class TemporalVerifier:
             else:
                 # Không vi phạm ở frame này
                 record["non_viol_streak"] += 1
-                if record["non_viol_streak"] > self.tolerance_frames:
+                tolerance_time = (self.tolerance_frames / self.source_fps) if (self.source_fps and self.source_fps > 0) else None
+                if tolerance_time is not None and record["last_viol_timestamp"] is not None:
+                    streak_exceeded = (current_timestamp - record["last_viol_timestamp"]) > tolerance_time
+                else:
+                    streak_exceeded = record["non_viol_streak"] > self.tolerance_frames
+
+                if streak_exceeded:
                     # Vượt ngưỡng dung sai -> reset hoàn toàn
                     record["count"] = 0
                     record["viol_confs"].clear()
@@ -639,7 +646,13 @@ class TemporalVerifier:
         for tid, r in self.track_records.items():
             if tid not in active_ids:
                 missing_streak = self.current_frame_index - r["last_seen"]
-                if missing_streak > self.tolerance_frames:
+                tolerance_time = (self.tolerance_frames / self.source_fps) if (self.source_fps and self.source_fps > 0) else None
+                if tolerance_time is not None and r["last_viol_timestamp"] is not None:
+                    missing_exceeded = (current_timestamp - r["last_viol_timestamp"]) > tolerance_time
+                else:
+                    missing_exceeded = missing_streak > self.tolerance_frames
+
+                if missing_exceeded:
                     if r["viol_confs"]:
                         r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
                     r["count"] = len(r["viol_confs"])
@@ -1270,23 +1283,30 @@ def run_monitor_mode(args):
                 sw_idx = sp.get("sidewalk_index", 1)
                 lbl = f"NGHI VAN VH#{sw_idx}: {sp['overlap_pct']}% (Anh tinh)"
                 status = TrackState.SUSPECTED
-                ev_res = evidence_saver.save_evidence(
-                    clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
-                    roi_frame=frame
-                )
-                if ev_res:
-                    rec_id = db.insert_violation(
-                        camera_id=roi_manager.camera_id,
-                        track_id=track_id,
-                        timestamp=ev_res["timestamp"],
-                        confidence=conf,
-                        overlap_pct=sp["overlap_pct"],
-                        full_image_path=ev_res["full_path"],
-                        crop_image_path=ev_res.get("crop_path", ""),
-                        bbox=box,
-                        sidewalk_index=sw_idx
+
+                # Kiểm tra khử trùng lặp trước khi ghi nhận bằng chứng
+                if db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5):
+                    print(f"   [BỎ QUA] Vi phạm ID #{track_id} tại vị trí này đã được ghi nhận trong 5 phút qua.")
+                else:
+                    ev_res = evidence_saver.save_evidence(
+                        clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
+                        roi_frame=frame
                     )
-                print(f"   [BẰNG CHỨNG #{confirmed_count}] Đã ghi nhận vi phạm ID #{track_id} -> DB record #{rec_id}")
+                    if ev_res:
+                        rec_id = db.insert_violation(
+                            camera_id=roi_manager.camera_id,
+                            track_id=track_id,
+                            timestamp=ev_res["timestamp"],
+                            confidence=conf,
+                            overlap_pct=sp["overlap_pct"],
+                            full_image_path=ev_res["full_path"],
+                            crop_image_path=ev_res.get("crop_path", ""),
+                            bbox=box,
+                            sidewalk_index=sw_idx
+                        )
+                        print(f"   [BẰNG CHỨNG #{confirmed_count}] Đã ghi nhận vi phạm ID #{track_id} -> DB record #{rec_id}")
+                    else:
+                        print(f"   [CẢNH BÁO] Không thể lưu bằng chứng cho vi phạm ID #{track_id}, bỏ qua chèn DB.")
             else:
                 lbl = f"HOP LE: {sp['overlap_pct']}%"
                 status = TrackState.NORMAL
@@ -1307,33 +1327,39 @@ def run_monitor_mode(args):
         return True
 
     # 5. XỬ LÝ LUỒNG VIDEO / RTSP / WEBCAM LIÊN TỤC
-    reader = StreamReader(source=source)
-    verifier.source_fps = reader.fps if hasattr(reader, 'fps') and reader.fps > 0 else None
-    fps_tracker = FPSTracker(alpha=0.15)
-    window_name = "CCTV Sidewalk Surveillance 2.0 (ByteTrack + Temporal Verifier)"
-
-    if not args.headless:
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(window_name, min(reader.width, 1024), min(reader.height, 768))
-
-    print(">> ĐANG GIÁM SÁT TRỰC TUYẾN 24/7. Nhấn 'q' hoặc 'ESC' để dừng.")
+    loop_video = getattr(args, "loop", False)
+    reader = None
     frame_count = 0
     total_confirmed_events = 0
-    roi_validated = False
-
-    last_verified_render = []
-    last_confirmed_count = 0
-    last_suspected_count = 0
-    last_object_count = 0
-
-    target_frame_interval = 1.0 / target_fps if target_fps > 0 else 0.04167
-
-    fail_count = 0
+    fps_tracker = FPSTracker(alpha=0.15)
     try:
+        reader = StreamReader(source=source, loop=loop_video)
+        effective_fps = (reader.fps / (frame_skip + 1)) if (hasattr(reader, 'fps') and reader.fps > 0) else 30.0
+        verifier.source_fps = effective_fps
+        window_name = "CCTV Sidewalk Surveillance 2.0 (ByteTrack + Temporal Verifier)"
+
+        if not args.headless:
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(window_name, min(reader.width, 1024), min(reader.height, 768))
+
+        print(">> ĐANG GIÁM SÁT TRỰC TUYẾN 24/7. Nhấn 'q' hoặc 'ESC' để dừng.")
+        roi_validated = False
+
+        last_verified_render = []
+        last_confirmed_count = 0
+        last_suspected_count = 0
+        last_object_count = 0
+
+        target_frame_interval = 1.0 / target_fps if target_fps > 0 else 0.04167
+
+        fail_count = 0
         while True:
             loop_start_time = time.perf_counter()
             ret, frame = reader.read()
             if not ret or frame is None:
+                if not getattr(reader, 'is_live_stream', False) and not loop_video:
+                    print(">> Đã đọc hết tệp video, kết thúc giám sát.")
+                    break
                 fail_count += 1
                 max_fails = 5 if getattr(reader, 'is_live_stream', False) else 150
                 if fail_count > max_fails:
@@ -1470,13 +1496,15 @@ def run_monitor_mode(args):
                     time.sleep(remaining_sleep)
 
     finally:
-        reader.release()
+        if reader is not None:
+            reader.release()
         if not args.headless:
             cv2.destroyAllWindows()
         print("-" * 78)
         print("TỔNG KẾT PHIÊN GIÁM SÁT:")
         print(f"  • Tổng số khung hình đã xử lý            : {frame_count}")
-        print(f"  • Tốc độ xử lý trung bình                : {fps_tracker.smoothed_fps:.1f} FPS")
+        avg_fps = fps_tracker.smoothed_fps if 'fps_tracker' in locals() else 0.0
+        print(f"  • Tốc độ xử lý trung bình                : {avg_fps:.1f} FPS")
         print(f"  • Tổng số sự kiện vi phạm được ghi nhận  : {total_confirmed_events}")
         print("[OK] Đã giải phóng tài nguyên an toàn.")
         print("=" * 78)
@@ -1588,6 +1616,8 @@ Ví dụ sử dụng:
                         help="Số frames bỏ qua giữa các lần infer (mặc định: 2, gợi ý: 1 hoặc 2)")
     parser.add_argument("--sync-fps", action="store_true",
                         help="Khóa nhịp FPS thời gian thực chuẩn 1.0x (tiết kiệm CPU, mặc định bật cho video)")
+    parser.add_argument("--loop", action="store_true",
+                        help="Tự động tua lại đầu video khi chạy hết (mặc định tắt: dừng khi hết video)")
     parser.add_argument("--no-sync", action="store_true",
                         help="Tắt khóa nhịp FPS để chạy hết công suất phần cứng (Benchmark mode)")
     parser.add_argument("--target-fps", type=float, default=None,
@@ -1773,7 +1803,7 @@ class ViolationChecker:
                       "status_text": str
                   }
         """
-        if len(polygon_points) < 3:
+        if not polygon_points or len(polygon_points) < 3:
             return {
                 "is_violation": False,
                 "overlap_ratio": 0.0,
@@ -1783,7 +1813,10 @@ class ViolationChecker:
                 "status_text": "CHƯA CÓ VÙNG VỈA HÈ"
             }
 
-        x1, y1, x2, y2 = box
+        # Chuẩn hóa tọa độ Bounding Box (chống đảo ngược x1>x2 hoặc y1>y2)
+        bx1, by1, bx2, by2 = float(box[0]), float(box[1]), float(box[2]), float(box[3])
+        x1, x2 = min(bx1, bx2), max(bx1, bx2)
+        y1, y2 = min(by1, by2), max(by1, by2)
         
         # ---------------------------------------------------------------------
         # ĐIỀU KIỆN 1: TỌA ĐỘ CHÂN TIẾP ĐẤT (3-POINT GROUND CONTACT POINT)
@@ -1806,18 +1839,21 @@ class ViolationChecker:
         # ---------------------------------------------------------------------
         # ĐIỀU KIỆN 2: TỶ LỆ DIỆN TÍCH GIAO NHAU (OVERLAP RATIO VỚI SHAPELY)
         # ---------------------------------------------------------------------
-        box_poly = sg.box(x1, y1, x2, y2)
-        sidewalk_poly = sg.Polygon(polygon_points)
-        
-        # Sửa lỗi đa giác tự cắt nếu có
-        if not sidewalk_poly.is_valid:
-            sidewalk_poly = sidewalk_poly.buffer(0)
-
         overlap_ratio = 0.0
-        if box_poly.area > 0:
-            intersection = sidewalk_poly.intersection(box_poly)
-            # Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
-            overlap_ratio = float(intersection.area / box_poly.area)
+        try:
+            box_poly = sg.box(x1, y1, x2, y2)
+            sidewalk_poly = sg.Polygon(polygon_points)
+            
+            # Sửa lỗi đa giác tự cắt nếu có
+            if not sidewalk_poly.is_valid:
+                sidewalk_poly = sidewalk_poly.buffer(0)
+
+            if box_poly.area > 0 and sidewalk_poly.is_valid and not sidewalk_poly.is_empty:
+                intersection = sidewalk_poly.intersection(box_poly)
+                # Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
+                overlap_ratio = float(intersection.area / box_poly.area)
+        except Exception:
+            overlap_ratio = 0.0
 
         # ---------------------------------------------------------------------
         # RA QUYẾT ĐỊNH (DECISION RULE)
@@ -3486,7 +3522,7 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = "bytetrack.yaml", imgsz: int = 640):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = "bytetrack.yaml", imgsz: int = 640, allowed_classes: list = None):
         """
         Khởi tạo ObjectTracker.
         
@@ -3495,11 +3531,13 @@ class ObjectTracker:
             conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.25 = 25% theo chuẩn đánh giá hệ thống)
             tracker_type: File cấu hình tracker ('bytetrack.yaml' hoặc 'botsort.yaml')
             imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
+            allowed_classes: Danh sách class_id hoặc tên class được phép bám vết (None = tất cả)
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
         self.tracker_type = tracker_type
         self.imgsz = imgsz
+        self.allowed_classes = allowed_classes
         
         if not os.path.exists(model_path) and not model_path.endswith("yolov8n.pt"):
             raise FileNotFoundError(f"Không tìm thấy file trọng số mô hình: {model_path}")
@@ -3532,15 +3570,19 @@ class ObjectTracker:
         """
         target_conf = conf if conf is not None else self.conf_threshold
         target_imgsz = imgsz if imgsz is not None else self.imgsz
+        track_kwargs = {
+            "source": frame,
+            "persist": True,
+            "tracker": self.tracker_type,
+            "conf": target_conf,
+            "imgsz": target_imgsz,
+            "verbose": False
+        }
+        if self.allowed_classes is not None and all(isinstance(c, int) for c in self.allowed_classes):
+            track_kwargs["classes"] = self.allowed_classes
+
         # persist=True: Bắt buộc để ByteTrack nhớ trạng thái Kalman Filter giữa các frames liên tiếp
-        results = self.model.track(
-            source=frame,
-            persist=True,
-            tracker=self.tracker_type,
-            conf=target_conf,
-            imgsz=target_imgsz,
-            verbose=False
-        )
+        results = self.model.track(**track_kwargs)
 
         tracked_objects = []
         if len(results) == 0 or results[0].boxes is None:
@@ -3548,10 +3590,14 @@ class ObjectTracker:
 
         boxes = results[0].boxes
         for box in boxes:
-            xyxy = box.xyxy[0].cpu().numpy().astype(int)
-            conf = float(box.conf[0].cpu().numpy())
             cls_id = int(box.cls[0].cpu().numpy())
             cls_name = self.class_names.get(cls_id, f"class_{cls_id}")
+            if self.allowed_classes is not None:
+                if cls_id not in self.allowed_classes and cls_name not in self.allowed_classes:
+                    continue
+
+            xyxy = box.xyxy[0].cpu().numpy().astype(int)
+            conf = float(box.conf[0].cpu().numpy())
 
             # Lấy track_id do ByteTrack sinh ra
             if box.id is not None:
@@ -3911,7 +3957,13 @@ class TemporalVerifier:
             else:
                 # Không vi phạm ở frame này
                 record["non_viol_streak"] += 1
-                if record["non_viol_streak"] > self.tolerance_frames:
+                tolerance_time = (self.tolerance_frames / self.source_fps) if (self.source_fps and self.source_fps > 0) else None
+                if tolerance_time is not None and record["last_viol_timestamp"] is not None:
+                    streak_exceeded = (current_timestamp - record["last_viol_timestamp"]) > tolerance_time
+                else:
+                    streak_exceeded = record["non_viol_streak"] > self.tolerance_frames
+
+                if streak_exceeded:
                     # Vượt ngưỡng dung sai -> reset hoàn toàn
                     record["count"] = 0
                     record["viol_confs"].clear()
@@ -3946,7 +3998,13 @@ class TemporalVerifier:
         for tid, r in self.track_records.items():
             if tid not in active_ids:
                 missing_streak = self.current_frame_index - r["last_seen"]
-                if missing_streak > self.tolerance_frames:
+                tolerance_time = (self.tolerance_frames / self.source_fps) if (self.source_fps and self.source_fps > 0) else None
+                if tolerance_time is not None and r["last_viol_timestamp"] is not None:
+                    missing_exceeded = (current_timestamp - r["last_viol_timestamp"]) > tolerance_time
+                else:
+                    missing_exceeded = missing_streak > self.tolerance_frames
+
+                if missing_exceeded:
                     if r["viol_confs"]:
                         r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
                     r["count"] = len(r["viol_confs"])
@@ -4013,12 +4071,13 @@ class StreamReader:
       - Chạy luồng đọc nền (Background Thread) để làm rỗng bộ đệm (Buffer Flush),
         đảm bảo frame đưa vào AI luôn là khung hình mới nhất (Zero Latency).
     """
-    def __init__(self, source, reconnect_delay: float = 2.0, max_retries: int = 10):
+    def __init__(self, source, reconnect_delay: float = 2.0, max_retries: int = 10, loop: bool = False):
         """
         Args:
             source: Nguồn dữ liệu (int nếu là webcam, str nếu là video/RTSP)
             reconnect_delay: Thời gian chờ (giây) trước khi thử kết nối lại
             max_retries: Số lần thử kết nối lại tối đa
+            loop: Tự động tua lại khi đọc hết tệp video (mặc định False: dừng khi hết file)
         """
         # Xử lý nếu source là chuỗi số ("0", "1")
         if isinstance(source, str) and source.isdigit():
@@ -4033,6 +4092,7 @@ class StreamReader:
 
         self.reconnect_delay = reconnect_delay
         self.max_retries = max_retries
+        self.loop = loop
 
         self.cap = None
         self.width = 1280
@@ -4116,10 +4176,16 @@ class StreamReader:
         """Worker chạy ngầm đọc frame liên tục cho live stream để tránh nghẽn buffer OpenCV."""
         while not self._stop_event.is_set():
             with self._cap_lock:
-                if self.cap is None or not self.cap.isOpened():
+                cap = self.cap
+                if cap is None or not cap.isOpened():
                     time.sleep(0.05)
                     continue
-                ret, frame = self.cap.read()
+            
+            # Đọc frame ngoài _cap_lock để tránh deadlock khi luồng chính gọi release() / _reconnect()
+            ret, frame = cap.read()
+            if self._stop_event.is_set():
+                break
+
             with self._lock:
                 self._latest_ret = ret
                 if ret and frame is not None:
@@ -4169,7 +4235,9 @@ class StreamReader:
         ret, frame = self.cap.read()
 
         if not ret or frame is None:
-            # Hết video file -> Tua lại đầu
+            if not self.loop:
+                return False, None
+            # Hết video file -> Tua lại đầu nếu bật chế độ lặp
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             self.looped = True
             ret, frame = self.cap.read()
@@ -4418,11 +4486,14 @@ TASK: 23 - Xây dựng Module evidence/saver.py (Lưu trữ ảnh bằng chứng
 ==============================================================================
 """
 
+import datetime
+import logging
 import os
 import time
-import datetime
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_imwrite(path: str, img: np.ndarray) -> bool:
@@ -4459,8 +4530,10 @@ class EvidenceSaver:
                 cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
                 if os.path.exists(cascade_path):
                     self._face_cascade = cv2.CascadeClassifier(cascade_path)
-            except Exception:
-                pass
+                else:
+                    logger.warning("[EVIDENCE] Không tìm thấy file Haar cascade tại %s. Tính năng face blur bị tắt.", cascade_path)
+            except Exception as e:
+                logger.warning("[EVIDENCE] Lỗi khi nạp Haar cascade: %s. Tính năng face blur bị tắt.", e)
         os.makedirs(self.base_dir, exist_ok=True)
 
     def save_evidence(self, frame: np.ndarray, box: tuple, track_id: int, 
@@ -4515,6 +4588,7 @@ class EvidenceSaver:
 
         # 2. Xử lý ảnh toàn cảnh (Full Frame with Target Highlight & Watermark Stamp)
         stamped_frame = roi_frame.copy() if roi_frame is not None else frame.copy()
+        privacy_blurred = False
 
         # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
         if self._face_cascade is not None:
@@ -4529,8 +4603,9 @@ class EvidenceSaver:
                             k_w = max(15, (fw_box // 2) * 2 + 1)
                             k_h = max(15, (fh_box // 2) * 2 + 1)
                             stamped_frame[fy:fy+fh_box, fx:fx+fw_box] = cv2.GaussianBlur(f_roi, (k_w, k_h), 20)
-            except Exception:
-                pass
+                            privacy_blurred = True
+            except Exception as e:
+                logger.warning("[EVIDENCE] Lỗi khi làm mờ khuôn mặt: %s", e)
 
         # Vẽ khung đỏ đánh dấu đối tượng vi phạm trên ảnh bằng chứng toàn cảnh
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -4559,7 +4634,8 @@ class EvidenceSaver:
             "timestamp": iso_timestamp,
             "camera_id": camera_id,
             "track_id": track_id,
-            "overlap_pct": overlap_pct
+            "overlap_pct": overlap_pct,
+            "privacy_blurred": privacy_blurred
         }
 
 
@@ -4576,9 +4652,12 @@ TASK: 24 - Xây dựng Module database/db.py (Quản lý CSDL SQLite)
 ==============================================================================
 """
 
+import logging
 import os
 import sqlite3
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class ViolationDatabase:
@@ -4598,8 +4677,8 @@ class ViolationDatabase:
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Không thể kích hoạt SQLite WAL mode (%s). Tiếp tục với chế độ mặc định.", e)
         return conn
 
     def init_tables(self):
@@ -10274,6 +10353,417 @@ def run_dashboard(port: int = PORT, host: str = "127.0.0.1", initial_tab: str = 
 if __name__ == "__main__":
     p = int(sys.argv[1]) if len(sys.argv) > 1 else PORT
     run_dashboard(p)
+
+
+================================================================================
+FILE: dashboard/app.py
+MỤC ĐÍCH KIỂM TRA: Web Dashboard Streamlit giám sát trực quan, bộ lọc đa ngày và điều khiển luồng an toàn
+================================================================================
+
+"""
+==============================================================================
+ĐỒ ÁN TỐT NGHIỆP: PHÁT HIỆN BIỂN HIỆU/BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
+Chủ đề: Web Dashboard Giám Sát & Quản Lý Phạt Nguội (Streamlit)
+TASK: 25 & 26 - GIAO DIỆN GIÁM SÁT TRỰC QUAN (VERSION 1.4)
+==============================================================================
+"""
+
+import os
+import sys
+import time
+import datetime
+import cv2
+import numpy as np
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    import streamlit as st
+except ImportError:
+    st = None
+
+# Thêm thư mục gốc vào đường dẫn import
+sys.path.insert(0, os.path.abspath("."))
+
+from camera import VideoReader
+from roi import ROIManager
+from tracking import ObjectTracker, TemporalVerifier, TrackState
+from violation import ViolationChecker
+from evidence import EvidenceSaver
+from database import ViolationDatabase
+from utils import FPSTracker, draw_fps_badge, draw_detection
+
+
+# Cấu hình giao diện Streamlit
+if st is None:
+    print("[CẢNH BÁO] Module streamlit chưa được cài đặt trong môi trường hiện tại. Vui lòng chạy Web Dashboard tích hợp sẵn qua 'python main.py --mode dashboard' hoặc cài đặt streamlit qua 'pip install streamlit'.")
+else:
+    st.set_page_config(
+        page_title="Hệ Thống Giám Sát Lấn Chiếm Vỉa Hè CCTV",
+        page_icon="",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
+    # Tùy biến CSS giao diện hiện đại
+    st.markdown("""
+    <style>
+        .main-header {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #1E88E5;
+            margin-bottom: 5px;
+        }
+        .sub-header {
+            font-size: 1.05rem;
+            color: #757575;
+            margin-bottom: 25px;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #334155;
+            text-align: center;
+        }
+        .badge-confirmed {
+            background-color: #ef4444;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .badge-suspected {
+            background-color: #f59e0b;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+    @st.cache_resource
+    def get_database():
+        return ViolationDatabase(db_path="data/surveillance.db")
+
+
+    db = get_database()
+
+    # Sidebar: Điều hướng chính
+    st.sidebar.image("https://img.icons8.com/color/96/cctv.png", width=70)
+    st.sidebar.title("CCTV Surveillance")
+    st.sidebar.markdown("**Đồ Án Tốt Nghiệp 2026**")
+    st.sidebar.markdown("---")
+
+    menu = st.sidebar.radio(
+        "CHỨC NĂNG CHÍNH",
+        [" Tổng Quan Hệ Thống", " Giám Sát Trực Tiếp", " Tra Cứu Vi Phạm & Bằng Chứng", "️ Quản Lý Vùng Vỉa Hè (ROI)"]
+    )
+
+    st.sidebar.markdown("---")
+    # Quick stats trên sidebar
+    stats = db.get_statistics()
+    st.sidebar.metric("Tổng số vụ vi phạm", stats["total_violations"])
+    st.sidebar.metric("Vi phạm hôm nay", stats["today_violations"])
+
+
+    # ==============================================================================
+    # TRANG 1: TỔNG QUAN HỆ THỐNG
+    # ==============================================================================
+    if menu == " Tổng Quan Hệ Thống":
+        st.markdown('<div class="main-header"> HỆ THỐNG GIÁM SÁT BIỂN HIỆU LẤN CHIẾM VỈA HÈ</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Phát hiện, định danh theo thời gian và quản lý xử phạt thông qua camera an ninh CCTV cố định</div>', unsafe_allow_html=True)
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric(" Điểm Giám Sát Có Dữ Liệu", len(stats["violations_by_camera"]))
+        with col2:
+            st.metric(" Tổng Số Vụ Vi Phạm", stats["total_violations"])
+        with col3:
+            st.metric(" Vi Phạm Trong Ngày", stats["today_violations"])
+        with col4:
+            st.metric(" Thuật Toán AI & Tracking", "YOLOv8 + ByteTrack")
+
+        st.markdown("---")
+        st.subheader(" Phân Bố Vi Phạm Theo Từng Vị Trí Camera")
+    
+        if stats["violations_by_camera"]:
+            df_cam = pd.DataFrame(list(stats["violations_by_camera"].items()), columns=["Camera ID", "Số Vụ Vi Phạm"])
+            st.bar_chart(df_cam.set_index("Camera ID"))
+        else:
+            st.info("Chưa có bản ghi vi phạm nào trong cơ sở dữ liệu. Hãy chạy tính năng Giám Sát Trực Tiếp để thu thập dữ liệu.")
+
+        st.markdown("---")
+        st.subheader(" Các Vụ Vi Phạm Gần Nhất")
+        recent_violations = db.get_violations(limit=5)
+        if recent_violations:
+            df_recent = pd.DataFrame(recent_violations)
+            st.dataframe(df_recent[["id", "camera_id", "track_id", "timestamp", "overlap_pct", "full_image_path"]], use_container_width=True)
+        else:
+            st.write("Chưa có vi phạm nào gần đây.")
+
+
+    # ==============================================================================
+    # TRANG 2: GIÁM SÁT TRỰC TIẾP
+    # ==============================================================================
+    elif menu == " Giám Sát Trực Tiếp":
+        st.markdown('<div class="main-header"> GIÁM SÁT CAMERA THỜI GIAN THỰC</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Luồng phân tích hình ảnh AI trực tiếp kèm cảnh báo thời gian thực</div>', unsafe_allow_html=True)
+
+        col_ctrl, col_view = st.columns([1, 3])
+
+        with col_ctrl:
+            st.subheader("️ Cấu Hình Luồng")
+            # Chọn nguồn
+            video_dir = "data/videos"
+            v_files = [f for f in os.listdir(video_dir) if f.lower().endswith(('.mp4', '.avi', '.mov'))] if os.path.exists(video_dir) else []
+            img_dir = "data/images"
+            i_files = [f for f in os.listdir(img_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))] if os.path.exists(img_dir) else []
+
+            source_options = [f"Video: {f}" for f in v_files] + [f"Ảnh: {f}" for f in i_files]
+            selected_src = st.selectbox("Nguồn dữ liệu CCTV", source_options) if source_options else None
+
+            # Chọn cấu hình ROI
+            config_files = [f for f in os.listdir("configs") if f.endswith(".json")] if os.path.exists("configs") else []
+            selected_cfg = st.selectbox("Cấu hình Vỉa hè (ROI)", config_files) if config_files else None
+
+            # Tùy chỉnh tham số
+            st.markdown("---")
+            st.markdown("**Tham số thuật toán:**")
+            conf_thresh = st.slider("Ngưỡng tin cậy AI (Confidence)", 0.1, 0.9, 0.20, 0.05)
+            overlap_thresh = st.slider("Ngưỡng lấn chiếm diện tích (%)", 10, 80, 30, 5)
+            confirm_n_frames = st.slider("Số frames xác nhận (N-frames)", 3, 30, 15, 1)
+
+            if "is_monitoring" not in st.session_state:
+                st.session_state["is_monitoring"] = False
+
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("▶️ Khởi Động", use_container_width=True, type="primary"):
+                    st.session_state["is_monitoring"] = True
+            with col_b2:
+                if st.button("⏹️ Dừng", use_container_width=True):
+                    st.session_state["is_monitoring"] = False
+
+        with col_view:
+            frame_placeholder = st.empty()
+            metrics_placeholder = st.empty()
+            log_placeholder = st.empty()
+
+            if st.session_state.get("is_monitoring", False) and selected_src and selected_cfg:
+                # Xác định đường dẫn nguồn
+                if selected_src.startswith("Video: "):
+                    media_path = os.path.join("data/videos", selected_src.replace("Video: ", ""))
+                    is_img = False
+                else:
+                    media_path = os.path.join("data/images", selected_src.replace("Ảnh: ", ""))
+                    is_img = True
+
+                cfg_path = os.path.join("configs", selected_cfg)
+
+                # Nạp các module
+                roi_mgr = ROIManager(cfg_path)
+                tracker = ObjectTracker(model_path="models/best.pt" if os.path.exists("models/best.pt") else "yolov8n.pt", conf_threshold=conf_thresh)
+                checker = ViolationChecker(threshold=overlap_thresh / 100.0)
+                verifier = TemporalVerifier(confirm_frames=confirm_n_frames, cooldown_seconds=60.0)
+                ev_saver = EvidenceSaver(base_dir="evidence")
+
+                if is_img:
+                    frame = cv2.imread(media_path)
+                    if frame is not None:
+                        tracked = tracker.track(frame)
+                        roi_mgr.draw_overlay(frame, alpha=0.25)
+                        confirmed_cnt = 0
+
+                        for obj in tracked:
+                            sp = checker.check_multi(obj["box"], roi_mgr.polygons)
+                            is_viol = sp["is_violation"]
+                            if is_viol:
+                                confirmed_cnt += 1
+                                sw_idx = sp.get("sidewalk_index", 1)
+                                lbl = f"VI PHAM VH#{sw_idx} ({sp['overlap_pct']}%)"
+                                st_val = TrackState.CONFIRMED
+                                ev_res = ev_saver.save_evidence(frame, obj["box"], obj["track_id"], camera_id=roi_mgr.camera_id, overlap_pct=sp["overlap_pct"])
+                                if ev_res is not None:
+                                    db.insert_violation(roi_mgr.camera_id, obj["track_id"], ev_res["timestamp"], obj["conf"], sp["overlap_pct"], ev_res["full_path"], ev_res.get("crop_path", ""))
+                            else:
+                                lbl = f"HOP LE ({sp['overlap_pct']}%)"
+                                st_val = TrackState.NORMAL
+
+                            draw_detection(frame, obj["box"], lbl, is_violation=is_viol, track_id=obj["track_id"], status=st_val)
+
+                        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        frame_placeholder.image(frame_rgb, caption=f"Ảnh: {selected_src} | Phát hiện: {len(tracked)} biển | Vi phạm: {confirmed_cnt}", use_container_width=True)
+                else:
+                    reader = VideoReader(media_path)
+                    fps_track = FPSTracker(alpha=0.15)
+                    f_count = 0
+
+                    try:
+                        while st.session_state.get("is_monitoring", False):
+                            ret, frame = reader.read()
+                            if not ret:
+                                break
+
+                            f_count += 1
+                            tracked = tracker.track(frame)
+                            roi_mgr.draw_overlay(frame, alpha=0.25)
+                            verified = verifier.process_frame(tracked, checker, roi_mgr.polygons)
+
+                            conf_cnt = 0
+                            susp_cnt = 0
+
+                            for it in verified:
+                                st_val = it["temporal_status"]
+                                sp = it["spatial_res"]
+                                if st_val == TrackState.CONFIRMED:
+                                    conf_cnt += 1
+                                    lbl = f"VI PHAM ({sp['overlap_pct']}%)"
+                                    if it["is_new_alert"]:
+                                        ev_res = ev_saver.save_evidence(frame, it["box"], it["track_id"], camera_id=roi_mgr.camera_id, overlap_pct=sp["overlap_pct"])
+                                        if ev_res is not None:
+                                            db.insert_violation(roi_mgr.camera_id, it["track_id"], ev_res["timestamp"], it["conf"], sp["overlap_pct"], ev_res["full_path"], ev_res.get("crop_path", ""))
+                                            log_placeholder.warning(f" [CẢNH BÁO VI PHẠM] ID #{it['track_id']} lấn chiếm vỉa hè ({sp['overlap_pct']}%) lúc {ev_res['timestamp']}!")
+                                elif st_val == TrackState.SUSPECTED:
+                                    susp_cnt += 1
+                                    lbl = f"NGHI VAN {it['violation_frames']}/{confirm_n_frames}"
+                                else:
+                                    lbl = f"HOP LE ({sp['overlap_pct']}%)"
+
+                                draw_detection(frame, it["box"], lbl, track_id=it["track_id"], status=st_val)
+
+                            cur_fps = fps_track.update()
+                            draw_fps_badge(frame, cur_fps, reader.fps)
+
+                            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            frame_placeholder.image(frame_rgb, use_container_width=True)
+
+                            metrics_placeholder.markdown(f"**FPS:** `{cur_fps:.1f}` | **Tổng biển:** `{len(verified)}` | **Nghi vấn:** `{susp_cnt}` | **XÁC NHẬN VI PHẠM:** `{conf_cnt}`")
+                            time.sleep(0.01)
+                    finally:
+                        reader.release()
+
+
+    # ==============================================================================
+    # TRANG 3: TRA CỨU VI PHẠM & BẰNG CHỨNG
+    # ==============================================================================
+    elif menu == " Tra Cứu Vi Phạm & Bằng Chứng":
+        st.markdown('<div class="main-header"> KHO LƯU TRỮ BẰNG CHỨNG & LỊCH SỬ PHẠT NGUỘI</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Truy vấn chi tiết từng vụ việc, hình ảnh đóng dấu tem pháp lý và xuất báo cáo</div>', unsafe_allow_html=True)
+
+        # Bộ lọc
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            cams = list(stats["violations_by_camera"].keys())
+            cam_filter = st.selectbox("Lọc theo Camera", ["Tất cả"] + cams)
+            cam_param = None if cam_filter == "Tất cả" else cam_filter
+
+        with col_f2:
+            filter_all_dates = st.checkbox("Tất cả các ngày", value=True)
+            if filter_all_dates:
+                date_filter = "Tất cả"
+                date_param = None
+            else:
+                date_val = st.date_input("Lọc theo ngày", value=datetime.date.today())
+                date_filter = str(date_val)
+                date_param = date_filter
+
+        with col_f3:
+            records_limit = st.selectbox("Số lượng bản ghi", [10, 25, 50, 100], index=1)
+
+        # Truy vấn dữ liệu từ SQLite theo đúng bộ lọc người dùng chọn
+        records = db.get_violations(camera_id=cam_param, date_str=date_param, limit=records_limit)
+
+        if records:
+            st.markdown(f"**Tìm thấy `{len(records)}` vụ vi phạm được ghi nhận:**")
+        else:
+            st.info(f"Không tìm thấy vụ vi phạm nào phù hợp với bộ lọc (Camera: {cam_filter}, Ngày: {date_filter}).")
+
+        if records:
+            # Nút xuất CSV
+            if pd is not None:
+                df_export = pd.DataFrame(records)
+                csv_data = df_export.to_csv(index=False).encode('utf-8')
+            else:
+                import io, csv
+                buf = io.StringIO()
+                if records:
+                    writer = csv.DictWriter(buf, fieldnames=list(records[0].keys()))
+                    writer.writeheader()
+                    writer.writerows(records)
+                csv_data = buf.getvalue().encode('utf-8')
+            st.download_button(
+                label=" Xuất Báo Cáo Vi Phạm (CSV)",
+                data=csv_data,
+                file_name=f"bao_cao_vi_pham_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+
+            st.markdown("---")
+            # Hiển thị từng card vụ việc
+            for rec in records:
+                with st.expander(f" Vụ #{rec['id']} | Cam: {rec['camera_id']} | ID Biển: #{rec['track_id']} | Thời gian: {rec['timestamp']} | Lấn chiếm: {rec['overlap_pct']}%"):
+                    c1, c2 = st.columns([2, 1])
+
+                    with c1:
+                        st.markdown("**Ảnh Toàn Cảnh (Full Frame - Tem Pháp Lý):**")
+                        if os.path.exists(rec["full_image_path"]):
+                            st.image(rec["full_image_path"], use_container_width=True)
+                        else:
+                            st.warning(f"Không tìm thấy file: {rec['full_image_path']}")
+
+                    with c2:
+                        st.markdown("**Ảnh Cận Cảnh (Cropped):**")
+                        if rec["crop_image_path"] and os.path.exists(rec["crop_image_path"]):
+                            st.image(rec["crop_image_path"], width=220)
+                        else:
+                            st.info("Chưa có ảnh crop.")
+
+                        st.markdown(f"""
+                        - **Mã vụ việc:** `#{rec['id']}`
+                        - **Camera:** `{rec['camera_id']}`
+                        - **Biển số ID:** `#{rec['track_id']}`
+                        - **Thời gian:** `{rec['timestamp']}`
+                        - **Độ tin cậy AI:** `{rec['confidence']*100:.0f}%`
+                        - **Mức độ lấn chiếm:** `{rec['overlap_pct']}%`
+                        - **Hành vi:** `Lấn chiếm vỉa hè`
+                        """)
+        else:
+            st.info("Không có dữ liệu vi phạm phù hợp với bộ lọc.")
+
+
+    # ==============================================================================
+    # TRANG 4: QUẢN LÝ VÙNG VỈA HÈ (ROI)
+    # ==============================================================================
+    elif menu == "️ Quản Lý Vùng Vỉa Hè (ROI)":
+        st.markdown('<div class="main-header">️ QUẢN LÝ VÙNG QUAN TÂM VỈA HÈ (ROI)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sub-header">Danh sách cấu hình đa giác vỉa hè cho từng camera an ninh</div>', unsafe_allow_html=True)
+
+        cfg_dir = "configs"
+        if os.path.exists(cfg_dir):
+            files = [f for f in os.listdir(cfg_dir) if f.endswith(".json")]
+            st.write(f"Hiện có **{len(files)}** file cấu hình vỉa hè:")
+
+            for f in files:
+                path = os.path.join(cfg_dir, f)
+                mgr = ROIManager(path)
+                with st.expander(f" {f} ({mgr.camera_id} - {len(mgr.polygons)} vùng vỉa hè)"):
+                    st.write(f"**Số vùng vỉa hè:** {len(mgr.polygons)}")
+                    for idx, p in enumerate(mgr.polygons, 1):
+                        st.write(f"- Vỉa hè #{idx}: `{p}`")
+
+        st.markdown("---")
+        st.subheader(" Cách Vẽ Thêm Vỉa Hè Mới:")
+        st.code(r".\.venv\Scripts\python.exe roi_drawer.py <đường_dẫn_ảnh_hoặc_video> configs/roi_ten_moi.json", language="powershell")
+        st.markdown("""
+        1. Click chuột trái để chấm các đỉnh vỉa hè.
+        2. Nhấn phím **`n`** nếu muốn vẽ thêm vỉa hè bên kia đường (Multi-ROI).
+        3. Nhấn phím **`s`** để lưu cấu hình JSON.
+        """)
 
 
 ================================================================================
