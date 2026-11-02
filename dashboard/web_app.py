@@ -2410,6 +2410,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </footer>
 
     <script>
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        
         let currentStatusFilter = 'all';
         let currentDateFilter = 'all'; // Mặc định hiển thị tất cả hồ sơ để vi phạm mới phát sinh luôn hiển thị ngay
         let allAvailableDates = [];
@@ -2423,13 +2433,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return dateStr;
         }
 
-        function isTodayDate(dateStr) {
-            const today = new Date();
-            const y = today.getFullYear();
-            const m = String(today.getMonth() + 1).padStart(2, '0');
-            const d = String(today.getDate()).padStart(2, '0');
-            return dateStr === `${y}-${m}-${d}`;
-        }
 
         async function loadDatesList() {
             try {
@@ -2570,7 +2573,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     } else if (status === 'confirmed') {
                         statusBadge = `<span class="card-status-badge badge-confirmed"><i class="fa-solid fa-circle-check"></i> Đã xác nhận</span>`;
                         actionButtons = `
-                            <button class="btn-action btn-resolve" onclick="updateStatusDirect(${v.id}, 'resolved', '${v.reviewed_by || 'Cán bộ'}')">
+                            <button class="btn-action btn-resolve" onclick="updateStatusDirect(${v.id}, 'resolved', null, null)">
                                 <i class="fa-solid fa-gavel"></i> Đã nộp phạt / Xử lý
                             </button>
                             <button class="btn-action btn-dismiss" onclick="openDismissDialog(${v.id})">
@@ -2579,8 +2582,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         `;
                         auditBox = `
                             <div class="review-audit-box confirmed-box">
-                                <strong> Người duyệt:</strong> ${v.reviewed_by || 'Cán bộ TTĐT'}<br>
-                                <span style="color: var(--text-muted); font-size: 0.75rem;">Thời gian duyệt: ${v.reviewed_at || v.timestamp}</span>
+                                <strong> Người duyệt:</strong> ${escapeHtml(v.reviewed_by || 'Cán bộ TTĐT')}<br>
+                                <span style="color: var(--text-muted); font-size: 0.75rem;">Thời gian duyệt: ${escapeHtml(v.reviewed_at || v.timestamp)}</span>
                             </div>
                         `;
                     } else if (status === 'dismissed') {
@@ -2592,14 +2595,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         `;
                         auditBox = `
                             <div class="review-audit-box dismissed-box">
-                                <strong> Lý do bác bỏ:</strong> ${v.dismiss_reason || 'Không có lý do chi tiết'}<br>
-                                <span style="color: var(--text-muted); font-size: 0.75rem;">Cán bộ: ${v.reviewed_by || 'Chưa rõ'} &bull; ${v.reviewed_at || ''}</span>
+                                <strong> Lý do bác bỏ:</strong> ${escapeHtml(v.dismiss_reason || 'Không có lý do chi tiết')}<br>
+                                <span style="color: var(--text-muted); font-size: 0.75rem;">Cán bộ: ${escapeHtml(v.reviewed_by || 'Chưa rõ')} &bull; ${escapeHtml(v.reviewed_at || '')}</span>
                             </div>
                         `;
                     } else if (status === 'resolved') {
                         statusBadge = `<span class="card-status-badge badge-resolved"><i class="fa-solid fa-circle-check"></i> Đã hoàn thành</span>`;
                         actionButtons = `
-                            <button class="btn-action btn-reopen" onclick="updateStatusDirect(${v.id}, 'confirmed', '${v.reviewed_by || 'Cán bộ'}')">
+                            <button class="btn-action btn-reopen" onclick="updateStatusDirect(${v.id}, 'confirmed', null, null)">
                                 <i class="fa-solid fa-arrow-rotate-left"></i> Đưa về Đã duyệt
                             </button>
                         `;
@@ -2620,8 +2623,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </div>
                             <div class="card-body">
                                 <div class="card-meta">
-                                    <span><i class="fa-solid fa-video"></i> ${v.camera_id}</span>
-                                    <span><i class="fa-solid fa-clock"></i> ${v.timestamp}</span>
+                                    <span><i class="fa-solid fa-video"></i> ${escapeHtml(v.camera_id)}</span>
+                                    <span><i class="fa-solid fa-clock"></i> ${escapeHtml(v.timestamp)}</span>
                                 </div>
                                 <div class="card-title">Hồ sơ #${v.id} &bull; Biển hiệu Track #${v.track_id}</div>
                                 
@@ -3764,9 +3767,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function renderEvaluationResults(data) {
-            const container = document.getElementById('eval-results-container');
+            const container = document.getElementById('eval-academic-body');
             if (!container) return;
-            container.style.display = 'block';
 
             const isBatch = !!data.metrics_version_b_official;
             const meta = data.metadata || {};
@@ -4326,7 +4328,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
             if range_match:
                 start = int(range_match.group(1))
-                end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+                end = min(int(range_match.group(2)) if range_match.group(2) else file_size - 1, file_size - 1)
+                if start > end or start >= file_size:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{file_size}")
+                    self.end_headers()
+                    return
                 length = end - start + 1
                 self.send_response(206)
                 self.send_header("Content-Type", "video/mp4")
@@ -4338,7 +4345,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 try:
                     with open(file_path, "rb") as f:
                         f.seek(start)
-                        self.wfile.write(f.read(length))
+                        remaining = length
+                        while remaining > 0:
+                            chunk = f.read(min(65536, remaining))
+                            if not chunk:
+                                break
+                            self.wfile.write(chunk)
+                            remaining -= len(chunk)
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     pass
                 return
@@ -4367,6 +4380,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         with _STREAM_LOCK:
+            _ACTIVE_STREAM_TOKENS.clear()
             _ACTIVE_STREAM_TOKENS[video_name] = token
             _STREAM_TELEMETRY[video_name] = {
                 "status": "streaming",
@@ -4706,7 +4720,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 os.path.abspath(os.path.join("data", "evidence")),
                 os.path.abspath(os.path.join("reports", "video_eval_crops")),
             ]
-            raw_path = path.lstrip("/")
+            raw_path = urllib.parse.unquote(path).lstrip("/")
             file_path = os.path.abspath(os.path.normpath(os.path.join(base_dir, raw_path)))
 
             # 1. Kiểm tra phần mở rộng: CHỈ cho phép file ảnh (.jpg, .jpeg, .png, .webp)
@@ -4786,6 +4800,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def _is_local_request(self):
+        host_hdr = self.headers.get("Host") or ""
+        origin = self.headers.get("Origin")
+        ok_origin = (not origin) or urllib.parse.urlparse(origin).netloc == host_hdr
+        return host_hdr.rsplit(":", 1)[0].strip("[]") in ("127.0.0.1", "localhost", "::1") and ok_origin
+
     def do_POST(self):
         """Xử lý cập nhật trạng thái vi phạm (Human-in-the-Loop)."""
         parsed = urllib.parse.urlparse(self.path)
@@ -4796,7 +4816,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if match:
             # Kiểm tra bảo mật: chỉ chấp nhận từ localhost
             client_host = self.client_address[0] if self.client_address else ""
-            if client_host not in ("127.0.0.1", "::1", "localhost"):
+            if client_host not in ("127.0.0.1", "::1", "localhost") or not self._is_local_request():
                 self.send_response(403)
                 self.end_headers()
                 self.wfile.write(b"403 Forbidden: Status updates require local access")
@@ -4829,7 +4849,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/roi/save":
             client_host = self.client_address[0] if self.client_address else ""
-            if client_host not in ("127.0.0.1", "::1", "localhost"):
+            if client_host not in ("127.0.0.1", "::1", "localhost") or not self._is_local_request():
                 self.send_response(403)
                 self.end_headers()
                 self.wfile.write(b"403 Forbidden: Saving ROI requires local access")
@@ -4851,7 +4871,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False).encode("utf-8"))
         elif path == "/api/eval/run":
             client_host = self.client_address[0] if self.client_address else ""
-            if client_host not in ("127.0.0.1", "::1", "localhost"):
+            if client_host not in ("127.0.0.1", "::1", "localhost") or not self._is_local_request():
                 self.send_response(403)
                 self.end_headers()
                 self.wfile.write(b"403 Forbidden: Evaluation requires local access")

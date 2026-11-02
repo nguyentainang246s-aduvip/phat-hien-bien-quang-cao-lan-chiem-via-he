@@ -72,6 +72,7 @@ def process_and_annotate(img, detections, checker=None, roi_manager=None, show_r
     has_roi = False
     if roi_manager and len(roi_manager.polygons) > 0:
         has_roi = True
+        roi_manager.validate_resolution(w, h)
         if show_roi:
             vis = roi_manager.draw_overlay(vis, alpha=0.30)
         
@@ -123,7 +124,7 @@ def test_images_batch(
     model_path: str = "models/best.pt",
     conf_thresh: float = 0.25,
     imgsz: int = 1280,
-    output_dir: str = "data/images/output_test_v8",
+    output_dir: str = "data/images/output_v12",
     roi_path: str = None
 ):
     """Chạy kiểm thử hàng loạt trên toàn bộ ảnh trong thư mục và lưu ảnh kết quả."""
@@ -139,7 +140,7 @@ def test_images_batch(
         return False
 
     print("=" * 75)
-    print("      KIỂM THỬ MÔ HÌNH NHẬN DIỆN BIỂN QUẢNG CÁO (YOLOv8n v8)")
+    print("      KIỂM THỬ MÔ HÌNH NHẬN DIỆN BIỂN QUẢNG CÁO (YOLOv8n v12)")
     print("=" * 75)
     print(f"[+] Trọng số mô hình : {model_path}")
     print(f"[+] Thư mục ảnh      : {os.path.abspath(img_dir)} ({len(images)} ảnh)")
@@ -197,7 +198,7 @@ def test_images_batch(
             print(f"      • Biển #{d['idx']}: Box={d['box']} | Chân={d['base_pt']} | Conf={d['conf']*100:.1f}% | Nhãn: {d['status_text']}")
 
         # Lưu ảnh kết quả
-        clean_name = f"v8_result_{idx}_{img_name.replace(' ', '_')}"
+        clean_name = f"v12_result_{idx}_{img_name.replace(' ', '_')}"
         out_path = os.path.join(output_dir, clean_name)
         cv2.imwrite(out_path, vis)
         print(f"    Đã lưu kết quả tại: {out_path}")
@@ -222,7 +223,7 @@ def test_single_image(
     model_path: str = "models/best.pt",
     conf_thresh: float = 0.25,
     imgsz: int = 1280,
-    output_dir: str = "data/images/output_test_v8",
+    output_dir: str = "data/images/output_v12",
     roi_path: str = None,
     show_gui: bool = False
 ):
@@ -407,13 +408,13 @@ def browse_images_interactively(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Kiểm thử mô hình YOLOv8n v8 & Quản lý ROI vỉa hè trên ảnh")
+    parser = argparse.ArgumentParser(description="Kiểm thử mô hình YOLOv8n v12 & Quản lý ROI vỉa hè trên ảnh")
     parser.add_argument("--dir", type=str, default="data/images", help="Thư mục chứa ảnh cần kiểm thử")
     parser.add_argument("--image", type=str, default=None, help="Đường dẫn đến một ảnh cụ thể")
     parser.add_argument("--model", type=str, default="models/best.pt", help="Đường dẫn trọng số mô hình")
     parser.add_argument("--conf", type=float, default=0.25, help="Ngưỡng độ tin cậy Confidence (0.0 - 1.0)")
     parser.add_argument("--imgsz", type=int, default=1280, help="Kích thước cạnh ảnh suy luận (mặc định 1280)")
-    parser.add_argument("--output-dir", type=str, default="data/images/output_test_v8", help="Thư mục lưu ảnh kết quả")
+    parser.add_argument("--output-dir", type=str, default="data/images/output_v12", help="Thư mục lưu ảnh kết quả")
     parser.add_argument("--roi", type=str, default=None, help="Tùy chọn file JSON cấu hình ROI vỉa hè để kiểm tra vi phạm")
     parser.add_argument("--gui", action="store_true", help="Bật giao diện xem tương tác bằng phím bấm")
 

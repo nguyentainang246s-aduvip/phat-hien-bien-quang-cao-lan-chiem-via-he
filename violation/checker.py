@@ -138,18 +138,20 @@ class ViolationChecker:
         if not list_of_polygons:
             return self.check(box, [])
 
-        best_result = None
-        max_overlap = -1.0
+        best_viol_result = None
+        max_viol_overlap = -1.0
+        best_any_result = None
+        max_any_overlap = -1.0
 
         for idx, pts in enumerate(list_of_polygons):
             res = self.check(box, pts)
-            if res["is_violation"]:
-                res["sidewalk_index"] = idx + 1
-                return res  # Lấn chiếm ít nhất 1 vỉa hè là đủ kết luận vi phạm
-            if res["overlap_ratio"] > max_overlap:
-                max_overlap = res["overlap_ratio"]
-                best_result = res
-                best_result["sidewalk_index"] = idx + 1
+            res["sidewalk_index"] = idx + 1
+            if res["is_violation"] and res["overlap_ratio"] > max_viol_overlap:
+                max_viol_overlap = res["overlap_ratio"]
+                best_viol_result = res
+            if res["overlap_ratio"] > max_any_overlap:
+                max_any_overlap = res["overlap_ratio"]
+                best_any_result = res
 
-        return best_result or self.check(box, [])
+        return best_viol_result or best_any_result or self.check(box, [])
 

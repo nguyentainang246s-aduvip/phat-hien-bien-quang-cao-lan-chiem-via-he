@@ -170,7 +170,8 @@ def run_monitor_mode(args):
     print("-" * 78)
 
     tracker = ObjectTracker(model_path=model_path, conf_threshold=conf_thres, imgsz=imgsz)
-    checker = ViolationChecker(threshold=overlap_thres)
+    ground_rule = bool(cfg_spatial.get("ground_contact_rule", True))
+    checker = ViolationChecker(threshold=overlap_thres, ground_contact_rule=ground_rule)
     allow_moving = getattr(args, "allow_moving", False)
     require_stationary = False if allow_moving else cfg_temporal.get("require_stationary", True)
     max_disp = args.max_displacement if getattr(args, "max_displacement", None) is not None else float(cfg_temporal.get("max_displacement_pixels", 50.0))
@@ -222,18 +223,22 @@ def run_monitor_mode(args):
                 sw_idx = sp.get("sidewalk_index", 1)
                 lbl = f"NGHI VAN VH#{sw_idx}: {sp['overlap_pct']}% (Anh tinh)"
                 status = TrackState.SUSPECTED
-                ev_res = evidence_saver.save_evidence(clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'])
-                rec_id = db.insert_violation(
-                    camera_id=roi_manager.camera_id,
-                    track_id=track_id,
-                    timestamp=ev_res["timestamp"],
-                    confidence=conf,
-                    overlap_pct=sp["overlap_pct"],
-                    full_image_path=ev_res["full_path"],
-                    crop_image_path=ev_res.get("crop_path", ""),
-                    bbox=box,
-                    sidewalk_index=sw_idx
+                ev_res = evidence_saver.save_evidence(
+                    clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
+                    roi_frame=frame
                 )
+                if ev_res:
+                    rec_id = db.insert_violation(
+                        camera_id=roi_manager.camera_id,
+                        track_id=track_id,
+                        timestamp=ev_res["timestamp"],
+                        confidence=conf,
+                        overlap_pct=sp["overlap_pct"],
+                        full_image_path=ev_res["full_path"],
+                        crop_image_path=ev_res.get("crop_path", ""),
+                        bbox=box,
+                        sidewalk_index=sw_idx
+                    )
                 print(f"   [BẰNG CHỨNG #{confirmed_count}] Đã ghi nhận vi phạm ID #{track_id} -> DB record #{rec_id}")
             else:
                 lbl = f"HOP LE: {sp['overlap_pct']}%"
@@ -276,13 +281,21 @@ def run_monitor_mode(args):
 
     target_frame_interval = 1.0 / target_fps if target_fps > 0 else 0.04167
 
+    fail_count = 0
     try:
         while True:
             loop_start_time = time.perf_counter()
             ret, frame = reader.read()
             if not ret or frame is None:
+                fail_count += 1
+                if fail_count > 150:
+                    print("[LỖI] Mất nguồn video/camera, dừng giám sát.")
+                    break
+                if not args.headless and (cv2.waitKey(10) & 0xFF) in (ord('q'), 27):
+                    break
                 time.sleep(0.01)
                 continue
+            fail_count = 0
 
             fps_val = fps_tracker.update()
 
@@ -308,7 +321,11 @@ def run_monitor_mode(args):
                 tracked_objects = tracker.track(frame)
                 clean_frame = frame.copy()
                 roi_manager.draw_overlay(frame, alpha=0.25)
-                verified_objects = verifier.process_frame(tracked_objects, checker, roi_manager.polygons)
+                # Dùng mốc thời gian nội tại nếu là video file có FPS xác định; dùng time.time() nếu là live stream
+                current_ts = (frame_count / reader.fps) if (not reader.is_live_stream and getattr(reader, 'fps', 0) > 0) else time.time()
+                verified_objects = verifier.process_frame(
+                    tracked_objects, checker, roi_manager.polygons, current_timestamp=current_ts
+                )
 
                 current_frame_confirmed = 0
                 current_frame_suspected = 0
@@ -334,21 +351,23 @@ def run_monitor_mode(args):
                             else:
                                 total_confirmed_events += 1
                                 ev_res = evidence_saver.save_evidence(
-                                    clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct']
+                                    clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
+                                    roi_frame=frame
                                 )
-                                rec_id = db.insert_violation(
-                                    camera_id=roi_manager.camera_id,
-                                    track_id=track_id,
-                                    timestamp=ev_res["timestamp"],
-                                    confidence=conf,
-                                    overlap_pct=sp["overlap_pct"],
-                                    full_image_path=ev_res["full_path"],
-                                    crop_image_path=ev_res.get("crop_path", ""),
-                                    bbox=box,
-                                    sidewalk_index=sw_idx
-                                )
-                                print(f" [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
-                                print(f"    Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
+                                if ev_res:
+                                    rec_id = db.insert_violation(
+                                        camera_id=roi_manager.camera_id,
+                                        track_id=track_id,
+                                        timestamp=ev_res["timestamp"],
+                                        confidence=conf,
+                                        overlap_pct=sp["overlap_pct"],
+                                        full_image_path=ev_res["full_path"],
+                                        crop_image_path=ev_res.get("crop_path", ""),
+                                        bbox=box,
+                                        sidewalk_index=sw_idx
+                                    )
+                                    print(f" [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
+                                    print(f"    Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
 
                     elif temporal_status == TrackState.SUSPECTED:
                         current_frame_suspected += 1
@@ -460,7 +479,7 @@ def run_benchmark_mode(args):
         source=args.source,
         config_path=args.config,
         model_path=args.model,
-        num_frames=args.max_frames if args.max_frames else 50
+        num_frames=args.max_frames if args.max_frames else 100
     )
     res = bench.run_benchmark(verbose=True)
     report_file = args.report if hasattr(args, 'report') and args.report else "reports/benchmark_report.md"

@@ -55,8 +55,10 @@ class StreamReader:
         
         # Luồng nền cho RTSP/Live Stream chống trễ hình (Zero Latency Buffer Flush)
         self._lock = threading.Lock()
+        self._cap_lock = threading.Lock()
         self._latest_frame = None
         self._latest_ret = False
+        self._latest_ts = 0.0
         self._thread = None
         self._stop_event = threading.Event()
 
@@ -68,65 +70,73 @@ class StreamReader:
         self._stop_event.set()
         if self._thread is not None and self._thread.is_alive():
             if threading.current_thread() != self._thread:
-                self._thread.join(timeout=1.5)
+                self._thread.join(timeout=2.5)
         self._thread = None
 
     def _connect(self) -> bool:
         """Tạo kết nối tới nguồn camera an toàn đa luồng."""
         self._stop_worker_thread()
 
-        if self.cap is not None:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
-            self.cap = None
+        with self._cap_lock:
+            if self.cap is not None:
+                try:
+                    self.cap.release()
+                except Exception:
+                    pass
+                self.cap = None
 
-        if not self.is_live_stream and isinstance(self.source, str) and not os.path.exists(self.source):
-            print(f"[LỖI] Tệp video không tồn tại trên đĩa: {self.source}")
-            return False
+            if not self.is_live_stream and isinstance(self.source, str) and not os.path.exists(self.source):
+                print(f"[LỖI] Tệp video không tồn tại trên đĩa: {self.source}")
+                return False
 
-        print(f"[CAMERA STREAM] Đang kết nối nguồn: {self.source}...")
-        self.cap = cv2.VideoCapture(self.source)
+            print(f"[CAMERA STREAM] Đang kết nối nguồn: {self.source}...")
+            self.cap = cv2.VideoCapture(self.source)
 
-        if not self.cap.isOpened():
-            print(f"[CẢNH BÁO] Không thể mở nguồn camera: {self.source}")
-            return False
+            if not self.cap.isOpened():
+                print(f"[CẢNH BÁO] Không thể mở nguồn camera: {self.source}")
+                return False
 
-        # Lấy thông số luồng
-        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280
-        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 720
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
-        print(f"[+] Kết nối camera thành công ({self.width}x{self.height}, {self.fps:.1f} FPS)")
+            # Lấy thông số luồng
+            self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280
+            self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 720
+            self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
+            print(f"[+] Kết nối camera thành công ({self.width}x{self.height}, {self.fps:.1f} FPS)")
         
         # Nếu là live stream / RTSP: Kích hoạt background thread để flush buffer liên tục
         if self.is_live_stream:
             with self._lock:
                 self._latest_frame = None
                 self._latest_ret = False
+                self._latest_ts = 0.0
             self._stop_event.clear()
             self._thread = threading.Thread(target=self._capture_worker, daemon=True)
             self._thread.start()
-            # Chờ frame đầu tiên sẵn sàng
-            for _ in range(20):
+            # Chờ frame đầu tiên sẵn sàng (tối đa 3.0s cho RTSP I-frame)
+            for _ in range(60):
                 with self._lock:
                     if self._latest_frame is not None:
                         break
                 time.sleep(0.05)
+            with self._lock:
+                if self._latest_frame is None:
+                    print("[CẢNH BÁO] Đã mở kết nối nhưng chưa nhận được frame đầu tiên sau 3.0s.")
+                    return False
                 
         return True
 
     def _capture_worker(self):
         """Worker chạy ngầm đọc frame liên tục cho live stream để tránh nghẽn buffer OpenCV."""
         while not self._stop_event.is_set():
-            if self.cap is None or not self.cap.isOpened():
-                time.sleep(0.05)
-                continue
-            ret, frame = self.cap.read()
+            with self._cap_lock:
+                if self.cap is None or not self.cap.isOpened():
+                    time.sleep(0.05)
+                    continue
+                ret, frame = self.cap.read()
             with self._lock:
                 self._latest_ret = ret
                 if ret and frame is not None:
                     self._latest_frame = frame
+                    self._latest_ts = time.monotonic()
             if not ret:
                 time.sleep(0.05)
 
@@ -147,7 +157,7 @@ class StreamReader:
         # 1. Đối với Live Stream / RTSP: Lấy frame mới nhất từ background thread
         if self.is_live_stream:
             with self._lock:
-                ret = self._latest_ret
+                ret = self._latest_ret and (time.monotonic() - self._latest_ts) < 5.0
                 frame = self._latest_frame.copy() if (ret and self._latest_frame is not None) else None
             
             if ret and frame is not None:
@@ -199,6 +209,7 @@ class StreamReader:
     def release(self):
         """Giải phóng bộ nhớ phần cứng camera và dừng background thread."""
         self._stop_worker_thread()
-        if self.cap is not None and self.cap.isOpened():
-            self.cap.release()
-            print("[OK] Đã giải phóng tài nguyên camera.")
+        with self._cap_lock:
+            if self.cap is not None and self.cap.isOpened():
+                self.cap.release()
+                print("[OK] Đã giải phóng tài nguyên camera.")

@@ -14,7 +14,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 
-def validate_yolo_dataset(dataset_dir: str = "datasets/v8"):
+def validate_yolo_dataset(dataset_dir: str = "datasets/v12"):
     """
     Kiểm tra tính toàn vẹn của tập dữ liệu sau khi tải từ Roboflow về.
     Xác thực file data.yaml và khớp cặp giữa ảnh (.jpg/.png) và nhãn (.txt).
@@ -100,5 +100,6 @@ def validate_yolo_dataset(dataset_dir: str = "datasets/v8"):
 
 
 if __name__ == "__main__":
-    dataset_folder = sys.argv[1] if len(sys.argv) > 1 else "datasets/v8"
+    default_dir = "datasets/v12"
+    dataset_folder = sys.argv[1] if len(sys.argv) > 1 else default_dir
     validate_yolo_dataset(dataset_folder)

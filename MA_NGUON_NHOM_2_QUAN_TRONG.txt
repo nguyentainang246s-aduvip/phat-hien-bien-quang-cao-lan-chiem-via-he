@@ -78,8 +78,10 @@ class StreamReader:
         
         # Luồng nền cho RTSP/Live Stream chống trễ hình (Zero Latency Buffer Flush)
         self._lock = threading.Lock()
+        self._cap_lock = threading.Lock()
         self._latest_frame = None
         self._latest_ret = False
+        self._latest_ts = 0.0
         self._thread = None
         self._stop_event = threading.Event()
 
@@ -91,65 +93,73 @@ class StreamReader:
         self._stop_event.set()
         if self._thread is not None and self._thread.is_alive():
             if threading.current_thread() != self._thread:
-                self._thread.join(timeout=1.5)
+                self._thread.join(timeout=2.5)
         self._thread = None
 
     def _connect(self) -> bool:
         """Tạo kết nối tới nguồn camera an toàn đa luồng."""
         self._stop_worker_thread()
 
-        if self.cap is not None:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
-            self.cap = None
+        with self._cap_lock:
+            if self.cap is not None:
+                try:
+                    self.cap.release()
+                except Exception:
+                    pass
+                self.cap = None
 
-        if not self.is_live_stream and isinstance(self.source, str) and not os.path.exists(self.source):
-            print(f"[LỖI] Tệp video không tồn tại trên đĩa: {self.source}")
-            return False
+            if not self.is_live_stream and isinstance(self.source, str) and not os.path.exists(self.source):
+                print(f"[LỖI] Tệp video không tồn tại trên đĩa: {self.source}")
+                return False
 
-        print(f"[CAMERA STREAM] Đang kết nối nguồn: {self.source}...")
-        self.cap = cv2.VideoCapture(self.source)
+            print(f"[CAMERA STREAM] Đang kết nối nguồn: {self.source}...")
+            self.cap = cv2.VideoCapture(self.source)
 
-        if not self.cap.isOpened():
-            print(f"[CẢNH BÁO] Không thể mở nguồn camera: {self.source}")
-            return False
+            if not self.cap.isOpened():
+                print(f"[CẢNH BÁO] Không thể mở nguồn camera: {self.source}")
+                return False
 
-        # Lấy thông số luồng
-        self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280
-        self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 720
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
-        print(f"[+] Kết nối camera thành công ({self.width}x{self.height}, {self.fps:.1f} FPS)")
+            # Lấy thông số luồng
+            self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280
+            self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 720
+            self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
+            print(f"[+] Kết nối camera thành công ({self.width}x{self.height}, {self.fps:.1f} FPS)")
         
         # Nếu là live stream / RTSP: Kích hoạt background thread để flush buffer liên tục
         if self.is_live_stream:
             with self._lock:
                 self._latest_frame = None
                 self._latest_ret = False
+                self._latest_ts = 0.0
             self._stop_event.clear()
             self._thread = threading.Thread(target=self._capture_worker, daemon=True)
             self._thread.start()
-            # Chờ frame đầu tiên sẵn sàng
-            for _ in range(20):
+            # Chờ frame đầu tiên sẵn sàng (tối đa 3.0s cho RTSP I-frame)
+            for _ in range(60):
                 with self._lock:
                     if self._latest_frame is not None:
                         break
                 time.sleep(0.05)
+            with self._lock:
+                if self._latest_frame is None:
+                    print("[CẢNH BÁO] Đã mở kết nối nhưng chưa nhận được frame đầu tiên sau 3.0s.")
+                    return False
                 
         return True
 
     def _capture_worker(self):
         """Worker chạy ngầm đọc frame liên tục cho live stream để tránh nghẽn buffer OpenCV."""
         while not self._stop_event.is_set():
-            if self.cap is None or not self.cap.isOpened():
-                time.sleep(0.05)
-                continue
-            ret, frame = self.cap.read()
+            with self._cap_lock:
+                if self.cap is None or not self.cap.isOpened():
+                    time.sleep(0.05)
+                    continue
+                ret, frame = self.cap.read()
             with self._lock:
                 self._latest_ret = ret
                 if ret and frame is not None:
                     self._latest_frame = frame
+                    self._latest_ts = time.monotonic()
             if not ret:
                 time.sleep(0.05)
 
@@ -170,7 +180,7 @@ class StreamReader:
         # 1. Đối với Live Stream / RTSP: Lấy frame mới nhất từ background thread
         if self.is_live_stream:
             with self._lock:
-                ret = self._latest_ret
+                ret = self._latest_ret and (time.monotonic() - self._latest_ts) < 5.0
                 frame = self._latest_frame.copy() if (ret and self._latest_frame is not None) else None
             
             if ret and frame is not None:
@@ -222,9 +232,10 @@ class StreamReader:
     def release(self):
         """Giải phóng bộ nhớ phần cứng camera và dừng background thread."""
         self._stop_worker_thread()
-        if self.cap is not None and self.cap.isOpened():
-            self.cap.release()
-            print("[OK] Đã giải phóng tài nguyên camera.")
+        with self._cap_lock:
+            if self.cap is not None and self.cap.isOpened():
+                self.cap.release()
+                print("[OK] Đã giải phóng tài nguyên camera.")
 
 
 ================================================================================
@@ -449,6 +460,18 @@ import cv2
 import numpy as np
 
 
+def _safe_imwrite(path: str, img: np.ndarray) -> bool:
+    """Ghi ảnh an toàn hỗ trợ đường dẫn Unicode trên Windows và kiểm tra kết quả."""
+    try:
+        ok, buf = cv2.imencode(".jpg", img)
+        if ok:
+            buf.tofile(path)
+            return True
+    except Exception as e:
+        print(f"[LỖI GHI ẢNH] Không thể lưu {path}: {e}")
+    return False
+
+
 class EvidenceSaver:
     """
     Quản lý lưu trữ bằng chứng hình ảnh khi phát hiện vi phạm lấn chiếm vỉa hè.
@@ -476,7 +499,8 @@ class EvidenceSaver:
         os.makedirs(self.base_dir, exist_ok=True)
 
     def save_evidence(self, frame: np.ndarray, box: tuple, track_id: int, 
-                      camera_id: str = "cam_01", overlap_pct: float = 0.0) -> dict:
+                      camera_id: str = "cam_01", overlap_pct: float = 0.0,
+                      roi_frame: np.ndarray = None) -> dict:
         """
         Lưu cặp ảnh bằng chứng (toàn cảnh + cận cảnh).
         
@@ -519,12 +543,13 @@ class EvidenceSaver:
         crop_filename = f"crop_id{track_id}_{time_str}.jpg"
         crop_path = os.path.join(crop_dir, crop_filename)
         if cropped_img.size > 0:
-            cv2.imwrite(crop_path, cropped_img)
+            if not _safe_imwrite(crop_path, cropped_img):
+                crop_path = ""
         else:
             crop_path = ""
 
         # 2. Xử lý ảnh toàn cảnh (Full Frame with Target Highlight & Watermark Stamp)
-        stamped_frame = frame.copy()
+        stamped_frame = roi_frame.copy() if roi_frame is not None else frame.copy()
 
         # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
         if self._face_cascade is not None:
@@ -559,7 +584,9 @@ class EvidenceSaver:
 
         full_filename = f"violation_id{track_id}_{time_str}.jpg"
         full_path = os.path.join(full_dir, full_filename)
-        cv2.imwrite(full_path, stamped_frame)
+        if not _safe_imwrite(full_path, stamped_frame):
+            print(f"[CẢNH BÁO] Không thể lưu ảnh bằng chứng toàn cảnh: {full_path}")
+            return None
 
         return {
             "full_path": full_path.replace("\\", "/"),
@@ -601,7 +628,7 @@ class ViolationDatabase:
 
     def get_connection(self):
         """Tạo kết nối SQLite với Row Factory để truy vấn dạng dict và kích hoạt WAL Mode."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
@@ -635,7 +662,7 @@ class ViolationDatabase:
                     reviewed_at DATETIME DEFAULT NULL,
                     full_image_path TEXT,
                     crop_image_path TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
                 )
             """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_camera ON violations(camera_id)")
@@ -936,7 +963,7 @@ class SystemBenchmark:
         source: str = None,
         config_path: str = None,
         model_path: str = "models/best.pt",
-        num_frames: int = 60
+        num_frames: int = 100
     ):
         # 1. Xác định nguồn video
         if source is None:
@@ -1052,7 +1079,7 @@ class SystemBenchmark:
         reader = StreamReader(self.source)
         roi_mgr = ROIManager(self.config_path)
         tracker = ObjectTracker(model_path=self.model_path, conf_threshold=0.25, imgsz=640)
-        checker = ViolationChecker(threshold=0.30)
+        checker = ViolationChecker(threshold=0.30, ground_contact_rule=True)
         verifier = TemporalVerifier(
             confirm_frames=20,
             confirm_seconds=3.0,
@@ -1106,8 +1133,9 @@ class SystemBenchmark:
             t3 = time.perf_counter()
 
             # 4. Bộ lọc xác minh thời gian (Temporal Verifier)
+            simulated_ts = (processed_frames + 1) / (reader.fps if getattr(reader, 'fps', 0) > 0 else 24.0)
             verified_objs = verifier.process_frame(
-                tracked_objs, checker, roi_mgr.polygons, precomputed_spatial=spatial_results
+                tracked_objs, checker, roi_mgr.polygons, current_timestamp=simulated_ts, precomputed_spatial=spatial_results
             )
             for item in verified_objs:
                 if item.get("is_new_alert"):
@@ -1302,7 +1330,7 @@ def main():
     parser.add_argument("--source", type=str, default=None, help="Nguồn video để benchmark")
     parser.add_argument("--config", type=str, default=None, help="File cấu hình ROI")
     parser.add_argument("--model", type=str, default="models/best.pt", help="Trọng số model")
-    parser.add_argument("--frames", type=int, default=50, help="Số khung hình đo đạc (mặc định: 50)")
+    parser.add_argument("--frames", type=int, default=100, help="Số khung hình đo đạc (mặc định: 100)")
     parser.add_argument("--report", type=str, default="reports/benchmark_report.md", help="File xuất báo cáo Markdown")
     args = parser.parse_args()
 

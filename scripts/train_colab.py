@@ -1,20 +1,22 @@
 # =============================================================================
-# CODE CHẠY TRÊN GOOGLE COLAB ĐỂ HUẤN LUYỆN YOLOV8N - VERSION 8
+# CODE CHẠY TRÊN GOOGLE COLAB ĐỂ HUẤN LUYỆN YOLOV8N - VERSION 12
 # =============================================================================
 # Copy toàn bộ đoạn mã này vào 1 ô code trên Google Colab (chọn GPU T4) và bấm Chạy:
 
 # 1. Cài đặt thư viện (trên Google Colab bỏ dấu thăng để chạy lệnh terminal: !pip install ultralytics roboflow)
 # !pip install ultralytics roboflow
 
-# 2. Tải Dataset Version 8 từ Roboflow
+# 2. Tải Dataset Version 12 từ Roboflow (2,410 ảnh)
 import os
 from roboflow import Roboflow
 
-# Bảo mật API Key qua biến môi trường (tránh hardcode khóa cá nhân trong mã nguồn)
-api_key = os.environ.get("ROBOFLOW_API_KEY", "YOUR_ROBOFLOW_API_KEY")
+# Bảo mật API Key qua biến môi trường (hoặc điền API Key dự án)
+api_key = os.environ.get("ROBOFLOW_API_KEY")
+if not api_key:
+    raise ValueError("Vui lòng thiết lập biến môi trường ROBOFLOW_API_KEY trước khi chạy.")
 rf = Roboflow(api_key=api_key)
 project = rf.workspace("tai-nang-nguyen-duc").project("sidewalk-signboard-detection-1")
-version = project.version(8)
+version = project.version(12)
 dataset = version.download("yolov8")
 
 # 3. Huấn luyện mô hình YOLOv8n với cấu hình chuẩn của ĐATN
@@ -35,7 +37,7 @@ results = model.train(
     momentum=0.937,
     mosaic=1.0,
     erasing=0.4,
-    name="train_v8",
+    name="train_v12",
     save=True,
     plots=True
 )
@@ -46,11 +48,15 @@ metrics_test = model.val(
     split="test",
     imgsz=1280,
     plots=True,
-    name="test_v8"
+    name="test_v12"
 )
 
-# 5. Nén kết quả và tải về máy (trên Google Colab: !zip -r training_results_v8.zip ...)
-# !zip -r training_results_v8.zip runs/detect/train_v8 runs/detect/test_v8
+# 5. Xuất mô hình sang định dạng ONNX
+model.export(format="onnx", imgsz=1280, dynamic=False, simplify=True)
+
+# 6. Nén kết quả và tải về máy
+# !zip -r training_results_v12.zip runs/detect/train_v12 runs/detect/test_v12
 from google.colab import files
-files.download("training_results_v8.zip")
-files.download("runs/detect/train_v8/weights/best.pt")
+# files.download("training_results_v12.zip")
+# files.download("runs/detect/train_v12/weights/best.pt")
+# files.download("runs/detect/train_v12/weights/best.onnx")

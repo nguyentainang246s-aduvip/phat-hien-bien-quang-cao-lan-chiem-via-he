@@ -13,6 +13,18 @@ import cv2
 import numpy as np
 
 
+def _safe_imwrite(path: str, img: np.ndarray) -> bool:
+    """Ghi ảnh an toàn hỗ trợ đường dẫn Unicode trên Windows và kiểm tra kết quả."""
+    try:
+        ok, buf = cv2.imencode(".jpg", img)
+        if ok:
+            buf.tofile(path)
+            return True
+    except Exception as e:
+        print(f"[LỖI GHI ẢNH] Không thể lưu {path}: {e}")
+    return False
+
+
 class EvidenceSaver:
     """
     Quản lý lưu trữ bằng chứng hình ảnh khi phát hiện vi phạm lấn chiếm vỉa hè.
@@ -40,7 +52,8 @@ class EvidenceSaver:
         os.makedirs(self.base_dir, exist_ok=True)
 
     def save_evidence(self, frame: np.ndarray, box: tuple, track_id: int, 
-                      camera_id: str = "cam_01", overlap_pct: float = 0.0) -> dict:
+                      camera_id: str = "cam_01", overlap_pct: float = 0.0,
+                      roi_frame: np.ndarray = None) -> dict:
         """
         Lưu cặp ảnh bằng chứng (toàn cảnh + cận cảnh).
         
@@ -83,12 +96,13 @@ class EvidenceSaver:
         crop_filename = f"crop_id{track_id}_{time_str}.jpg"
         crop_path = os.path.join(crop_dir, crop_filename)
         if cropped_img.size > 0:
-            cv2.imwrite(crop_path, cropped_img)
+            if not _safe_imwrite(crop_path, cropped_img):
+                crop_path = ""
         else:
             crop_path = ""
 
         # 2. Xử lý ảnh toàn cảnh (Full Frame with Target Highlight & Watermark Stamp)
-        stamped_frame = frame.copy()
+        stamped_frame = roi_frame.copy() if roi_frame is not None else frame.copy()
 
         # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
         if self._face_cascade is not None:
@@ -123,7 +137,9 @@ class EvidenceSaver:
 
         full_filename = f"violation_id{track_id}_{time_str}.jpg"
         full_path = os.path.join(full_dir, full_filename)
-        cv2.imwrite(full_path, stamped_frame)
+        if not _safe_imwrite(full_path, stamped_frame):
+            print(f"[CẢNH BÁO] Không thể lưu ảnh bằng chứng toàn cảnh: {full_path}")
+            return None
 
         return {
             "full_path": full_path.replace("\\", "/"),

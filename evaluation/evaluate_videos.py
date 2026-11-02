@@ -113,7 +113,9 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
     Khớp nối 2 chiều khách quan (Bipartite Spatio-Temporal Matching) giữa Ground Truth và Tracks.
     Loại bỏ hoàn toàn bất kỳ mapping viết cứng nào (Zero Hardcoded Mapping).
     1. First pass: Khớp trực tiếp nếu expected_track_id xuất hiện trong danh sách track
-       VÀ thỏa mãn điều kiện kiểm chứng lân cận không gian (s_iou > 0.05 hoặc dist_px <= 250px).
+       VÀ thỏa mãn điều kiện kiểm chứng lân cận không gian (s_iou > 0.05, tâm nằm trong GT box,
+       hoặc khoảng cách tâm dist_px <= 850px để thích nghi với méo phối cảnh camera góc rộng 1280x720)
+       kết hợp cùng giao thoa thời gian (t_iou >= 0.1).
     2. Second pass: Với các GT items còn lại, giải bài toán phân công tối ưu toàn cục
        bằng thuật toán Hungarian (scipy.optimize.linear_sum_assignment) dựa trên ma trận
        độ tương đồng không gian - thời gian (Affinity Matrix).
@@ -241,9 +243,11 @@ def compute_metrics_from_ground_truth(results_by_video: dict, gt_file: str):
     # Khớp nối động theo không gian - thời gian cho từng video
     matched_by_video = {}
     for vid_id, v_gt_items in gt_by_video.items():
-        vid_res = results_by_video.get(vid_id, {})
+        vid_res = results_by_video.get(vid_id) or {}
         v_tracks = vid_res.get("tracks", {})
-        matched_by_video[vid_id] = match_gt_to_tracks_robust(v_gt_items, v_tracks, fps=24.0)
+        _dur = vid_res.get("duration_sec") or 0
+        _fps = (vid_res["total_frames"] / _dur) if _dur > 0 and "total_frames" in vid_res else 24.0
+        matched_by_video[vid_id] = match_gt_to_tracks_robust(v_gt_items, v_tracks, fps=_fps)
 
     for item in gt_items:
         vid_id = item["video_id"]
@@ -299,8 +303,44 @@ def compute_metrics_from_ground_truth(results_by_video: dict, gt_file: str):
             "best_crop_path": track_info.get("best_crop_path", "").replace("\\", "/") if track_info else ""
         })
 
+    # Kiểm tra thêm các track CONFIRMED không khớp với bất kỳ GT nào (Open-set evaluation - Bug #3 fix)
+    unmatched_confirmed_fps = 0
+    for vid_id, vid_res in results_by_video.items():
+        if not vid_res:
+            continue
+        matched_tids = {
+            m["matched_track_id"]
+            for m in matched_by_video.get(vid_id, {}).values()
+            if m and m.get("matched_track_id") is not None
+        }
+        for tid, t_info in vid_res.get("tracks", {}).items():
+            if tid not in matched_tids and t_info.get("final_status") == TrackState.CONFIRMED:
+                unmatched_confirmed_fps += 1
+                fp += 1
+                item_evaluations.append({
+                    "object_id": f"UNMATCHED_{vid_id}_T{tid}",
+                    "video_id": vid_id,
+                    "matched_track_id": tid,
+                    "expected_track_id": None,
+                    "match_method": "unmatched_false_positive",
+                    "match_confidence": 0.0,
+                    "spatial_iou": 0.0,
+                    "temporal_iou": 0.0,
+                    "description": f"Track #{tid} ngoài Ground Truth bị kết luận nhầm là vi phạm",
+                    "gt_label": "BACKGROUND",
+                    "system_status": TrackState.CONFIRMED,
+                    "eval_result": "FP",
+                    "justification": "Báo động giả (False Positive) từ vật thể ngoài tập nhãn chuẩn.",
+                    "total_detections": t_info.get("total_detections", 0),
+                    "avg_conf": round(float(np.mean(t_info["conf_list"])), 3) if t_info.get("conf_list") else 0.0,
+                    "avg_overlap": round(float(np.mean(t_info["overlap_list"])), 1) if t_info.get("overlap_list") else 0.0,
+                    "best_crop_path": t_info.get("best_crop_path", "").replace("\\", "/")
+                })
+
     total_evaluated = tp + fp + fn + tn
-    assert total_evaluated == len(gt_items), f"Tong so danh gia ({total_evaluated}) phai bang so mau GT ({len(gt_items)})"
+    assert total_evaluated == len(gt_items) + unmatched_confirmed_fps, (
+        f"Tong so danh gia ({total_evaluated}) phai bang so mau GT ({len(gt_items)}) + unmatched FP ({unmatched_confirmed_fps})"
+    )
 
     prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
@@ -385,7 +425,8 @@ def evaluate_single_video(
         log_file_handle.write(header_msg + "\n")
 
     tracker = ObjectTracker(model_path=model_path, conf_threshold=conf_threshold, imgsz=det_cfg.get("imgsz", 640))
-    checker = ViolationChecker(threshold=overlap_threshold)
+    ground_rule = bool(spat_cfg.get("ground_contact_rule", True))
+    checker = ViolationChecker(threshold=overlap_threshold, ground_contact_rule=ground_rule)
     verifier = TemporalVerifier(
         confirm_frames=confirm_frames,
         confirm_seconds=confirm_seconds,
@@ -514,6 +555,7 @@ def evaluate_single_video(
                 t_info["conf_list"].append(conf)
                 t_info["overlap_list"].append(spatial["overlap_ratio"] * 100)
                 t_info["boxes"].append([int(v) for v in box])
+                t_info["is_spatial_viol_count"] += (1 if spatial["is_violation"] else 0)
                 if t_status == TrackState.CONFIRMED:
                     t_info["final_status"] = TrackState.CONFIRMED
                 elif t_info["final_status"] != TrackState.CONFIRMED:
@@ -693,8 +735,12 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
         metrics_b = compute_metrics_from_ground_truth(results_dict_b, GROUND_TRUTH_FILE)
         metrics_a = compute_metrics_from_ground_truth(results_dict_a, GROUND_TRUTH_FILE)
 
-        standee_3_v1_ov_a = round(float(np.mean(res_v1_a["tracks"][3]["overlap_list"])), 1) if (res_v1_a and 3 in res_v1_a.get("tracks", {})) else 66.0
-        standee_3_v1_ov_b = round(float(np.mean(results_dict_b["video_test"]["tracks"][3]["overlap_list"])), 1) if ("video_test" in results_dict_b and 3 in results_dict_b["video_test"].get("tracks", {})) else 77.0
+        v1_obj3_a = next((x for x in metrics_a["item_evaluations"] if x["object_id"] == "V1_OBJ_3"), None)
+        v1_obj3_b = next((x for x in metrics_b["item_evaluations"] if x["object_id"] == "V1_OBJ_3"), None)
+        standee_3_v1_ov_a = v1_obj3_a.get("avg_overlap", 0.0) if v1_obj3_a else 0.0
+        standee_3_v1_ov_b = v1_obj3_b.get("avg_overlap", 0.0) if v1_obj3_b else 0.0
+        standee_3_v1_status_a = v1_obj3_a.get("system_status", "N/A") if v1_obj3_a else "N/A"
+        standee_3_v1_status_b = v1_obj3_b.get("system_status", "N/A") if v1_obj3_b else "N/A"
 
         all_fps = [r["avg_fps"] for r in results_dict_b.values()]
         all_steady_fps = [r["latency_stats"]["steady_state_fps"] for r in results_dict_b.values()]
@@ -807,7 +853,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             },
             "configuration": {
                 "model": "models/best.onnx",
-                "runtime": "ONNX Runtime 1.30 (CPU AVX2)",
+                "runtime": (lambda: f"ONNX Runtime {getattr(__import__('onnxruntime'), '__version__', '1.30')} (CPU AVX2)")(),
                 "imgsz": 640,
                 "conf_threshold": 0.25,
                 "overlap_threshold": 0.30,
@@ -831,7 +877,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
                 "f1_score": round(metrics_b["f1_score"], 4),
                 "false_alarms_in_sample": metrics_b["false_positives"],
                 "standee_3_v1_avg_overlap": standee_3_v1_ov_b,
-                "standee_3_v1_status": results_dict_b["video_test"]["tracks"][3]["final_status"] if ("video_test" in results_dict_b and 3 in results_dict_b["video_test"].get("tracks", {})) else "CONFIRMED",
+                "standee_3_v1_status": standee_3_v1_status_b,
                 "pipeline_throughput_fps_min": round(min(all_fps), 1),
                 "pipeline_throughput_fps_max": round(max(all_fps), 1),
                 "pipeline_steady_state_fps_min": round(min(all_steady_fps), 1),
@@ -854,7 +900,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
                 "recall_wilson_95_ci": [round(metrics_a["recall_wilson_95_ci"][0], 4), round(metrics_a["recall_wilson_95_ci"][1], 4)],
                 "f1_score": round(metrics_a["f1_score"], 4),
                 "standee_3_v1_avg_overlap": standee_3_v1_ov_a,
-                "standee_3_v1_status": res_v1_a["tracks"][3]["final_status"] if (res_v1_a and 3 in res_v1_a.get("tracks", {})) else "NORMAL"
+                "standee_3_v1_status": standee_3_v1_status_a
             },
             "stability_analysis": {
                 "num_trials": 3,
@@ -928,7 +974,12 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write(f"| Thông số | Giá trị thực nghiệm | Ghi chú kỹ thuật |\n")
             mf.write(f"| :--- | :--- | :--- |\n")
             mf.write(f"| **Hệ thống thử nghiệm** | CPU {platform.processor()} ({platform.platform()}) | Tối ưu hóa suy luận trên CPU phổ thông |\n")
-            mf.write(f"| **Engine suy luận AI** | ONNX Runtime 1.30 (CPU AVX2 ExecutionProvider) | `models/best.onnx` (FP32, Imgsz: 640x640) |\n")
+            try:
+                import onnxruntime as _ort
+                _ort_v = _ort.__version__
+            except Exception:
+                _ort_v = '1.30'
+            mf.write(f"| **Engine suy luận AI** | ONNX Runtime {_ort_v} (CPU AVX2 ExecutionProvider) | `models/best.onnx` (FP32, Imgsz: 640x640) |\n")
             mf.write(f"| **Thuật toán bám vết** | ByteTrack (`bytetrack.yaml`) | Gán mã định danh ổn định theo thời gian |\n")
             mf.write(f"| **Quy tắc hình học không gian** | Overlap $\\ge 30\\%$ + Tiếp đất chân đế 3 điểm | Loại trừ biển treo trên cao |\n")
             mf.write(f"| **Bộ lọc chuỗi thời gian** | `confirm_seconds = 3.0s` (cửa sổ trượt 1.0s $\\le 50\\text{{px}}$) | Loại trừ người bê biển đi ngang & rung lắc |\n")
@@ -1057,7 +1108,8 @@ def run_single_video_eval_named(video_filename: str, progress_callback=None, cus
     """Đánh giá 1 video cụ thể theo tên file và trả về kết quả chi tiết kèm đối chiếu Ground Truth."""
     video_dir = "data/videos"
     config_dir = "configs"
-    video_path = os.path.join(video_dir, video_filename) if not os.path.isabs(video_filename) else video_filename
+    video_filename = os.path.basename(video_filename)
+    video_path = os.path.join(video_dir, video_filename)
     if not os.path.exists(video_path):
         return {"error": f"Không tìm thấy video: {video_filename}"}
 

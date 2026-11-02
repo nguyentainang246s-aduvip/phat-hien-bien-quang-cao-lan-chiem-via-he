@@ -32,16 +32,18 @@ data/surveillance.db
 evidence/records/
 evidence/crops/
 
-# Model trùng lặp (chỉ giữ best.pt)
-models/best (3).pt
-models/best (2).pt
+# Model trùng lặp (chỉ giữ models/best.pt & models/best.onnx)
+models/best (*).pt
+models/best_*.pt
+models/best_*.onnx
 
 # Dataset Roboflow (tải lại bằng script datasets/download_dataset.py)
 sidewalk-signboard-detection*/
 datasets/raw_images/
-datasets/v8/train/
-datasets/v8/valid/
-datasets/v8/test/
+datasets/*/train/
+datasets/*/valid/
+datasets/*/test/
+runs/
 
 # Log & Temp
 *.log

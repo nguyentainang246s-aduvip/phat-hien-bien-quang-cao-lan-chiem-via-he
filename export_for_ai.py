@@ -38,6 +38,17 @@ EXCLUDE_DIRS = {
 
 OUTPUT_FILE = "FULL_PROJECT_REVIEW.txt"
 
+# Các tệp văn bản gộp review không đưa vào để tránh đệ quy lặp lại mã nguồn nhiều lần
+EXCLUDE_FILES = {
+    OUTPUT_FILE,
+    "FULL_PROJECT_REVIEW.txt",
+    "MA_NGUON_TONG_HOP_GUI_REVIEW.txt",
+    "MA_NGUON_NHOM_1_BAT_BUOC.txt",
+    "MA_NGUON_NHOM_2_QUAN_TRONG.txt",
+    "MA_NGUON_NHOM_3_BO_SUNG.txt",
+    "PROJECT_ESSENTIALS_FOR_AI.txt",
+}
+
 
 def export_project():
     root_dir = Path(".")
@@ -59,7 +70,7 @@ def export_project():
                 continue
 
             if file_path.is_file() and file_path.suffix.lower() in TEXT_EXTENSIONS:
-                if file_path.name in {OUTPUT_FILE, "FULL_PROJECT_REVIEW.txt"}:
+                if file_path.name in EXCLUDE_FILES:
                     continue
 
                 rel_path = file_path.relative_to(root_dir)

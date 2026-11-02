@@ -23,7 +23,7 @@ class ViolationDatabase:
 
     def get_connection(self):
         """Tạo kết nối SQLite với Row Factory để truy vấn dạng dict và kích hoạt WAL Mode."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
@@ -57,7 +57,7 @@ class ViolationDatabase:
                     reviewed_at DATETIME DEFAULT NULL,
                     full_image_path TEXT,
                     crop_image_path TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
                 )
             """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_camera ON violations(camera_id)")

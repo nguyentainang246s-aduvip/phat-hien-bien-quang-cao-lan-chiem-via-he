@@ -263,20 +263,24 @@ class TemporalVerifier:
 
                 # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
                 if self._confirm_threshold_reached(record, current_timestamp):
-                    # Stationary check (sliding window)
-                    is_stationary = self._is_stationary(record, current_timestamp)
-
-                    if not is_stationary:
-                        # Đang di chuyển -> người bê biển đi ngang, giữ SUSPECTED
-                        record["status"] = TrackState.SUSPECTED
-                        suspect_reason = "DI CHUYEN"
-                    elif avg_conf < self.min_avg_confidence:
-                        # Confidence TB quá thấp -> giữ SUSPECTED
-                        record["status"] = TrackState.SUSPECTED
-                        suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
-                    else:
-                        record["status"] = TrackState.CONFIRMED
+                    if record["status"] == TrackState.CONFIRMED:
+                        # Đã xác nhận vi phạm trước đó và hiện vẫn đang lấn chiếm không gian -> giữ nguyên CONFIRMED
                         suspect_reason = ""
+                    else:
+                        # Stationary check (sliding window)
+                        is_stationary = self._is_stationary(record, current_timestamp)
+
+                        if not is_stationary:
+                            # Đang di chuyển -> người bê biển đi ngang, giữ SUSPECTED
+                            record["status"] = TrackState.SUSPECTED
+                            suspect_reason = "DI CHUYEN"
+                        elif avg_conf < self.min_avg_confidence:
+                            # Confidence TB quá thấp -> giữ SUSPECTED
+                            record["status"] = TrackState.SUSPECTED
+                            suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
+                        else:
+                            record["status"] = TrackState.CONFIRMED
+                            suspect_reason = ""
 
                     # Spatial & temporal deduplication
                     if record["status"] == TrackState.CONFIRMED:
@@ -327,6 +331,8 @@ class TemporalVerifier:
                         record["viol_start_time"] = None
                         record["last_viol_timestamp"] = None
                         record["status"] = TrackState.NORMAL
+                    else:
+                        record["viol_start_time"] = record["viol_confs"][0][0]
 
             enriched_results.append({
                 "track_id": track_id,
@@ -352,6 +358,8 @@ class TemporalVerifier:
                         r["viol_start_time"] = None
                         r["last_viol_timestamp"] = None
                         r["status"] = TrackState.NORMAL
+                    else:
+                        r["viol_start_time"] = r["viol_confs"][0][0]
 
         # 5. Garbage Collection – xóa track cũ khỏi RAM
         stale_ids = [

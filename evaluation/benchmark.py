@@ -43,7 +43,7 @@ class SystemBenchmark:
         source: str = None,
         config_path: str = None,
         model_path: str = "models/best.pt",
-        num_frames: int = 60
+        num_frames: int = 100
     ):
         # 1. Xác định nguồn video
         if source is None:
@@ -159,7 +159,7 @@ class SystemBenchmark:
         reader = StreamReader(self.source)
         roi_mgr = ROIManager(self.config_path)
         tracker = ObjectTracker(model_path=self.model_path, conf_threshold=0.25, imgsz=640)
-        checker = ViolationChecker(threshold=0.30)
+        checker = ViolationChecker(threshold=0.30, ground_contact_rule=True)
         verifier = TemporalVerifier(
             confirm_frames=20,
             confirm_seconds=3.0,
@@ -213,8 +213,9 @@ class SystemBenchmark:
             t3 = time.perf_counter()
 
             # 4. Bộ lọc xác minh thời gian (Temporal Verifier)
+            simulated_ts = (processed_frames + 1) / (reader.fps if getattr(reader, 'fps', 0) > 0 else 24.0)
             verified_objs = verifier.process_frame(
-                tracked_objs, checker, roi_mgr.polygons, precomputed_spatial=spatial_results
+                tracked_objs, checker, roi_mgr.polygons, current_timestamp=simulated_ts, precomputed_spatial=spatial_results
             )
             for item in verified_objs:
                 if item.get("is_new_alert"):
@@ -409,7 +410,7 @@ def main():
     parser.add_argument("--source", type=str, default=None, help="Nguồn video để benchmark")
     parser.add_argument("--config", type=str, default=None, help="File cấu hình ROI")
     parser.add_argument("--model", type=str, default="models/best.pt", help="Trọng số model")
-    parser.add_argument("--frames", type=int, default=50, help="Số khung hình đo đạc (mặc định: 50)")
+    parser.add_argument("--frames", type=int, default=100, help="Số khung hình đo đạc (mặc định: 100)")
     parser.add_argument("--report", type=str, default="reports/benchmark_report.md", help="File xuất báo cáo Markdown")
     args = parser.parse_args()
 

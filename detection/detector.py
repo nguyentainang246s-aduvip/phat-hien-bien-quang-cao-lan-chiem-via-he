@@ -77,7 +77,7 @@ class YOLODetector:
             
             detections.append({
                 "box": (int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])),
-                "conf": round(conf, 2),
+                "conf": round(conf, 4),
                 "class_id": cls_id,
                 "class_name": cls_name
             })
