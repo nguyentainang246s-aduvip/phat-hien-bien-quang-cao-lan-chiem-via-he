@@ -48,5 +48,6 @@ runs/
 # Log & Temp
 *.log
 *.tmp
+~$*
 *.zip
 scratch/
