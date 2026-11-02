@@ -89,7 +89,7 @@ class SystemBenchmark:
         # ISSUE 22 FIX: Bổ sung thông số CPU/RAM cụ thể
         cpu_name = platform.processor() or "Unknown"
         
-        # Thử lấy tên CPU chi tiết hơn trên Windows
+        # Thử lấy tên CPU chi tiết hơn trên Windows (hỗ trợ wmic và PowerShell Get-CimInstance)
         try:
             import subprocess
             result = subprocess.run(
@@ -99,8 +99,18 @@ class SystemBenchmark:
             lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip() and l.strip() != 'Name']
             if lines:
                 cpu_name = lines[0]
+            else:
+                raise Exception("Empty wmic output")
         except Exception:
-            pass
+            try:
+                import subprocess
+                ps_cmd = 'powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name"'
+                res = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=5)
+                out = res.stdout.strip()
+                if out:
+                    cpu_name = out
+            except Exception:
+                pass
         
         # Thử lấy RAM
         ram_gb = "Unknown"
@@ -117,8 +127,18 @@ class SystemBenchmark:
                 caps = [int(l.strip()) for l in result.stdout.strip().split('\n') if l.strip().isdigit()]
                 if caps:
                     ram_gb = f"{sum(caps) / (1024**3):.1f} GB"
+                else:
+                    raise Exception("Empty wmic capacity")
             except Exception:
-                pass
+                try:
+                    import subprocess
+                    ps_cmd = 'powershell -NoProfile -Command "(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1GB"'
+                    res = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=5)
+                    out = res.stdout.strip().replace(',', '.')
+                    if out:
+                        ram_gb = f"{float(out):.1f} GB"
+                except Exception:
+                    pass
 
         info = {
             "os": f"{platform.system()} {platform.release()} ({platform.machine()})",
@@ -187,6 +207,12 @@ class SystemBenchmark:
             ret, frame = reader.read()
             if ret and frame is not None:
                 _ = tracker.track(frame)
+
+        # Rewind video offline và làm sạch trạng thái tracker/verifier sau warmup
+        if hasattr(reader, "cap") and reader.cap is not None and not getattr(reader, "is_live_stream", False):
+            reader.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        tracker.reset()
+        verifier.reset()
 
         processed_frames = 0
 
@@ -276,6 +302,11 @@ class SystemBenchmark:
                     ((raw_violation_alerts_count - temporal_confirmed_alerts_count) / raw_violation_alerts_count * 100)
                     if raw_violation_alerts_count > 0 else 0.0, 1
                 )
+            },
+            "verifier_config": {
+                "confirm_frames": verifier.confirm_frames,
+                "confirm_seconds": verifier.confirm_seconds,
+                "cooldown_seconds": verifier.cooldown_seconds,
             }
         }
 
@@ -288,6 +319,9 @@ class SystemBenchmark:
         lat = res["latency_breakdown_ms"]
         fps = res["throughput_fps"]
         abl = res["ablation_study"]
+        v_cfg = res.get("verifier_config", {})
+        c_frames = v_cfg.get("confirm_frames", 20)
+        c_secs = v_cfg.get("confirm_seconds", 3.0)
 
         print("\n" + "=" * 78)
         print(" BẢNG TỔNG HỢP HIỆU NĂNG THỰC NGHIỆM (BENCHMARK SUMMARY)")
@@ -307,7 +341,7 @@ class SystemBenchmark:
         print("-" * 78)
         print("5. Nghiên cứu bóc tách thành phần (Ablation Study - Temporal Verification):")
         print(f"   • Cảnh báo thô từng frame (No Temporal) : {abl['raw_single_frame_alerts']} lần (dễ bị spam/báo giả)")
-        print(f"   • Cảnh báo chốt sau 15 frames (Proposed): {abl['temporal_verified_alerts']} sự kiện xác thực")
+        print(f"   • Cảnh báo chốt sau {c_frames} frames ({c_secs}s) (Proposed): {abl['temporal_verified_alerts']} sự kiện xác thực")
         print(f"   => Tỷ lệ giảm thiểu và loại trừ báo động giả/spam   : {abl['false_alarm_reduction_pct']}%")
         print("=" * 78)
 
@@ -323,6 +357,10 @@ class SystemBenchmark:
         lat = results["latency_breakdown_ms"]
         fps = results["throughput_fps"]
         abl = results["ablation_study"]
+        v_cfg = results.get("verifier_config", {})
+        c_frames = v_cfg.get("confirm_frames", 20)
+        c_secs = v_cfg.get("confirm_seconds", 3.0)
+        cool_secs = v_cfg.get("cooldown_seconds", 60.0)
 
         md_content = f"""# CHƯƠNG 7: THỰC NGHIỆM VÀ ĐÁNH GIÁ KẾT QUẢ HỆ THỐNG
 
@@ -353,7 +391,7 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 | 1 | **Đọc khung hình (Camera Ingestion)** | {lat['camera_read_avg']} ms | {round(lat['camera_read_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | StreamReader xử lý buffer flush |
 | 2 | **AI Object Detection + ByteTrack** | **{lat['yolo_track_avg']} ms** | **{round(lat['yolo_track_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}%** | **YOLOv8n + gán định danh track_id** |
 | 3 | **Phán quyết hình học (Spatial Check)** | {lat['spatial_check_avg']} ms | {round(lat['spatial_check_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | Tọa độ chân $P_{{base}} \\in ROI$ & Overlap |
-| 4 | **Bộ lọc thời gian (Temporal Verifier)** | {lat['temporal_verifier_avg']} ms | {round(lat['temporal_verifier_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | Máy trạng thái 3 cấp độ (15 frames) |
+| 4 | **Bộ lọc thời gian (Temporal Verifier)** | {lat['temporal_verifier_avg']} ms | {round(lat['temporal_verifier_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | Máy trạng thái 3 cấp độ ({c_frames} frames / {c_secs}s) |
 | 5 | **Vẽ & Trực quan hóa (Rendering)** | {lat['render_overlay_avg']} ms | {round(lat['render_overlay_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | Lớp phủ đa giác bán trong suốt + HUD |
 | **—** | **TỔNG THỜI GIAN ĐẦU-CUỐI (E2E Latency)** | **{lat['total_end_to_end_avg']} ms** | **100%** | **Độ lệch chuẩn: ±{lat['total_std_dev']} ms** |
 
@@ -376,14 +414,14 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 
 Để làm rõ đóng góp khoa học của giải pháp kiểm định thời gian nhiều khung hình, thực nghiệm so sánh hai kịch bản đã được thực hiện:
 1. **Kịch bản cơ sở (Baseline - Không có Temporal Verifier):** Phán quyết vi phạm tức thời theo từng khung hình độc lập (Single-frame).
-2. **Kịch bản đề xuất (Proposed System):** Tích hợp máy trạng thái xác thực 15 khung hình liên tiếp và cơ chế làm nguội (Cooldown 60s).
+2. **Kịch bản đề xuất (Proposed System):** Tích hợp máy trạng thái xác thực {c_frames} khung hình ({c_secs}s) và cơ chế làm nguội (Cooldown {cool_secs}s).
 
 ### Bảng 7.3. Kết quả so sánh khả năng giảm thiểu và loại trừ báo động giả
 
 | Kịch bản đánh giá | Tổng số cảnh báo sinh ra | Số vụ vi phạm chốt lưu DB | Tỷ lệ giảm báo giả/spam |
 | :--- | :---: | :---: | :---: |
 | **Baseline (Từng frame đơn lẻ)** | {abl['raw_single_frame_alerts']} cảnh báo | {abl['raw_single_frame_alerts']} (bị spam liên tục mỗi frame) | 0% |
-| **Proposed (Bộ lọc 15 frames + Cooldown)** | {abl['temporal_verified_alerts']} sự kiện | {abl['temporal_verified_alerts']} sự kiện | **{abl['false_alarm_reduction_pct']}%** |
+| **Proposed (Bộ lọc {c_frames} frames + Cooldown)** | {abl['temporal_verified_alerts']} sự kiện | {abl['temporal_verified_alerts']} sự kiện | **{abl['false_alarm_reduction_pct']}%** |
 
 > **Kết luận:**
 """

@@ -54,6 +54,11 @@ class StreamReader:
         self.fps = 30.0
         self.is_running = False
         self.looped = False
+        self._frame_seq = 0
+        self._last_consumed_seq = -1
+        
+        # Thiết lập timeout TCP cho FFmpeg để chống treo luồng C++ khi mất mạng
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;3000000"
         
         # Luồng nền cho RTSP/Live Stream chống trễ hình (Zero Latency Buffer Flush)
         self._lock = threading.Lock()
@@ -122,6 +127,14 @@ class StreamReader:
             with self._lock:
                 if self._latest_frame is None:
                     print("[CẢNH BÁO] Đã mở kết nối nhưng chưa nhận được frame đầu tiên sau 3.0s.")
+                    self._stop_worker_thread()
+                    with self._cap_lock:
+                        if self.cap is not None:
+                            try:
+                                self.cap.release()
+                            except Exception:
+                                pass
+                            self.cap = None
                     return False
                 
         return True
@@ -145,6 +158,7 @@ class StreamReader:
                 if ret and frame is not None:
                     self._latest_frame = frame
                     self._latest_ts = time.monotonic()
+                    self._frame_seq += 1
             if not ret:
                 time.sleep(0.05)
 
@@ -152,8 +166,8 @@ class StreamReader:
         """
         Đọc 1 frame tiếp theo.
         Tự động xử lý:
-          - Video file: Tự động tua lại đầu video để chạy liên tục như camera thật.
-          - RTSP/Live stream: Đọc từ background thread bộ nhớ đệm sạch, tự động reconnect nếu mất luồng.
+          - Video file: Tự động tua lại đầu video nếu bật loop, hoặc dừng an toàn.
+          - RTSP/Live stream: Chờ frame mới (Zero Latency Buffer Flush & Duplicate Prevention).
           
         Returns:
             (ret: bool, frame: np.ndarray)
@@ -164,6 +178,19 @@ class StreamReader:
         
         # 1. Đối với Live Stream / RTSP: Lấy frame mới nhất từ background thread
         if self.is_live_stream:
+            start_wait = time.monotonic()
+            while not self._stop_event.is_set():
+                with self._lock:
+                    is_new = (self._frame_seq != self._last_consumed_seq)
+                    has_frame = self._latest_frame is not None and self._latest_ret
+                    ts_fresh = (time.monotonic() - self._latest_ts) < 5.0
+                    if has_frame and ts_fresh and (is_new or (time.monotonic() - start_wait) > 0.05):
+                        self._last_consumed_seq = self._frame_seq
+                        return True, self._latest_frame.copy()
+                if (time.monotonic() - start_wait) > 0.5:
+                    break
+                time.sleep(0.005)
+            
             with self._lock:
                 ret = self._latest_ret and (time.monotonic() - self._latest_ts) < 5.0
                 frame = self._latest_frame.copy() if (ret and self._latest_frame is not None) else None

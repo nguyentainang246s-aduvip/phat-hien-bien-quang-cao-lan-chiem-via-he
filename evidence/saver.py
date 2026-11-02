@@ -84,8 +84,9 @@ class EvidenceSaver:
         time_str = now.strftime("%H-%M-%S-%f")  # Bao gồm microsecond để tránh trùng file
         iso_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
 
-        # 1. Tạo cấu trúc thư mục lưu trữ theo ngày và camera
-        camera_clean_id = camera_id.replace(" ", "_").replace("(", "").replace(")", "")
+        # 1. Tạo cấu trúc thư mục lưu trữ theo ngày và camera (làm sạch tên camera chống Path Traversal)
+        import re
+        camera_clean_id = re.sub(r'[^a-zA-Z0-9_-]', '_', str(camera_id))
         full_dir = os.path.join(self.base_dir, "records", camera_clean_id, date_str)
         crop_dir = os.path.join(self.base_dir, "crops", camera_clean_id, date_str)
         os.makedirs(full_dir, exist_ok=True)
@@ -96,24 +97,14 @@ class EvidenceSaver:
         x1_clamped, y1_clamped = max(0, x1), max(0, y1)
         x2_clamped, y2_clamped = min(w, x2), min(h, y2)
 
-        # 1. Cắt ảnh cận cảnh (Cropped Target Sign) từ frame sạch trước khi vẽ đè
-        cropped_img = frame[y1_clamped:y2_clamped, x1_clamped:x2_clamped].copy()
-        crop_filename = f"crop_id{track_id}_{time_str}.jpg"
-        crop_path = os.path.join(crop_dir, crop_filename)
-        if cropped_img.size > 0:
-            if not _safe_imwrite(crop_path, cropped_img):
-                crop_path = ""
-        else:
-            crop_path = ""
-
-        # 2. Xử lý ảnh toàn cảnh (Full Frame with Target Highlight & Watermark Stamp)
+        # 2. Xử lý làm mờ khuôn mặt (Face Blurring) trên ảnh gốc sạch trước khi cắt ảnh crop
         stamped_frame = roi_frame.copy() if roi_frame is not None else frame.copy()
+        clean_blurred_frame = frame.copy()
         privacy_blurred = False
 
-        # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
         if self._face_cascade is not None:
             try:
-                gray = cv2.cvtColor(stamped_frame, cv2.COLOR_BGR2GRAY)
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 faces = self._face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=4, minSize=(30, 30))
                 for (fx, fy, fw_box, fh_box) in faces:
                     is_inside_sign = (fx >= x1_clamped and fx + fw_box <= x2_clamped and fy >= y1_clamped and fy + fh_box <= y2_clamped)
@@ -123,9 +114,22 @@ class EvidenceSaver:
                             k_w = max(15, (fw_box // 2) * 2 + 1)
                             k_h = max(15, (fh_box // 2) * 2 + 1)
                             stamped_frame[fy:fy+fh_box, fx:fx+fw_box] = cv2.GaussianBlur(f_roi, (k_w, k_h), 20)
+                            c_roi = clean_blurred_frame[fy:fy+fh_box, fx:fx+fw_box]
+                            if c_roi.size > 0:
+                                clean_blurred_frame[fy:fy+fh_box, fx:fx+fw_box] = cv2.GaussianBlur(c_roi, (k_w, k_h), 20)
                             privacy_blurred = True
             except Exception as e:
                 logger.warning("[EVIDENCE] Lỗi khi làm mờ khuôn mặt: %s", e)
+
+        # 1. Cắt ảnh cận cảnh (Cropped Target Sign) từ frame đã bảo vệ riêng tư
+        cropped_img = clean_blurred_frame[y1_clamped:y2_clamped, x1_clamped:x2_clamped].copy()
+        crop_filename = f"crop_id{track_id}_{time_str}.jpg"
+        crop_path = os.path.join(crop_dir, crop_filename)
+        if cropped_img.size > 0:
+            if not _safe_imwrite(crop_path, cropped_img):
+                crop_path = ""
+        else:
+            crop_path = ""
 
         # Vẽ khung đỏ đánh dấu đối tượng vi phạm trên ảnh bằng chứng toàn cảnh
         font = cv2.FONT_HERSHEY_SIMPLEX

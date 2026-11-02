@@ -95,13 +95,15 @@ class TemporalVerifier:
     # ------------------------------------------------------------------
 
     def _elapsed_viol_seconds(self, record: dict, now: float) -> float:
-        """Trả về số giây vi phạm liên tiếp kể từ lần đầu bắt đầu của chuỗi quan sát hiện tại."""
+        """Trả về số giây vi phạm liên tiếp thực tế dựa trên các quan sát hợp lệ."""
         if not record.get("viol_confs"):
             return 0.0
-        start = record.get("viol_start_time")
-        if start is None:
-            return 0.0
-        return max(0.0, now - start)
+        span = max(0.0, record["viol_confs"][-1][0] - record["viol_confs"][0][0])
+        if self.source_fps and self.source_fps > 0:
+            frame_dt = 1.0 / self.source_fps
+            max_valid_span = (len(record["viol_confs"]) + self.tolerance_frames) * frame_dt
+            return min(span, max_valid_span)
+        return span
 
     def _is_stationary(self, record: dict, now: float) -> bool:
         """
@@ -240,7 +242,7 @@ class TemporalVerifier:
             if is_spatial_viol:
                 # Kiểm tra gián đoạn chuỗi vi phạm (gap lớn hơn dung sai liên tục)
                 frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
-                max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval * 3)
+                max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval)
                 if record["last_viol_timestamp"] is not None:
                     gap = current_timestamp - record["last_viol_timestamp"]
                     if gap > max_allowed_gap:
@@ -263,24 +265,20 @@ class TemporalVerifier:
 
                 # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
                 if self._confirm_threshold_reached(record, current_timestamp):
-                    if record["status"] == TrackState.CONFIRMED:
-                        # Đã xác nhận vi phạm trước đó và hiện vẫn đang lấn chiếm không gian -> giữ nguyên CONFIRMED
-                        suspect_reason = ""
-                    else:
-                        # Stationary check (sliding window)
-                        is_stationary = self._is_stationary(record, current_timestamp)
+                    # Kiểm tra đứng yên (sliding window) - áp dụng cho cả track mới và track đã CONFIRMED
+                    is_stationary = self._is_stationary(record, current_timestamp)
 
-                        if not is_stationary:
-                            # Đang di chuyển -> người bê biển đi ngang, giữ SUSPECTED
-                            record["status"] = TrackState.SUSPECTED
-                            suspect_reason = "DI CHUYEN"
-                        elif avg_conf < self.min_avg_confidence:
-                            # Confidence TB quá thấp -> giữ SUSPECTED
-                            record["status"] = TrackState.SUSPECTED
-                            suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
-                        else:
-                            record["status"] = TrackState.CONFIRMED
-                            suspect_reason = ""
+                    if not is_stationary:
+                        # Đang di chuyển -> người bê biển đi ngang hoặc di dời biển, chuyển về SUSPECTED
+                        record["status"] = TrackState.SUSPECTED
+                        suspect_reason = "DI CHUYEN"
+                    elif avg_conf < self.min_avg_confidence:
+                        # Confidence TB quá thấp -> giữ SUSPECTED
+                        record["status"] = TrackState.SUSPECTED
+                        suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
+                    else:
+                        record["status"] = TrackState.CONFIRMED
+                        suspect_reason = ""
 
                     # Spatial & temporal deduplication
                     if record["status"] == TrackState.CONFIRMED:
@@ -363,15 +361,22 @@ class TemporalVerifier:
                     missing_exceeded = missing_streak > self.tolerance_frames
 
                 if missing_exceeded:
-                    if r["viol_confs"]:
-                        r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
-                    r["count"] = len(r["viol_confs"])
-                    if r["count"] == 0:
+                    if missing_streak > (self.max_missing_frames // 2):
+                        r["status"] = TrackState.NORMAL
+                        r["viol_confs"].clear()
+                        r["count"] = 0
                         r["viol_start_time"] = None
                         r["last_viol_timestamp"] = None
-                        r["status"] = TrackState.NORMAL
                     else:
-                        r["viol_start_time"] = r["viol_confs"][0][0]
+                        if r["viol_confs"]:
+                            r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
+                        r["count"] = len(r["viol_confs"])
+                        if r["count"] == 0:
+                            r["viol_start_time"] = None
+                            r["last_viol_timestamp"] = None
+                            r["status"] = TrackState.NORMAL
+                        else:
+                            r["viol_start_time"] = r["viol_confs"][0][0]
 
         # 5. Garbage Collection – xóa track cũ khỏi RAM
         stale_ids = [

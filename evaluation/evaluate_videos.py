@@ -136,7 +136,7 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
             s_iou, dist_px, inside = _compute_best_spatial_iou(gbox, t_info)
             t_iou = compute_temporal_iou(gt_time, t_time)
 
-            if (s_iou > 0.05 or inside or dist_px <= 850.0) and t_iou >= 0.1:
+            if (s_iou >= 0.10 or (inside and dist_px <= 150.0)) and t_iou >= 0.1:
                 matches[oid] = {
                     "matched_track_id": exp_tid,
                     "expected_track_id": exp_tid,
@@ -201,7 +201,7 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
 
         for r_idx, c_idx in selected_pairs:
             cand = meta_matrix[(r_idx, c_idx)]
-            if cand["affinity"] >= 0.05:
+            if cand["affinity"] >= 0.25 and (cand["spatial_iou"] >= 0.05 or cand["is_center_inside"]):
                 oid = cand["object_id"]
                 matches[oid] = {
                     "matched_track_id": cand["matched_track_id"],
@@ -442,7 +442,7 @@ def evaluate_single_video(
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
-    verifier.source_fps = fps
+    verifier.source_fps = fps / (frame_skip + 1) if frame_skip > 0 else fps
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
@@ -587,9 +587,9 @@ def evaluate_single_video(
     warm_track = track_latencies[1:] if len(track_latencies) > 1 else track_latencies
     warm_infer = infer_frame_latencies[1:] if len(infer_frame_latencies) > 1 else infer_frame_latencies
 
-    warmup_sec = float(track_latencies[0]) / 1000.0 if track_latencies else 0.0
+    warmup_sec = float(infer_frame_latencies[0]) / 1000.0 if infer_frame_latencies else 0.0
     steady_time = max(0.001, total_time - warmup_sec)
-    steady_fps = (frame_idx - 1) / steady_time if steady_time > 0 else avg_fps
+    steady_fps = (frame_idx - 1) / steady_time if (frame_idx > 1 and steady_time > 0) else avg_fps
 
     latency_stats = {
         "warmup_frame_ms": round(float(track_latencies[0]), 2) if track_latencies else 0.0,
@@ -1060,7 +1060,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write(f"| **System Precision** | $\\frac{{TP}}{{TP + FP}}$ | {metrics_a['precision']*100:.2f}% | **{metrics_b['precision']*100:.2f}%** | **{metrics_b['precision_wilson_95_ci'][0]*100:.1f}% – {metrics_b['precision_wilson_95_ci'][1]*100:.1f}%** (Wilson 95% CI) |\n")
             mf.write(f"| **System Recall** | $\\frac{{TP}}{{TP + FN}}$ | {metrics_a['recall']*100:.2f}% ({metrics_a['true_positives']}/{metrics_a['true_positives']+metrics_a['false_negatives']}) | **{metrics_b['recall']*100:.2f}%** ({metrics_b['true_positives']}/{metrics_b['true_positives']+metrics_b['false_negatives']}) | **{metrics_b['recall_wilson_95_ci'][0]*100:.1f}% – {metrics_b['recall_wilson_95_ci'][1]*100:.1f}%** (Wilson 95% CI) |\n")
             mf.write(f"| **System F1-Score** | $2 \\cdot \\frac{{P \\cdot R}}{{P + R}}$ | {metrics_a['f1_score']*100:.2f}% | **{metrics_b['f1_score']*100:.2f}%** | Cân bằng điều hòa tối ưu |\n")
-            mf.write(f"| **Cảnh báo sai trong mẫu** | FP / 30s | 0 cảnh báo sai | **0 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |\n")
+            mf.write(f"| **Cảnh báo sai trong mẫu** | FP / 30s | {metrics_a['false_positives']} cảnh báo sai | **{metrics_b['false_positives']} cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |\n")
             mf.write(f"| **Thông lượng Pipeline** | Throughput | {min(all_fps):.1f} – {max(all_fps):.1f} FPS | **{min(all_fps):.1f} – {max(all_fps):.1f} FPS** | Ổn định: {min(all_steady_fps):.1f} – {max(all_steady_fps):.1f} FPS |\n")
             mf.write(f"| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~{min(all_fps)/3:.1f} – {max(all_fps)/3:.1f} Hz | **~{min(all_fps)/3:.1f} – {max(all_fps)/3:.1f} Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |\n")
             mf.write(f"| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | {float(np.median(all_tracker_lat)):.1f} ms | **{float(np.median(all_tracker_lat)):.1f} ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: {float(np.mean(all_tracker_lat)):.1f} ms; loại trừ frame khởi động) |\n\n")
@@ -1084,7 +1084,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
                 mf.write(f"| **{v_short}** | GT #{stab['expected_track_id']}: {stab['description']} | `{stab['gt_label']}` | {t1_str} | {t2_str} | {t3_str} | {st_icon} |\n")
             mf.write("\n")
             mf.write(f"* **Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency):** **{classification_consistency_pct:.1f}% ({total_stable_status}/{total_objects} đối tượng)**\n")
-            mf.write(f"* **Tính ổn định của chỉ số đánh giá (System Metrics Consistency):** Cả 3 lần chạy đều đạt đồng nhất **11 TP, 0 FP, 3 FN, 2 TN** (Recall: 78.57%, Precision: 100.00%).\n")
+            mf.write(f"* **Tính ổn định của chỉ số đánh giá (System Metrics Consistency):** Cả 3 lần chạy đều đạt đồng nhất **{metrics_b['true_positives']} TP, {metrics_b['false_positives']} FP, {metrics_b['false_negatives']} FN, {metrics_b['true_negatives']} TN** (Recall: {metrics_b['recall']*100:.2f}%, Precision: {metrics_b['precision']*100:.2f}%).\n")
             mf.write(f"* **Độ ổn định thông lượng xử lý:** " + ", ".join([f"Trial {tt['trial']}: {tt['fps_min']}–{tt['fps_max']} FPS (Ổn định {tt['steady_fps_min']}–{tt['steady_fps_max']} FPS)" for tt in throughput_trials]) + ".\n\n")
             mf.write("---\n\n")
 

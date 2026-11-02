@@ -23,7 +23,7 @@ from evaluation.eval_system import SystemEvaluator
 
 def run_threshold_sweep(
     gt_path: str = "evaluation/ground_truth.json",
-    model_path: str = "models/best.pt",
+    model_path: str = "models/best.onnx" if os.path.exists("models/best.onnx") else "models/best.pt",
     thresholds: list = None,
     output_report: str = "reports/threshold_sweep_report.md"
 ):
@@ -38,8 +38,8 @@ def run_threshold_sweep(
     with open(gt_path, "r", encoding="utf-8") as f:
         gt_data = json.load(f)
 
-    # 2. Detect tất cả vật thể một lần (reuse cho mọi threshold)
-    detector = YOLODetector(model_path=model_path, conf_threshold=0.20)
+    # 2. Detect tất cả vật thể một lần đồng bộ cấu hình chuẩn settings.yaml (conf 0.25, imgsz 640)
+    detector = YOLODetector(model_path=model_path, conf_threshold=0.25, imgsz=640)
     evaluator = SystemEvaluator(iou_threshold=0.5)
 
     all_detections = []  # [(frame_dets, roi_polygons, gt_annotations)]
@@ -80,36 +80,41 @@ def run_threshold_sweep(
         checker = ViolationChecker(threshold=th)
         total_boxes = 0
         total_violations = 0
-        all_gt = []
-        all_pred = []
+        tp = fp = fn = 0
         avg_overlap = []
 
         for dets, polys, annotations in all_detections:
+            img_pred = []
+            img_gt = []
             for d in dets:
                 total_boxes += 1
                 sp = checker.check_multi(d["box"], polys)
                 avg_overlap.append(sp["overlap_pct"])
                 if sp["is_violation"]:
                     total_violations += 1
-                all_pred.append({
+                img_pred.append({
                     "box": list(d["box"]),
                     "is_violation": sp["is_violation"]
                 })
 
             for ann in annotations:
-                all_gt.append({
+                img_gt.append({
                     "box": ann["box"],
                     "is_violation": ann["is_violation"]
                 })
 
-        # Tính System Metrics
-        if all_gt:
-            metrics = evaluator.evaluate(all_gt, all_pred)
-            precision = metrics["system_precision"]
-            recall = metrics["system_recall"]
-            f1 = metrics["system_f1"]
-        else:
-            precision = recall = f1 = 0.0
+            # Đánh giá ghép cặp IoU cục bộ cho từng ảnh (chống ghép cặp sai xuyên ảnh)
+            if img_gt or img_pred:
+                m = evaluator.evaluate(img_gt, img_pred)
+                tp += m["TP"]
+                fp += m["FP"]
+                fn += m["FN"]
+
+        # Tính System Metrics tổng hợp từ các ảnh
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        metrics = {"TP": tp, "FP": fp, "FN": fn}
 
         mean_ov = sum(avg_overlap) / len(avg_overlap) if avg_overlap else 0.0
 

@@ -209,6 +209,7 @@ def run_monitor_mode(args):
         tracked_objs = tracker.track(frame)
         clean_frame = frame.copy()
         roi_manager.draw_overlay(frame, alpha=0.25)
+        base_roi_frame = frame.copy()
 
         confirmed_count = 0
         for obj in tracked_objs:
@@ -230,7 +231,7 @@ def run_monitor_mode(args):
                 else:
                     ev_res = evidence_saver.save_evidence(
                         clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
-                        roi_frame=frame
+                        roi_frame=base_roi_frame
                     )
                     if ev_res:
                         rec_id = db.insert_violation(
@@ -335,6 +336,7 @@ def run_monitor_mode(args):
                 tracked_objects = tracker.track(frame)
                 clean_frame = frame.copy()
                 roi_manager.draw_overlay(frame, alpha=0.25)
+                base_roi_frame = frame.copy()
                 # Dùng mốc thời gian nội tại nếu là video file có FPS xác định; dùng time.time() nếu là live stream
                 current_ts = (frame_count / reader.fps) if (not reader.is_live_stream and getattr(reader, 'fps', 0) > 0) else time.time()
                 verified_objects = verifier.process_frame(
@@ -360,13 +362,14 @@ def run_monitor_mode(args):
                         label = f"VI PHAM VH#{sw_idx} ({sp['overlap_pct']}%)"
 
                         if is_new_alert:
-                            if db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5):
+                            is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5) if getattr(reader, 'is_live_stream', False) else False
+                            if is_dup:
                                 print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi tương tự trong 5 phút gần đây)")
                             else:
                                 total_confirmed_events += 1
                                 ev_res = evidence_saver.save_evidence(
                                     clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
-                                    roi_frame=frame
+                                    roi_frame=base_roi_frame
                                 )
                                 if ev_res:
                                     rec_id = db.insert_violation(
@@ -457,7 +460,7 @@ def run_dashboard_mode(args):
     print(BANNER)
     print(">> ĐANG KHỞI ĐỘNG WEB DASHBOARD TRỰC QUAN...")
     from dashboard.web_app import run_dashboard
-    run_dashboard(port=args.port)
+    run_dashboard(port=args.port, db_path=getattr(args, "db", "data/surveillance.db"))
 
 
 def run_roi_mode(args):
@@ -484,7 +487,7 @@ def run_roi_mode(args):
         except Exception:
             pass
         from dashboard.web_app import run_dashboard
-        run_dashboard(port=port, initial_tab="roi")
+        run_dashboard(port=port, initial_tab="roi", db_path=getattr(args, "db", "data/surveillance.db"))
 
 
 def run_benchmark_mode(args):

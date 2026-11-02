@@ -119,9 +119,10 @@ class ROIManager:
 
     def is_point_inside(self, point: tuple) -> bool:
         """Kiểm tra điểm (x, y) có nằm trong BẤT KỲ vùng vỉa hè nào không"""
+        pt = (float(point[0]), float(point[1]))
         for pts in self.polygons:
             pts_arr = np.array(pts, dtype=np.int32)
-            if cv2.pointPolygonTest(pts_arr, point, measureDist=False) >= 0:
+            if cv2.pointPolygonTest(pts_arr, pt, measureDist=False) >= 0:
                 return True
         return False
 

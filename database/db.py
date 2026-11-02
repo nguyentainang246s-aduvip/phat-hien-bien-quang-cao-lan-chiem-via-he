@@ -136,8 +136,9 @@ class ViolationDatabase:
         So sánh: cùng camera + bbox gần giống + trong vòng N phút.
         """
         x1, y1, x2, y2 = bbox if bbox else (0, 0, 0, 0)
-        # Khoảng mở rộng pixel cho phép coi là "cùng vị trí"
-        margin = max(30, int((x2 - x1) * 0.15))  # 15% chiều rộng box hoặc tối thiểu 30px
+        # Tách riêng biên độ pixel theo trục X và trục Y để thích nghi với biển dạng đứng
+        margin_x = max(30, int(abs(x2 - x1) * 0.15))
+        margin_y = max(30, int(abs(y2 - y1) * 0.15))
         
         conn = self.get_connection()
         try:
@@ -152,7 +153,7 @@ class ViolationDatabase:
                   AND timestamp >= datetime('now', 'localtime', ?)
             """, (
                 camera_id,
-                x1, margin, y1, margin, x2, margin, y2, margin,
+                x1, margin_x, y1, margin_y, x2, margin_x, y2, margin_y,
                 f'-{time_window_minutes} minutes'
             ))
             count = cursor.fetchone()[0]

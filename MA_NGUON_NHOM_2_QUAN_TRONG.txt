@@ -77,6 +77,11 @@ class StreamReader:
         self.fps = 30.0
         self.is_running = False
         self.looped = False
+        self._frame_seq = 0
+        self._last_consumed_seq = -1
+        
+        # Thiết lập timeout TCP cho FFmpeg để chống treo luồng C++ khi mất mạng
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;3000000"
         
         # Luồng nền cho RTSP/Live Stream chống trễ hình (Zero Latency Buffer Flush)
         self._lock = threading.Lock()
@@ -145,6 +150,14 @@ class StreamReader:
             with self._lock:
                 if self._latest_frame is None:
                     print("[CẢNH BÁO] Đã mở kết nối nhưng chưa nhận được frame đầu tiên sau 3.0s.")
+                    self._stop_worker_thread()
+                    with self._cap_lock:
+                        if self.cap is not None:
+                            try:
+                                self.cap.release()
+                            except Exception:
+                                pass
+                            self.cap = None
                     return False
                 
         return True
@@ -168,6 +181,7 @@ class StreamReader:
                 if ret and frame is not None:
                     self._latest_frame = frame
                     self._latest_ts = time.monotonic()
+                    self._frame_seq += 1
             if not ret:
                 time.sleep(0.05)
 
@@ -175,8 +189,8 @@ class StreamReader:
         """
         Đọc 1 frame tiếp theo.
         Tự động xử lý:
-          - Video file: Tự động tua lại đầu video để chạy liên tục như camera thật.
-          - RTSP/Live stream: Đọc từ background thread bộ nhớ đệm sạch, tự động reconnect nếu mất luồng.
+          - Video file: Tự động tua lại đầu video nếu bật loop, hoặc dừng an toàn.
+          - RTSP/Live stream: Chờ frame mới (Zero Latency Buffer Flush & Duplicate Prevention).
           
         Returns:
             (ret: bool, frame: np.ndarray)
@@ -187,6 +201,19 @@ class StreamReader:
         
         # 1. Đối với Live Stream / RTSP: Lấy frame mới nhất từ background thread
         if self.is_live_stream:
+            start_wait = time.monotonic()
+            while not self._stop_event.is_set():
+                with self._lock:
+                    is_new = (self._frame_seq != self._last_consumed_seq)
+                    has_frame = self._latest_frame is not None and self._latest_ret
+                    ts_fresh = (time.monotonic() - self._latest_ts) < 5.0
+                    if has_frame and ts_fresh and (is_new or (time.monotonic() - start_wait) > 0.05):
+                        self._last_consumed_seq = self._frame_seq
+                        return True, self._latest_frame.copy()
+                if (time.monotonic() - start_wait) > 0.5:
+                    break
+                time.sleep(0.005)
+            
             with self._lock:
                 ret = self._latest_ret and (time.monotonic() - self._latest_ts) < 5.0
                 frame = self._latest_frame.copy() if (ret and self._latest_frame is not None) else None
@@ -411,9 +438,10 @@ class ROIManager:
 
     def is_point_inside(self, point: tuple) -> bool:
         """Kiểm tra điểm (x, y) có nằm trong BẤT KỲ vùng vỉa hè nào không"""
+        pt = (float(point[0]), float(point[1]))
         for pts in self.polygons:
             pts_arr = np.array(pts, dtype=np.int32)
-            if cv2.pointPolygonTest(pts_arr, point, measureDist=False) >= 0:
+            if cv2.pointPolygonTest(pts_arr, pt, measureDist=False) >= 0:
                 return True
         return False
 
@@ -541,8 +569,9 @@ class EvidenceSaver:
         time_str = now.strftime("%H-%M-%S-%f")  # Bao gồm microsecond để tránh trùng file
         iso_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
 
-        # 1. Tạo cấu trúc thư mục lưu trữ theo ngày và camera
-        camera_clean_id = camera_id.replace(" ", "_").replace("(", "").replace(")", "")
+        # 1. Tạo cấu trúc thư mục lưu trữ theo ngày và camera (làm sạch tên camera chống Path Traversal)
+        import re
+        camera_clean_id = re.sub(r'[^a-zA-Z0-9_-]', '_', str(camera_id))
         full_dir = os.path.join(self.base_dir, "records", camera_clean_id, date_str)
         crop_dir = os.path.join(self.base_dir, "crops", camera_clean_id, date_str)
         os.makedirs(full_dir, exist_ok=True)
@@ -553,24 +582,14 @@ class EvidenceSaver:
         x1_clamped, y1_clamped = max(0, x1), max(0, y1)
         x2_clamped, y2_clamped = min(w, x2), min(h, y2)
 
-        # 1. Cắt ảnh cận cảnh (Cropped Target Sign) từ frame sạch trước khi vẽ đè
-        cropped_img = frame[y1_clamped:y2_clamped, x1_clamped:x2_clamped].copy()
-        crop_filename = f"crop_id{track_id}_{time_str}.jpg"
-        crop_path = os.path.join(crop_dir, crop_filename)
-        if cropped_img.size > 0:
-            if not _safe_imwrite(crop_path, cropped_img):
-                crop_path = ""
-        else:
-            crop_path = ""
-
-        # 2. Xử lý ảnh toàn cảnh (Full Frame with Target Highlight & Watermark Stamp)
+        # 2. Xử lý làm mờ khuôn mặt (Face Blurring) trên ảnh gốc sạch trước khi cắt ảnh crop
         stamped_frame = roi_frame.copy() if roi_frame is not None else frame.copy()
+        clean_blurred_frame = frame.copy()
         privacy_blurred = False
 
-        # Làm mờ khuôn mặt người đi đường nếu bật privacy_blur_faces
         if self._face_cascade is not None:
             try:
-                gray = cv2.cvtColor(stamped_frame, cv2.COLOR_BGR2GRAY)
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 faces = self._face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=4, minSize=(30, 30))
                 for (fx, fy, fw_box, fh_box) in faces:
                     is_inside_sign = (fx >= x1_clamped and fx + fw_box <= x2_clamped and fy >= y1_clamped and fy + fh_box <= y2_clamped)
@@ -580,9 +599,22 @@ class EvidenceSaver:
                             k_w = max(15, (fw_box // 2) * 2 + 1)
                             k_h = max(15, (fh_box // 2) * 2 + 1)
                             stamped_frame[fy:fy+fh_box, fx:fx+fw_box] = cv2.GaussianBlur(f_roi, (k_w, k_h), 20)
+                            c_roi = clean_blurred_frame[fy:fy+fh_box, fx:fx+fw_box]
+                            if c_roi.size > 0:
+                                clean_blurred_frame[fy:fy+fh_box, fx:fx+fw_box] = cv2.GaussianBlur(c_roi, (k_w, k_h), 20)
                             privacy_blurred = True
             except Exception as e:
                 logger.warning("[EVIDENCE] Lỗi khi làm mờ khuôn mặt: %s", e)
+
+        # 1. Cắt ảnh cận cảnh (Cropped Target Sign) từ frame đã bảo vệ riêng tư
+        cropped_img = clean_blurred_frame[y1_clamped:y2_clamped, x1_clamped:x2_clamped].copy()
+        crop_filename = f"crop_id{track_id}_{time_str}.jpg"
+        crop_path = os.path.join(crop_dir, crop_filename)
+        if cropped_img.size > 0:
+            if not _safe_imwrite(crop_path, cropped_img):
+                crop_path = ""
+        else:
+            crop_path = ""
 
         # Vẽ khung đỏ đánh dấu đối tượng vi phạm trên ảnh bằng chứng toàn cảnh
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -759,8 +791,9 @@ class ViolationDatabase:
         So sánh: cùng camera + bbox gần giống + trong vòng N phút.
         """
         x1, y1, x2, y2 = bbox if bbox else (0, 0, 0, 0)
-        # Khoảng mở rộng pixel cho phép coi là "cùng vị trí"
-        margin = max(30, int((x2 - x1) * 0.15))  # 15% chiều rộng box hoặc tối thiểu 30px
+        # Tách riêng biên độ pixel theo trục X và trục Y để thích nghi với biển dạng đứng
+        margin_x = max(30, int(abs(x2 - x1) * 0.15))
+        margin_y = max(30, int(abs(y2 - y1) * 0.15))
         
         conn = self.get_connection()
         try:
@@ -775,7 +808,7 @@ class ViolationDatabase:
                   AND timestamp >= datetime('now', 'localtime', ?)
             """, (
                 camera_id,
-                x1, margin, y1, margin, x2, margin, y2, margin,
+                x1, margin_x, y1, margin_y, x2, margin_x, y2, margin_y,
                 f'-{time_window_minutes} minutes'
             ))
             count = cursor.fetchone()[0]
@@ -1030,7 +1063,7 @@ class SystemBenchmark:
         # ISSUE 22 FIX: Bổ sung thông số CPU/RAM cụ thể
         cpu_name = platform.processor() or "Unknown"
         
-        # Thử lấy tên CPU chi tiết hơn trên Windows
+        # Thử lấy tên CPU chi tiết hơn trên Windows (hỗ trợ wmic và PowerShell Get-CimInstance)
         try:
             import subprocess
             result = subprocess.run(
@@ -1040,8 +1073,18 @@ class SystemBenchmark:
             lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip() and l.strip() != 'Name']
             if lines:
                 cpu_name = lines[0]
+            else:
+                raise Exception("Empty wmic output")
         except Exception:
-            pass
+            try:
+                import subprocess
+                ps_cmd = 'powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name"'
+                res = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=5)
+                out = res.stdout.strip()
+                if out:
+                    cpu_name = out
+            except Exception:
+                pass
         
         # Thử lấy RAM
         ram_gb = "Unknown"
@@ -1058,8 +1101,18 @@ class SystemBenchmark:
                 caps = [int(l.strip()) for l in result.stdout.strip().split('\n') if l.strip().isdigit()]
                 if caps:
                     ram_gb = f"{sum(caps) / (1024**3):.1f} GB"
+                else:
+                    raise Exception("Empty wmic capacity")
             except Exception:
-                pass
+                try:
+                    import subprocess
+                    ps_cmd = 'powershell -NoProfile -Command "(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum / 1GB"'
+                    res = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=5)
+                    out = res.stdout.strip().replace(',', '.')
+                    if out:
+                        ram_gb = f"{float(out):.1f} GB"
+                except Exception:
+                    pass
 
         info = {
             "os": f"{platform.system()} {platform.release()} ({platform.machine()})",
@@ -1128,6 +1181,12 @@ class SystemBenchmark:
             ret, frame = reader.read()
             if ret and frame is not None:
                 _ = tracker.track(frame)
+
+        # Rewind video offline và làm sạch trạng thái tracker/verifier sau warmup
+        if hasattr(reader, "cap") and reader.cap is not None and not getattr(reader, "is_live_stream", False):
+            reader.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        tracker.reset()
+        verifier.reset()
 
         processed_frames = 0
 
@@ -1217,6 +1276,11 @@ class SystemBenchmark:
                     ((raw_violation_alerts_count - temporal_confirmed_alerts_count) / raw_violation_alerts_count * 100)
                     if raw_violation_alerts_count > 0 else 0.0, 1
                 )
+            },
+            "verifier_config": {
+                "confirm_frames": verifier.confirm_frames,
+                "confirm_seconds": verifier.confirm_seconds,
+                "cooldown_seconds": verifier.cooldown_seconds,
             }
         }
 
@@ -1229,6 +1293,9 @@ class SystemBenchmark:
         lat = res["latency_breakdown_ms"]
         fps = res["throughput_fps"]
         abl = res["ablation_study"]
+        v_cfg = res.get("verifier_config", {})
+        c_frames = v_cfg.get("confirm_frames", 20)
+        c_secs = v_cfg.get("confirm_seconds", 3.0)
 
         print("\n" + "=" * 78)
         print(" BẢNG TỔNG HỢP HIỆU NĂNG THỰC NGHIỆM (BENCHMARK SUMMARY)")
@@ -1248,7 +1315,7 @@ class SystemBenchmark:
         print("-" * 78)
         print("5. Nghiên cứu bóc tách thành phần (Ablation Study - Temporal Verification):")
         print(f"   • Cảnh báo thô từng frame (No Temporal) : {abl['raw_single_frame_alerts']} lần (dễ bị spam/báo giả)")
-        print(f"   • Cảnh báo chốt sau 15 frames (Proposed): {abl['temporal_verified_alerts']} sự kiện xác thực")
+        print(f"   • Cảnh báo chốt sau {c_frames} frames ({c_secs}s) (Proposed): {abl['temporal_verified_alerts']} sự kiện xác thực")
         print(f"   => Tỷ lệ giảm thiểu và loại trừ báo động giả/spam   : {abl['false_alarm_reduction_pct']}%")
         print("=" * 78)
 
@@ -1264,6 +1331,10 @@ class SystemBenchmark:
         lat = results["latency_breakdown_ms"]
         fps = results["throughput_fps"]
         abl = results["ablation_study"]
+        v_cfg = results.get("verifier_config", {})
+        c_frames = v_cfg.get("confirm_frames", 20)
+        c_secs = v_cfg.get("confirm_seconds", 3.0)
+        cool_secs = v_cfg.get("cooldown_seconds", 60.0)
 
         md_content = f"""# CHƯƠNG 7: THỰC NGHIỆM VÀ ĐÁNH GIÁ KẾT QUẢ HỆ THỐNG
 
@@ -1294,7 +1365,7 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 | 1 | **Đọc khung hình (Camera Ingestion)** | {lat['camera_read_avg']} ms | {round(lat['camera_read_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | StreamReader xử lý buffer flush |
 | 2 | **AI Object Detection + ByteTrack** | **{lat['yolo_track_avg']} ms** | **{round(lat['yolo_track_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}%** | **YOLOv8n + gán định danh track_id** |
 | 3 | **Phán quyết hình học (Spatial Check)** | {lat['spatial_check_avg']} ms | {round(lat['spatial_check_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | Tọa độ chân $P_{{base}} \\in ROI$ & Overlap |
-| 4 | **Bộ lọc thời gian (Temporal Verifier)** | {lat['temporal_verifier_avg']} ms | {round(lat['temporal_verifier_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | Máy trạng thái 3 cấp độ (15 frames) |
+| 4 | **Bộ lọc thời gian (Temporal Verifier)** | {lat['temporal_verifier_avg']} ms | {round(lat['temporal_verifier_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | Máy trạng thái 3 cấp độ ({c_frames} frames / {c_secs}s) |
 | 5 | **Vẽ & Trực quan hóa (Rendering)** | {lat['render_overlay_avg']} ms | {round(lat['render_overlay_avg']/lat['total_end_to_end_avg']*100, 1) if lat['total_end_to_end_avg'] else 0}% | Lớp phủ đa giác bán trong suốt + HUD |
 | **—** | **TỔNG THỜI GIAN ĐẦU-CUỐI (E2E Latency)** | **{lat['total_end_to_end_avg']} ms** | **100%** | **Độ lệch chuẩn: ±{lat['total_std_dev']} ms** |
 
@@ -1317,14 +1388,14 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 
 Để làm rõ đóng góp khoa học của giải pháp kiểm định thời gian nhiều khung hình, thực nghiệm so sánh hai kịch bản đã được thực hiện:
 1. **Kịch bản cơ sở (Baseline - Không có Temporal Verifier):** Phán quyết vi phạm tức thời theo từng khung hình độc lập (Single-frame).
-2. **Kịch bản đề xuất (Proposed System):** Tích hợp máy trạng thái xác thực 15 khung hình liên tiếp và cơ chế làm nguội (Cooldown 60s).
+2. **Kịch bản đề xuất (Proposed System):** Tích hợp máy trạng thái xác thực {c_frames} khung hình ({c_secs}s) và cơ chế làm nguội (Cooldown {cool_secs}s).
 
 ### Bảng 7.3. Kết quả so sánh khả năng giảm thiểu và loại trừ báo động giả
 
 | Kịch bản đánh giá | Tổng số cảnh báo sinh ra | Số vụ vi phạm chốt lưu DB | Tỷ lệ giảm báo giả/spam |
 | :--- | :---: | :---: | :---: |
 | **Baseline (Từng frame đơn lẻ)** | {abl['raw_single_frame_alerts']} cảnh báo | {abl['raw_single_frame_alerts']} (bị spam liên tục mỗi frame) | 0% |
-| **Proposed (Bộ lọc 15 frames + Cooldown)** | {abl['temporal_verified_alerts']} sự kiện | {abl['temporal_verified_alerts']} sự kiện | **{abl['false_alarm_reduction_pct']}%** |
+| **Proposed (Bộ lọc {c_frames} frames + Cooldown)** | {abl['temporal_verified_alerts']} sự kiện | {abl['temporal_verified_alerts']} sự kiện | **{abl['false_alarm_reduction_pct']}%** |
 
 > **Kết luận:**
 """

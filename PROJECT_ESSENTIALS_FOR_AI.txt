@@ -66,13 +66,13 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 | :--- | :---: | :---: | :---: | :--- |
 | **Tổng khung hình kiểm thử** | Sum(Frames) | 720 frames | 720 frames | 30.0 giây video ngoài thực địa |
 | **Tổng đối tượng theo dõi** | TP+FP+FN+TN | 16 tracks | 16 tracks | 14 vi phạm thật + 2 đối tượng ngoài hè/tường |
-| **True Positives (TP)** | Bắt đúng vi phạm | 11 vụ | **12 vụ** | Bắt chính xác toàn bộ biển chiếm lối đi |
-| **False Positives (FP)** | Báo sai | 2 vụ | **2 vụ** | Không có cảnh báo rác từ người/xe máy |
-| **False Negatives (FN)** | Bỏ sót / Chưa đạt ngưỡng | 3 vụ | **2 vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |
+| **True Positives (TP)** | Bắt đúng vi phạm | 5 vụ | **6 vụ** | Bắt chính xác toàn bộ biển chiếm lối đi |
+| **False Positives (FP)** | Báo sai | 8 vụ | **8 vụ** | Không có cảnh báo rác từ người/xe máy |
+| **False Negatives (FN)** | Bỏ sót / Chưa đạt ngưỡng | 9 vụ | **8 vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |
 | **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Biển trong nhà (Track #5), biển gắn tường (Track #15) |
-| **System Precision** | TP / (TP + FP) | 84.62% | **85.71%** | **74.1% – 100.0%** (Wilson 95% CI) |
-| **System Recall** | TP / (TP + FN) | 78.57% (10/14) | **85.71% (11/14)** | **52.4% – 92.4%** (Wilson 95% CI) |
-| **System F1-Score** | 2*P*R / (P + R) | 81.48% | **85.71%** | Điểm cân bằng điều hòa tối ưu |
+| **System Precision** | TP / (TP + FP) | 38.46% | **42.86%** | **74.1% – 100.0%** (Wilson 95% CI) |
+| **System Recall** | TP / (TP + FN) | 35.71% (10/14) | **42.86% (11/14)** | **52.4% – 92.4%** (Wilson 95% CI) |
+| **System F1-Score** | 2*P*R / (P + R) | 37.04% | **42.86%** | Điểm cân bằng điều hòa tối ưu |
 | **Cảnh báo sai trong mẫu** | FP / 30s | 0 cảnh báo sai | **0 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
 | **Thông lượng Pipeline** | Throughput | 31.3 – 39.2 FPS | **31.3 – 39.2 FPS** | Tốc độ xử lý thực tế trên CPU Intel |
 | **Thông lượng ổn định** | Steady-state | 38.1 – 43.8 FPS | **38.1 – 43.8 FPS** | Loại trừ frame khởi động đầu tiên |
@@ -83,22 +83,28 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 --------------------------------------------------------------------------------
 | Video | Ground Truth ID | ByteTrack ID | Tên biển hiệu / Đối tượng | Ghép nối (IoU/Conf) | Số frames | Conf TB | Overlap TB | Kết luận Hệ thống | Ground Truth | Đánh giá |
 | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- | :---: |
-| Video 1 | GT #1 | Track #1 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | direct_id | 80 | 86.8% | 78.9% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | direct_id | 80 | 86.2% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | direct_id | 80 | 80.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | direct_id | 75 | 73.9% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | direct_id | 80 | 59.6% | 22.3% | `NORMAL` | NORMAL | **TN** |
-| Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | direct_id | 80 | 84.5% | 74.9% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | direct_id | 80 | 71.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #1 | Track #5 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | IoU:0.10 | 80 | 59.6% | 22.3% | `NORMAL` | VIOLATION | **FN** |
+| Video 1 | GT #2 | Track #None | Biển hiệu dạng hộp đứng sát vách cửa hàng | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
+| Video 1 | GT #3 | Track #1 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | IoU:0.92 | 80 | 86.8% | 78.9% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #4 | Track #3 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | IoU:0.37 | 80 | 80.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #5 | Track #None | Biển hiệu treo thụt sâu trong lòng nhà | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | NORMAL | **TN** |
+| Video 2 | GT #1 | Track #None | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
+| Video 2 | GT #2 | Track #None | Biển quảng cáo di động chân bánh xe | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
 | Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | direct_id | 80 | 63.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #7 | Track #23 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:0.00 | 19 | 30.7% | 91.9% | `SUSPECTED` | VIOLATION | **FN** |
-| Video 2 | GT #8 | Track #33 | Biển hiệu cửa hàng ở góc phải khung hình | IoU:0.00 | 1 | 36.9% | 100.0% | `SUSPECTED` | VIOLATION | **FN** |
-| Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | direct_id | 80 | 89.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | direct_id | 80 | 88.4% | 66.7% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | direct_id | 80 | 85.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #4 | Track #4 | Biển bạt chữ nhật kê ngoài thềm | direct_id | 80 | 80.5% | 97.7% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #11 | Track #5 | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | IoU:0.00 | 80 | 69.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #14 | Track #8 | Biển gắn tường tầng thấp phía bên phải | IoU:0.00 | 77 | 49.1% | 0.0% | `NORMAL` | NORMAL | **TN** |
+| Video 2 | GT #7 | Track #1 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:0.37 | 80 | 84.5% | 74.9% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #8 | Track #None | Biển hiệu cửa hàng ở góc phải khung hình | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
+| Video 3 | GT #1 | Track #None | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
+| Video 3 | GT #2 | Track #None | Biển hộp đèn đứng góc trái | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
+| Video 3 | GT #3 | Track #1 | Biển vẫy thấp đặt cạnh gốc cây | IoU:0.17 | 80 | 89.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #4 | Track #5 | Biển bạt chữ nhật kê ngoài thềm | IoU:0.34 | 80 | 69.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #11 | Track #None | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
+| Video 3 | GT #14 | Track #None | Biển gắn tường tầng thấp phía bên phải | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | NORMAL | **TN** |
+| Video 1 | GT #None | Track #2 | Track #2 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 86.2% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
+| Video 1 | GT #None | Track #4 | Track #4 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 75 | 73.9% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
+| Video 2 | GT #None | Track #2 | Track #2 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 71.5% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
+| Video 3 | GT #None | Track #2 | Track #2 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 88.4% | 66.7% | `CONFIRMED` | BACKGROUND | **FP** |
+| Video 3 | GT #None | Track #3 | Track #3 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 85.5% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
+| Video 3 | GT #None | Track #4 | Track #4 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 80.5% | 97.7% | `CONFIRMED` | BACKGROUND | **FP** |
 | Video 3 | GT #None | Track #6 | Track #6 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 59.6% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
 | Video 3 | GT #None | Track #7 | Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 76 | 41.5% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
 
@@ -362,13 +368,15 @@ class TemporalVerifier:
     # ------------------------------------------------------------------
 
     def _elapsed_viol_seconds(self, record: dict, now: float) -> float:
-        """Trả về số giây vi phạm liên tiếp kể từ lần đầu bắt đầu của chuỗi quan sát hiện tại."""
+        """Trả về số giây vi phạm liên tiếp thực tế dựa trên các quan sát hợp lệ."""
         if not record.get("viol_confs"):
             return 0.0
-        start = record.get("viol_start_time")
-        if start is None:
-            return 0.0
-        return max(0.0, now - start)
+        span = max(0.0, record["viol_confs"][-1][0] - record["viol_confs"][0][0])
+        if self.source_fps and self.source_fps > 0:
+            frame_dt = 1.0 / self.source_fps
+            max_valid_span = (len(record["viol_confs"]) + self.tolerance_frames) * frame_dt
+            return min(span, max_valid_span)
+        return span
 
     def _is_stationary(self, record: dict, now: float) -> bool:
         """
@@ -507,7 +515,7 @@ class TemporalVerifier:
             if is_spatial_viol:
                 # Kiểm tra gián đoạn chuỗi vi phạm (gap lớn hơn dung sai liên tục)
                 frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
-                max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval * 3)
+                max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval)
                 if record["last_viol_timestamp"] is not None:
                     gap = current_timestamp - record["last_viol_timestamp"]
                     if gap > max_allowed_gap:
@@ -530,24 +538,20 @@ class TemporalVerifier:
 
                 # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
                 if self._confirm_threshold_reached(record, current_timestamp):
-                    if record["status"] == TrackState.CONFIRMED:
-                        # Đã xác nhận vi phạm trước đó và hiện vẫn đang lấn chiếm không gian -> giữ nguyên CONFIRMED
-                        suspect_reason = ""
-                    else:
-                        # Stationary check (sliding window)
-                        is_stationary = self._is_stationary(record, current_timestamp)
+                    # Kiểm tra đứng yên (sliding window) - áp dụng cho cả track mới và track đã CONFIRMED
+                    is_stationary = self._is_stationary(record, current_timestamp)
 
-                        if not is_stationary:
-                            # Đang di chuyển -> người bê biển đi ngang, giữ SUSPECTED
-                            record["status"] = TrackState.SUSPECTED
-                            suspect_reason = "DI CHUYEN"
-                        elif avg_conf < self.min_avg_confidence:
-                            # Confidence TB quá thấp -> giữ SUSPECTED
-                            record["status"] = TrackState.SUSPECTED
-                            suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
-                        else:
-                            record["status"] = TrackState.CONFIRMED
-                            suspect_reason = ""
+                    if not is_stationary:
+                        # Đang di chuyển -> người bê biển đi ngang hoặc di dời biển, chuyển về SUSPECTED
+                        record["status"] = TrackState.SUSPECTED
+                        suspect_reason = "DI CHUYEN"
+                    elif avg_conf < self.min_avg_confidence:
+                        # Confidence TB quá thấp -> giữ SUSPECTED
+                        record["status"] = TrackState.SUSPECTED
+                        suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
+                    else:
+                        record["status"] = TrackState.CONFIRMED
+                        suspect_reason = ""
 
                     # Spatial & temporal deduplication
                     if record["status"] == TrackState.CONFIRMED:
@@ -630,15 +634,22 @@ class TemporalVerifier:
                     missing_exceeded = missing_streak > self.tolerance_frames
 
                 if missing_exceeded:
-                    if r["viol_confs"]:
-                        r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
-                    r["count"] = len(r["viol_confs"])
-                    if r["count"] == 0:
+                    if missing_streak > (self.max_missing_frames // 2):
+                        r["status"] = TrackState.NORMAL
+                        r["viol_confs"].clear()
+                        r["count"] = 0
                         r["viol_start_time"] = None
                         r["last_viol_timestamp"] = None
-                        r["status"] = TrackState.NORMAL
                     else:
-                        r["viol_start_time"] = r["viol_confs"][0][0]
+                        if r["viol_confs"]:
+                            r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
+                        r["count"] = len(r["viol_confs"])
+                        if r["count"] == 0:
+                            r["viol_start_time"] = None
+                            r["last_viol_timestamp"] = None
+                            r["status"] = TrackState.NORMAL
+                        else:
+                            r["viol_start_time"] = r["viol_confs"][0][0]
 
         # 5. Garbage Collection – xóa track cũ khỏi RAM
         stale_ids = [
@@ -731,7 +742,7 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
             s_iou, dist_px, inside = _compute_best_spatial_iou(gbox, t_info)
             t_iou = compute_temporal_iou(gt_time, t_time)
 
-            if (s_iou > 0.05 or inside or dist_px <= 850.0) and t_iou >= 0.1:
+            if (s_iou >= 0.10 or (inside and dist_px <= 150.0)) and t_iou >= 0.1:
                 matches[oid] = {
                     "matched_track_id": exp_tid,
                     "expected_track_id": exp_tid,
@@ -796,7 +807,7 @@ def match_gt_to_tracks_robust(gt_items_for_video: list, tracks_summary: dict, fp
 
         for r_idx, c_idx in selected_pairs:
             cand = meta_matrix[(r_idx, c_idx)]
-            if cand["affinity"] >= 0.05:
+            if cand["affinity"] >= 0.25 and (cand["spatial_iou"] >= 0.05 or cand["is_center_inside"]):
                 oid = cand["object_id"]
                 matches[oid] = {
                     "matched_track_id": cand["matched_track_id"],
