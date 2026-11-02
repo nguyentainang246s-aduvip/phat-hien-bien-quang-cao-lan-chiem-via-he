@@ -1,6 +1,6 @@
 # BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG TRÊN VIDEO THỰC TẾ (SYSTEM-LEVEL METRICS)
 
-> **Thời gian chạy kiểm thử:** 2026-11-02 22:40:47  
+> **Thời gian chạy kiểm thử:** 2026-11-02 22:55:51  
 > **Người thực hiện:** Nguyễn Đức Tài Năng (ĐATN 20224083)  
 > **Cơ chế đo đạc:** Chạy tự động từ `evaluation/evaluate_videos.py`, đối chiếu với `configs/video_ground_truth.json` và trích xuất `reports/system_eval_results.json`.
 
@@ -22,8 +22,8 @@
 ## 2. Kết Quả Chi Tiết Từng Video Thực Địa
 
 ### Video: `data/videos/video test.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **31.3 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 54.80 ms (p50: 43.70 ms, p95: 110.95 ms); Verifier Mean = 1.97 ms; Tổng khung hình infer = 60.80 ms (Frame khởi động: 2247.75 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **36.3 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 46.15 ms (p50: 38.94 ms, p95: 75.20 ms); Verifier Mean = 1.82 ms; Tổng khung hình infer = 51.40 ms (Frame khởi động: 2010.41 ms)
 * **Kết quả:** **4 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **2 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -39,8 +39,8 @@
 ---
 
 ### Video: `data/videos/videotesst2.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **38.7 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 62.61 ms (p50: 54.44 ms, p95: 116.62 ms); Verifier Mean = 1.29 ms; Tổng khung hình infer = 68.42 ms (Frame khởi động: 164.08 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **44.3 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 55.09 ms (p50: 43.49 ms, p95: 100.78 ms); Verifier Mean = 1.07 ms; Tổng khung hình infer = 59.73 ms (Frame khởi động: 191.6 ms)
 * **Kết quả:** **3 Vi phạm (Confirmed)** | **2 Nghi vấn (Suspected)** | **0 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -54,8 +54,8 @@
 ---
 
 ### Video: `data/videos/video test3.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **35.9 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 65.47 ms (p50: 57.13 ms, p95: 107.04 ms); Verifier Mean = 2.98 ms; Tổng khung hình infer = 73.01 ms (Frame khởi động: 223.33 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **47.2 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 48.21 ms (p50: 42.37 ms, p95: 84.71 ms); Verifier Mean = 2.39 ms; Tổng khung hình infer = 54.50 ms (Frame khởi động: 160.42 ms)
 * **Kết quả:** **7 Vi phạm (Confirmed)** | **3 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -103,9 +103,9 @@
 * Để bảo đảm tính minh bạch và liêm chính học thuật, đề tài công bố công khai cả hai phiên bản trong bảng tổng hợp dưới đây.
 
 ### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):
-1. **Track #8 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #8):** Xuất hiện 22 detections liên tục từ Frame 175 (7.29s) đến cuối video tại Frame 238 (9.92s). Tổng thời gian tích lũy liên tục đạt 2.63 giây. Do video chỉ dài 10.0 giây, clip kết thúc trước khi đối tượng kịp chạm ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.
-2. **Track #11 (Video 3 - Biển hiệu nhỏ ở xa, matched Track #13):** Xuất hiện 28 detections rải rác từ Frame 94 đến Frame 208 (~4.75s). Do cự ly xa và góc nghiêng, confidence dao động chập chờn quanh ngưỡng 0.25 (0.25 – 0.43), các frame mất dấu vượt quá dung sai khiến bộ đếm vi phạm liên tục bị decay/reset trước khi đạt chuỗi liên tục 3.0 giây, giữ ở trạng thái `SUSPECTED`.
-3. **Track #7 (Video 2 - Biển hiệu khung sắt tầm thấp, matched Track #4):** Độ tin cậy trung bình trên toàn track đạt 0.359, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian (tính trung bình trên chuỗi quan sát thực tế và trừ confidence tương ứng khi decay), hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.
+1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #33):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.
+2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #23):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.
+3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).
 
 ---
 
@@ -114,18 +114,18 @@
 | Chỉ số Đánh giá | Công thức | Version A (ROI cũ) | Version B (ROI chuẩn hóa) | Khoảng tin cậy (Wilson 95% Version B) |
 | :--- | :---: | :---: | :---: | :--- |
 | **Tổng khung hình kiểm thử** | $\sum \text{Frames}$ | 720 frames | 720 frames | 30.0 giây video liên tục tại Hà Nội |
-| **Tổng đối tượng theo dõi** | $TP+FP+FN+TN$ | 16 tracks | 16 tracks | 14 vi phạm thật + 2 đối tượng ngoài hè/tường |
+| **Tổng đối tượng theo dõi** | $TP+FP+FN+TN$ | 18 tracks | **18 tracks** | 14 vi phạm thật + 2 hợp lệ + 2 báo sai ngoài GT |
 | **True Positives (TP)** | Bắt đúng vi phạm | 11 vụ | **12 vụ** | Bắt chính xác các biển lấn chiếm |
 | **False Positives (FP)** | Báo sai | 2 vụ | **2 vụ** | Không có cảnh báo sai từ người/xe |
 | **False Negatives (FN)** | Bỏ sót / Chưa đạt ngưỡng | 3 vụ | **2 vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |
-| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Track #5 ngoài hè, Track #15 biển gắn tường |
+| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Track #5 trong nhà, Track #8 biển gắn tường |
 | **System Precision** | $\frac{TP}{TP + FP}$ | 84.62% | **85.71%** | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System Recall** | $\frac{TP}{TP + FN}$ | 78.57% (11/14) | **85.71%** (12/14) | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System F1-Score** | $2 \cdot \frac{P \cdot R}{P + R}$ | 81.48% | **85.71%** | Cân bằng điều hòa tối ưu |
 | **Cảnh báo sai trong mẫu** | FP / 30s | 2 cảnh báo sai | **2 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
-| **Thông lượng Pipeline** | Throughput | 31.3 – 38.7 FPS | **31.3 – 38.7 FPS** | Ổn định: 37.2 – 44.6 FPS |
-| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~10.4 – 12.9 Hz | **~10.4 – 12.9 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
-| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 62.6 ms | **62.6 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 61.0 ms; loại trừ frame khởi động) |
+| **Thông lượng Pipeline** | Throughput | 36.3 – 47.2 FPS | **36.3 – 47.2 FPS** | Ổn định: 46.0 – 52.5 FPS |
+| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~12.1 – 15.7 Hz | **~12.1 – 15.7 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
+| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 48.2 ms | **48.2 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 49.8 ms; loại trừ frame khởi động) |
 
 ---
 
@@ -162,7 +162,7 @@ Nhằm trả lời chất vấn của Hội đồng về tính ổn định và 
 
 * **Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency):** **100.0% (18/18 đối tượng)**
 * **Tính ổn định của chỉ số đánh giá (System Metrics Consistency):** Cả 3 lần chạy đều đạt đồng nhất **12 TP, 2 FP, 2 FN, 2 TN** (Recall: 85.71%, Precision: 85.71%).
-* **Độ ổn định thông lượng xử lý:** Trial 1: 31.3–38.7 FPS (Ổn định 37.2–44.6 FPS), Trial 2: 35.6–38.3 FPS (Ổn định 37.0–39.4 FPS), Trial 3: 30.6–40.9 FPS (Ổn định 32.1–42.3 FPS).
+* **Độ ổn định thông lượng xử lý:** Trial 1: 36.3–47.2 FPS (Ổn định 46.0–52.5 FPS), Trial 2: 46.7–49.4 FPS (Ổn định 48.5–51.1 FPS), Trial 3: 35.5–45.6 FPS (Ổn định 36.7–47.6 FPS).
 
 ---
 
@@ -182,8 +182,8 @@ Toàn bộ ảnh chụp cận cảnh biển hiệu vi phạm được lưu trữ
 ### Bảng Lịch Sử Hiệu Chuẩn Vùng ROI Video 1:
 | Phiên bản | Tên file cấu hình | Số đỉnh | Mã băm toàn vẹn (SHA-256) | Thời điểm ghi nhận | Kết quả đối sánh | Ghi chú kỹ thuật |
 | :--- | :--- | :---: | :--- | :--- | :---: | :--- |
-| **Version A** | `configs/roi_video_test_version_a.json` | 7 đỉnh | `a47cd6aefe3a88a71af2bf8ffea4b0d61a1b98fd5064e2f60d9e6e96d678500f` | Tái dựng 11/10 (từ ghi chép 05/10) | Recall 71.43% (10/14) | Thử nghiệm sơ khai: vẽ hẹp sát mép tường, Standee #3 rơi điểm chân ra ngoài ROI -> bỏ sót (False Negative). |
-| **Version B** | `configs/roi_video_test_version_b.json` & `roi_video_test.json` | 8 đỉnh | `8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c` | 2026-10-08 22:23:56 (Đóng băng) | Recall 78.57% (11/14) | **Bản chuẩn hóa chính thức**: bao trùm toàn bộ không gian vỉa hè thực tế, Standee #3 đạt Overlap 100.0% -> CONFIRMED (True Positive). |
+| **Version A** | `configs/roi_video_test_version_a.json` | 7 đỉnh | `a47cd6aefe3a88a71af2bf8ffea4b0d61a1b98fd5064e2f60d9e6e96d678500f` | Tái dựng 11/10 (từ ghi chép 05/10) | Recall 78.57% (11/14) | Thử nghiệm sơ khai: vẽ hẹp sát mép tường, Standee #3 rơi điểm chân ra ngoài ROI -> bỏ sót (False Negative). |
+| **Version B** | `configs/roi_video_test_version_b.json` & `roi_video_test.json` | 8 đỉnh | `8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c` | 2026-10-08 22:23:56 (Đóng băng) | Recall 85.71% (12/14) | **Bản chuẩn hóa chính thức**: bao trùm toàn bộ không gian vỉa hè thực tế, Standee #3 đạt Overlap 100.0% -> CONFIRMED (True Positive). |
 | **Version C** | `configs/roi_video_test_version_c.json` | 6 đỉnh | `eed72b3341b56109434e0b70e10c378542dddf0a7ed6436c72abd67af309766f` | 2026-10-12 14:27:30 (Thử nghiệm Web) | Overlap giảm còn 63.1% | Thử nghiệm rút gọn đỉnh trên Web Studio; đã lưu trữ độc lập và loại bỏ để đóng băng vĩnh viễn Version B. |
 
 ### Các file cấu hình chuẩn hóa khác:

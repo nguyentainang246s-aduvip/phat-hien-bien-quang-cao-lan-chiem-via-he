@@ -115,14 +115,12 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 
 ### Phân tích 2 trường hợp True Negative (TN) — Nhận diện đúng hợp lệ, không phạt nhầm:
 1. Track #5 (Video 1 - Biển hiệu treo thụt sâu trong lòng nhà):
-   - Tỷ lệ đè vỉa hè chỉ đạt 15.3% (thấp hơn ngưỡng 30%) và điểm chân đế nằm hoàn toàn trong khuôn viên nhà dân.
+   - Tỷ lệ đè vỉa hè chỉ đạt 22.3% (thấp hơn ngưỡng 30%) và điểm chân đế nằm hoàn toàn trong khuôn viên nhà dân.
    - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian -> True Negative (TN).
-2. Track #15 (Video 3 - Biển gắn tường tầng thấp phía bên phải, GT #8):
+2. Track #8 (Video 3 - Biển gắn tường tầng thấp phía bên phải, GT #8):
    - Biển gắn cố định trên phần tường thấp sát mặt đất, không cắm chân hay đặt trên mặt vỉa hè.
-   - Do hiệu ứng suy biến chiều sâu khi chiếu phối cảnh 3D xuống mặt phẳng 2D (Perspective Projection) của camera góc cao,
-     cạnh đáy BBox 2D của biển gắn tường tầng thấp chiếu trùng lên đa giác ROI (Overlap = 98.4%), đưa đối tượng vào diện SUSPECTED.
-   - Nhờ kiến trúc Phòng thủ nhiều lớp (Defense-in-Depth), bộ lọc chuỗi thời gian (confirm_seconds = 3.0s) giữ đối tượng ở diện
-     SUSPECTED (chỉ xuất hiện 5 frames) và không phát sinh cảnh báo phạt sai -> True Negative (TN).
+   - Xuất hiện liên tục 77 frames, tỷ lệ đè vỉa hè ghi nhận Overlap TB = 0.0% và chân đế không tiếp xúc mặt hè phố.
+   - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian (Spatial Checker) -> True Negative (TN).
 
 ## 5. ĐÁNH GIÁ ĐỘ ỔN ĐỊNH QUA 3 LẦN CHẠY LẶP & CƠ CHẾ GHÉP CẶP BIPARTITE
 --------------------------------------------------------------------------------
@@ -170,16 +168,16 @@ Câu hỏi 1: Vì sao mã Track ID của ByteTrack lại thay đổi giữa các
    thuật toán Spatio-Temporal Bipartite Matching tự động đối sánh theo IoU không gian, cự ly tâm và cửa sổ thời gian, đạt 100% ổn định
    phán quyết qua 3 lần chạy độc lập mà không cần bất kỳ ánh xạ thủ công nào.
 
-Câu hỏi 2: Tại sao em chỉ gán nhãn biển đứng trên Roboflow mà không gán nhãn biển treo tường? Trường hợp biển gắn tường tầng thấp có hình chiếu 2D đè lên ROI vỉa hè (như Track #15 ở Video 3 có Overlap 98.4%) thì hệ thống xử lý thế nào?
+Câu hỏi 2: Tại sao em chỉ gán nhãn biển đứng trên Roboflow mà không gán nhãn biển treo tường? Trường hợp biển treo/gắn tường có khả năng bị phạt nhầm không?
 -> Trả lời:
    1. Mặt biển đứng và biển treo tường có đặc trưng thị giác giống nhau đến 90% (khung chữ nhật, bạt in, chữ quảng cáo),
       khác nhau mỗi chân đế kim loại mỏng dễ bị che khuất. Nếu ép YOLO phân loại 2 class sẽ gây nhập nhằng nhãn (class confusion).
    2. Hệ thống áp dụng kiến trúc Phòng thủ nhiều lớp (Defense-in-Depth):
       - Lớp 1 (Spatial Rule Engine): Kiểm tra Overlap >= 30% và chân đế tiếp đất 3 điểm (base_in_roi), loại trừ ngay 100% biển treo
-        trên cao hoặc thụt trong nhà (như Track #5 ở Video 1 có Overlap 15.3% -> xếp NORMAL).
-      - Lớp 2 (Temporal Verifier & Calibration): Với trường hợp biên (Corner Case) là biển gắn sát chân tường tầng thấp (Track #15)
-        bị suy biến chiều sâu 2D làm đáy Box rơi vào ROI, tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đã chặn
-        lại ở trạng thái SUSPECTED (True Negative), kết hợp quy trình hiệu chuẩn lùi biên ROI cách chân tường 10-15px trên Web ROI Studio.
+        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 22.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 77 frames) -> xếp NORMAL.
+      - Lớp 2 (Temporal Verifier & Calibration): Với các trường hợp biên (Corner Case) góc nghiêng camera làm đáy Box chiếu sát mép vỉa hè,
+        tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đóng vai trò chốt chặn an toàn giữ đối tượng ở diện SUSPECTED (không bao giờ phạt nhầm),
+        kết hợp quy trình hiệu chuẩn lùi biên ROI cách chân tường 10-15px trên Web ROI Studio.
       - Lớp 3 (Human-in-the-Loop): Hồ sơ bằng chứng xuất kèm ảnh Full Frame và ảnh Crop để cán bộ trật tự đô thị phê duyệt cuối cùng
         theo Nghị định 168/2024/NĐ-CP, đảm bảo tỷ lệ phạt oan bằng 0%.
 
