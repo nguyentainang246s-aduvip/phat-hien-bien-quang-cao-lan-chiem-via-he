@@ -742,6 +742,18 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
         standee_3_v1_status_a = v1_obj3_a.get("system_status", "N/A") if v1_obj3_a else "N/A"
         standee_3_v1_status_b = v1_obj3_b.get("system_status", "N/A") if v1_obj3_b else "N/A"
 
+        if not results_dict_b:
+
+            print("[LỖI] Không có video nào được đánh giá thành công. Dừng tiến trình đánh giá.")
+
+            return None
+
+
+
+        if not results_dict_b:
+            print("[LỖI] Không có video nào được đánh giá thành công. Dừng tiến trình đánh giá.")
+            return None
+
         all_fps = [r["avg_fps"] for r in results_dict_b.values()]
         all_steady_fps = [r["latency_stats"]["steady_state_fps"] for r in results_dict_b.values()]
         all_tracker_lat = [r["latency_stats"]["tracker_mean_ms"] for r in results_dict_b.values()]
@@ -1108,7 +1120,8 @@ def run_single_video_eval_named(video_filename: str, progress_callback=None, cus
     """Đánh giá 1 video cụ thể theo tên file và trả về kết quả chi tiết kèm đối chiếu Ground Truth."""
     video_dir = "data/videos"
     config_dir = "configs"
-    video_filename = os.path.basename(video_filename)
+    video_filename = os.path.basename(video_filename)
+
     video_path = os.path.join(video_dir, video_filename)
     if not os.path.exists(video_path):
         return {"error": f"Không tìm thấy video: {video_filename}"}

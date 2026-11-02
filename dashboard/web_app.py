@@ -4489,8 +4489,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 if not db.is_duplicate_violation(camera_clean_id, box, time_window_minutes=5):
                                     sw_idx = sp.get("sidewalk_index", 1)
                                     ev_res = evidence_saver.save_evidence(
-                                        clean_frame, box, track_id=tid, camera_id=camera_clean_id, overlap_pct=sp["overlap_pct"]
+                                        clean_frame, box, track_id=tid, camera_id=camera_clean_id, overlap_pct=sp["overlap_pct"],
+                                        roi_frame=frame
                                     )
+                                    if not ev_res:
+                                        continue
                                     rec_id = db.insert_violation(
                                         camera_id=camera_clean_id,
                                         track_id=tid,

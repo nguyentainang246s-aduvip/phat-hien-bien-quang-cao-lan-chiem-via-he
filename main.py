@@ -288,7 +288,8 @@ def run_monitor_mode(args):
             ret, frame = reader.read()
             if not ret or frame is None:
                 fail_count += 1
-                if fail_count > 150:
+                max_fails = 5 if getattr(reader, 'is_live_stream', False) else 150
+                if fail_count > max_fails:
                     print("[LỖI] Mất nguồn video/camera, dừng giám sát.")
                     break
                 if not args.headless and (cv2.waitKey(10) & 0xFF) in (ord('q'), 27):

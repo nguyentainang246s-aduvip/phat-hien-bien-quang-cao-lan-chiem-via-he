@@ -54,7 +54,7 @@ Hệ thống giải quyết triệt để bài toán thị giác máy tính bằ
                 │
                 ▼
   [Tầng 2: Perception Layer - YOLOv8n ONNX]
-  • Mô hình: YOLOv8n Version 12 (6.65 MB PyTorch -> 13.05 MB ONNX Runtime).
+  • Mô hình: YOLOv8n Version 8 (6.4 MB PyTorch -> 11.7 MB ONNX Runtime).
   • Class mục tiêu: 1 class duy nhất 'bien_quang_cao' (Conf >= 0.25).
   • Nhiệm vụ: Chỉ phát hiện mọi ứng viên mang hình thái biển hiệu, KHÔNG kết luận vi phạm tại tầng này.
                 │
@@ -848,9 +848,11 @@ def compute_metrics_from_ground_truth(results_by_video: dict, gt_file: str):
     # Khớp nối động theo không gian - thời gian cho từng video
     matched_by_video = {}
     for vid_id, v_gt_items in gt_by_video.items():
-        vid_res = results_by_video.get(vid_id, {})
+        vid_res = results_by_video.get(vid_id) or {}
         v_tracks = vid_res.get("tracks", {})
-        matched_by_video[vid_id] = match_gt_to_tracks_robust(v_gt_items, v_tracks, fps=24.0)
+        _dur = vid_res.get("duration_sec") or 0
+        _fps = (vid_res["total_frames"] / _dur) if _dur > 0 and "total_frames" in vid_res else 24.0
+        matched_by_video[vid_id] = match_gt_to_tracks_robust(v_gt_items, v_tracks, fps=_fps)
 
     for item in gt_items:
         vid_id = item["video_id"]
@@ -1333,7 +1335,8 @@ def run_monitor_mode(args):
             ret, frame = reader.read()
             if not ret or frame is None:
                 fail_count += 1
-                if fail_count > 150:
+                max_fails = 5 if getattr(reader, 'is_live_stream', False) else 150
+                if fail_count > max_fails:
                     print("[LỖI] Mất nguồn video/camera, dừng giám sát.")
                     break
                 if not args.headless and (cv2.waitKey(10) & 0xFF) in (ord('q'), 27):
@@ -2627,6 +2630,18 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
         standee_3_v1_ov_b = v1_obj3_b.get("avg_overlap", 0.0) if v1_obj3_b else 0.0
         standee_3_v1_status_a = v1_obj3_a.get("system_status", "N/A") if v1_obj3_a else "N/A"
         standee_3_v1_status_b = v1_obj3_b.get("system_status", "N/A") if v1_obj3_b else "N/A"
+
+        if not results_dict_b:
+
+            print("[LỖI] Không có video nào được đánh giá thành công. Dừng tiến trình đánh giá.")
+
+            return None
+
+
+
+        if not results_dict_b:
+            print("[LỖI] Không có video nào được đánh giá thành công. Dừng tiến trình đánh giá.")
+            return None
 
         all_fps = [r["avg_fps"] for r in results_dict_b.values()]
         all_steady_fps = [r["latency_stats"]["steady_state_fps"] for r in results_dict_b.values()]
@@ -9801,8 +9816,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 if not db.is_duplicate_violation(camera_clean_id, box, time_window_minutes=5):
                                     sw_idx = sp.get("sidewalk_index", 1)
                                     ev_res = evidence_saver.save_evidence(
-                                        clean_frame, box, track_id=tid, camera_id=camera_clean_id, overlap_pct=sp["overlap_pct"]
+                                        clean_frame, box, track_id=tid, camera_id=camera_clean_id, overlap_pct=sp["overlap_pct"],
+                                        roi_frame=frame
                                     )
+                                    if not ev_res:
+                                        continue
                                     rec_id = db.insert_violation(
                                         camera_id=camera_clean_id,
                                         track_id=tid,
