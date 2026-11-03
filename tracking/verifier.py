@@ -225,6 +225,7 @@ class TemporalVerifier:
                     "status": TrackState.NORMAL,
                     "last_seen": self.current_frame_index,
                     "last_alert_time": None,
+                    "alerted": False,
                     "non_viol_streak": 0,
                     "stationary_since": None,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
@@ -293,31 +294,29 @@ class TemporalVerifier:
                         record["status"] = TrackState.CONFIRMED
                         suspect_reason = ""
 
-                    # Spatial & temporal deduplication
+                    # Spatial & temporal deduplication (khử trùng lặp theo vụ việc/incident)
                     if record["status"] == TrackState.CONFIRMED:
-                        is_spatially_cooldown = any(
-                            ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
-                            and (current_timestamp - c["time"]) < self.cooldown_seconds
-                            for c in self.confirmed_locations
-                        )
-                        time_ok = (record.get("last_alert_time") is None) or (
-                            (current_timestamp - record["last_alert_time"]) >= self.cooldown_seconds
-                        )
-
-                        if not is_spatially_cooldown and time_ok:
-                            is_new_alert = True
-                            record["last_alert_time"] = current_timestamp
-                            self.confirmed_locations.append({
-                                "cx": cx,
-                                "cy": cy,
-                                "time": current_timestamp,
-                                "track_id": track_id,
-                            })
-                            # Dọn dẹp mốc cũ
-                            self.confirmed_locations = [
-                                c for c in self.confirmed_locations
-                                if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
-                            ]
+                        if not record.get("alerted", False):
+                            is_spatially_cooldown = any(
+                                ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
+                                and (current_timestamp - c["time"]) < self.cooldown_seconds
+                                for c in self.confirmed_locations
+                            )
+                            if not is_spatially_cooldown:
+                                is_new_alert = True
+                                record["alerted"] = True
+                                record["last_alert_time"] = current_timestamp
+                                self.confirmed_locations.append({
+                                    "cx": cx,
+                                    "cy": cy,
+                                    "time": current_timestamp,
+                                    "track_id": track_id,
+                                })
+                                # Dọn dẹp mốc cũ
+                                self.confirmed_locations = [
+                                    c for c in self.confirmed_locations
+                                    if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
+                                ]
                 else:
                     if record["status"] != TrackState.CONFIRMED:
                         record["status"] = TrackState.SUSPECTED
@@ -339,6 +338,7 @@ class TemporalVerifier:
                     record["viol_start_time"] = None
                     record["last_viol_timestamp"] = None
                     record["status"] = TrackState.NORMAL
+                    record["alerted"] = False
                 else:
                     # Trong ngưỡng dung sai (1-2 frame flicker): trừ conf tương ứng khi decay
                     if record["viol_confs"]:
@@ -348,6 +348,7 @@ class TemporalVerifier:
                         record["viol_start_time"] = None
                         record["last_viol_timestamp"] = None
                         record["status"] = TrackState.NORMAL
+                        record["alerted"] = False
                     else:
                         record["viol_start_time"] = record["viol_confs"][0][0]
 
@@ -376,6 +377,7 @@ class TemporalVerifier:
                 if missing_exceeded:
                     if missing_streak > (self.max_missing_frames // 2):
                         r["status"] = TrackState.NORMAL
+                        r["alerted"] = False
                         r["viol_confs"].clear()
                         r["count"] = 0
                         r["viol_start_time"] = None

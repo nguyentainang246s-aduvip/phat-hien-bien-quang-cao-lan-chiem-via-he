@@ -7182,11 +7182,12 @@ class ViolationDatabase:
         finally:
             conn.close()
 
-    def is_duplicate_violation(self, camera_id: str, bbox: tuple, time_window_minutes: int = 5) -> bool:
+    def is_duplicate_violation(self, camera_id: str, bbox: tuple, time_window_minutes: int = 60) -> bool:
         """
-        ISSUE 09 FIX: Kiểm tra xem đã có bản ghi vi phạm tương tự trong DB chưa
-        (để tránh ghi trùng khi hệ thống restart).
-        So sánh: cùng camera + bbox gần giống + trong vòng N phút.
+        Kiểm tra xem đã có bản ghi vi phạm tương tự trong DB chưa (khử trùng lặp theo vụ việc/incident):
+        1. Cùng camera và tọa độ bbox tương đồng.
+        2. Nếu đang có hồ sơ 'pending' hoặc 'confirmed' trong vòng time_window_minutes (mặc định 60 phút).
+        3. Nếu hồ sơ tại vị trí này đã được cán bộ duyệt 'dismissed' (có giấy phép) trong 24 giờ qua thì không báo lại.
         """
         x1, y1, x2, y2 = bbox if bbox else (0, 0, 0, 0)
         # Tách riêng biên độ pixel theo trục X và trục Y để thích nghi với biển dạng đứng
@@ -7203,7 +7204,10 @@ class ViolationDatabase:
                   AND ABS(bbox_y1 - ?) <= ?
                   AND ABS(bbox_x2 - ?) <= ?
                   AND ABS(bbox_y2 - ?) <= ?
-                  AND timestamp >= datetime('now', 'localtime', ?)
+                  AND (
+                      (status IN ('pending', 'confirmed') AND timestamp >= datetime('now', 'localtime', ?))
+                      OR (status = 'dismissed' AND timestamp >= datetime('now', 'localtime', '-24 hours'))
+                  )
             """, (
                 camera_id,
                 x1, margin_x, y1, margin_y, x2, margin_x, y2, margin_y,
@@ -8760,16 +8764,16 @@ def _compute_best_spatial_iou(gbox: list, t_info: dict) -> tuple:
     Xét cả best_box lẫn toàn bộ lịch sử boxes của track để tránh sai lệch tại 1 frame đơn lẻ.
     """
     tbox = t_info.get("best_box", [0, 0, 0, 0])
-    s_iou = compute_box_iou(gbox, tbox)
-
     all_boxes = t_info.get("boxes", [])
     if all_boxes:
-        max_hist_iou = max(compute_box_iou(gbox, b) for b in all_boxes)
-        s_iou = max(s_iou, max_hist_iou)
+        # Tính Median IoU trên chuỗi lịch sử quan sát thực tế (phản ánh độ chính xác định vị tự nhiên, không lấy max 1.00)
+        ious = [compute_box_iou(gbox, b) for b in all_boxes]
+        s_iou = float(np.median(ious)) if ious else compute_box_iou(gbox, tbox)
         med_cx = float(np.median([(b[0] + b[2]) / 2.0 for b in all_boxes]))
         med_cy = float(np.median([(b[1] + b[3]) / 2.0 for b in all_boxes]))
         c_tr = (med_cx, med_cy)
     else:
+        s_iou = compute_box_iou(gbox, tbox)
         c_tr = ((tbox[0] + tbox[2]) / 2.0, (tbox[1] + tbox[3]) / 2.0)
 
     c_gt = ((gbox[0] + gbox[2]) / 2.0, (gbox[1] + gbox[3]) / 2.0)
@@ -9684,8 +9688,8 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write("* Để bảo đảm tính minh bạch và liêm chính học thuật, đề tài công bố công khai cả hai phiên bản trong bảng tổng hợp dưới đây.\n\n")
 
             mf.write("### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):\n")
-            mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #33):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
-            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #23):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
+            mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
+            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
             mf.write("3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).\n\n")
 
             mf.write("---\n\n")
@@ -11239,14 +11243,21 @@ def run_monitor_mode(args):
             config_path = candidate_1
         elif os.path.exists(candidate_2):
             config_path = candidate_2
+        elif is_live_stream:
+            print(f"[LỖI CẤU HÌNH] Nguồn camera trực tiếp '{source}' chưa được chỉ định cấu hình ROI.")
+            print("Vui lòng truyền tường minh tham số: --config configs/roi_<camera_id>.json")
+            return False
         elif os.path.exists("configs/roi_camera1.json"):
             config_path = "configs/roi_camera1.json"
         else:
-            roi_files = sorted(f for f in os.listdir("configs") if f.startswith("roi_") and f.endswith(".json"))
-            config_path = os.path.join("configs", roi_files[0]) if roi_files else "configs/roi_camera1.json"
+            print(f"[LỖI CẤU HÌNH] Không tìm thấy tệp cấu hình ROI vỉa hè nào trong thư mục configs/.")
+            return False
 
     roi_manager = ROIManager(config_path)
     total_pts = sum(len(p) for p in roi_manager.polygons)
+    if total_pts == 0:
+        print(f"[LỖI CẤU HÌNH] Tệp ROI '{config_path}' không chứa đa giác vỉa hè nào! Hệ thống từ chối chạy ở trạng thái mù.")
+        return False
 
     # 3. Nạp cấu hình tham số tập trung (settings.yaml)
     cfg = _load_settings()
@@ -11499,29 +11510,32 @@ def run_monitor_mode(args):
                         label = f"VI PHAM VH#{sw_idx} ({sp['overlap_pct']}%)"
 
                         if is_new_alert:
-                            is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5)
-                            if is_dup:
-                                print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi tương tự trong 5 phút gần đây)")
-                            else:
-                                total_confirmed_events += 1
-                                ev_res = evidence_saver.save_evidence(
-                                    clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
-                                    roi_frame=base_roi_frame
-                                )
-                                if ev_res:
-                                    rec_id = db.insert_violation(
-                                        camera_id=roi_manager.camera_id,
-                                        track_id=track_id,
-                                        timestamp=ev_res["timestamp"],
-                                        confidence=conf,
-                                        overlap_pct=sp["overlap_pct"],
-                                        full_image_path=ev_res["full_path"],
-                                        crop_image_path=ev_res.get("crop_path", ""),
-                                        bbox=box,
-                                        sidewalk_index=sw_idx
+                            try:
+                                is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=60)
+                                if is_dup:
+                                    print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi còn hiệu lực hoặc đã được xử lý)")
+                                else:
+                                    total_confirmed_events += 1
+                                    ev_res = evidence_saver.save_evidence(
+                                        clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
+                                        roi_frame=base_roi_frame
                                     )
-                                    print(f" [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
-                                    print(f"    Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
+                                    if ev_res:
+                                        rec_id = db.insert_violation(
+                                            camera_id=roi_manager.camera_id,
+                                            track_id=track_id,
+                                            timestamp=ev_res["timestamp"],
+                                            confidence=conf,
+                                            overlap_pct=sp["overlap_pct"],
+                                            full_image_path=ev_res["full_path"],
+                                            crop_image_path=ev_res.get("crop_path", ""),
+                                            bbox=box,
+                                            sidewalk_index=sw_idx
+                                        )
+                                        print(f" [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
+                                        print(f"    Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
+                            except Exception as e_rec:
+                                print(f"[CẢNH BÁO LƯU TRỮ] Không thể ghi nhận bằng chứng vi phạm ID #{track_id}: {e_rec}")
 
                     elif temporal_status == TrackState.SUSPECTED:
                         current_frame_suspected += 1
@@ -12442,12 +12456,112 @@ python -m unittest discover tests
 
 
 ================================================================================
+FILE: report2\Bao_cao_tuan_9_11.md
+================================================================================
+
+# BÁO CÁO TIẾN ĐỘ ĐỒ ÁN – TUẦN 9–11
+
+**Ngày lập:** 03/11/2026  
+**Sinh viên:** Nguyễn Đức Tài Năng — MSSV 20224083  
+**Đề tài:** Hệ thống phát hiện biển quảng cáo lấn chiếm vỉa hè qua camera CCTV
+
+## Mục tiêu giai đoạn
+
+- Huấn luyện YOLOv8n trên bộ dữ liệu biển hiệu/biển quảng cáo.
+- Đánh giá và tinh chỉnh mô hình bằng Precision, Recall, mAP; xem xét bổ sung/làm sạch dữ liệu khi cần.
+
+## Công việc và kết quả
+
+1. **Huấn luyện:** cấu hình huấn luyện trong `runs/detect/train_v13/args.yaml` cho thấy YOLOv8n được huấn luyện tối đa 100 epoch, ảnh đầu vào 1280×1280, batch 8, optimizer AdamW. Nhật ký `results.csv` ghi nhận 51 epoch hoàn tất; checkpoint tốt nhất theo mAP@0.5 là epoch 49.
+2. **Đánh giá detector:** tại epoch 49, Precision = **90.45%**, Recall = **82.87%**, mAP@0.5 = **90.03%**, mAP@0.5:0.95 = **61.69%**. Đây là chỉ số validation trong nhật ký huấn luyện, không phải kết quả đánh giá video thực địa.
+3. **Đầu ra mô hình:** có `models/best.pt` (6,611,242 byte) và `models/best.onnx` (13,053,904 byte). Cấu hình hệ thống trỏ tới checkpoint `models/best.pt`; kích thước suy luận cấu hình là 640.
+4. **Minh chứng nhận diện:** có 3 ảnh kết quả trong `data/images/output_v13/`. Các ảnh này thể hiện kết quả chạy mô hình trên ảnh hiện trường; không suy diễn chúng thành phép đo Precision/Recall.
+5. **Tinh chỉnh tiếp:** cần kiểm tra riêng lỗi bỏ sót biển nhỏ/xa, độ tin cậy theo bối cảnh và hiệu chuẩn ROI trước khi chốt kết quả cấp hệ thống. Bộ dữ liệu hiện có các tập train/valid/test; số ảnh không ghi trong báo cáo vì chưa được kiểm kê trực tiếp trong lần lập này.
+
+## Đánh giá chung
+
+Đã có checkpoint YOLOv8n và bộ chỉ số validation cụ thể; mAP@0.5 của checkpoint tốt nhất đạt 90.03%. Kết quả cho thấy mô hình có khả năng phát hiện tốt trên tập validation, trong khi Recall 82.87% cho thấy vẫn cần tiếp tục rà soát các trường hợp bị bỏ sót. Không gộp chỉ số detector với chỉ số phán quyết vi phạm của toàn pipeline.
+
+## Kế hoạch tiếp theo
+
+- Đối chiếu lỗi dự đoán với nhãn trên tập test độc lập và phân loại false positive/false negative.
+- Bổ sung hoặc làm sạch mẫu khó khi có bằng chứng lỗi, nhất là biển nhỏ, bị che khuất và điều kiện ánh sáng khác nhau.
+- Đo lại các chỉ số sau tinh chỉnh; ghi rõ tập dữ liệu, checkpoint, cấu hình và ngưỡng đánh giá.
+- Kiểm tra kết quả tích hợp detector–tracking–ROI trên video, báo cáo riêng Precision/Recall cấp sự kiện và tốc độ xử lý.
+
+## Nguồn số liệu trong đồ án
+
+- `runs/detect/train_v13/results.csv` — nhật ký metric theo epoch; checkpoint tốt nhất chọn theo mAP@0.5.
+- `runs/detect/train_v13/args.yaml` — cấu hình huấn luyện.
+- `configs/settings.yaml` — cấu hình chạy hệ thống.
+- `models/best.pt`, `models/best.onnx` — tệp trọng số hiện có.
+- `data/images/output_v13/` — ảnh minh chứng nhận diện.
+
+*Ghi chú: Báo cáo được tổng hợp từ các tệp nguồn của đồ án; không mở hoặc sử dụng bất kỳ báo cáo nào trong thư mục `reports`.*
+
+
+================================================================================
+FILE: report2\make_report.py
+================================================================================
+
+from pathlib import Path
+from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
+
+out = Path(__file__).parent / 'Bao_cao_tuan_9_11.docx'
+doc = Document()
+sec = doc.sections[0]
+sec.top_margin = Inches(.72); sec.bottom_margin = Inches(.72)
+sec.left_margin = Inches(.82); sec.right_margin = Inches(.82)
+styles = doc.styles
+styles['Normal'].font.name = 'Arial'; styles['Normal'].font.size = Pt(10)
+styles['Normal'].font.color.rgb = RGBColor(35, 45, 60)
+for s in ['Heading 1','Heading 2']:
+    styles[s].font.name='Arial'; styles[s].font.color.rgb=RGBColor(30,58,138)
+
+p=doc.add_paragraph(); p.alignment=WD_ALIGN_PARAGRAPH.CENTER
+r=p.add_run('BÁO CÁO TIẾN ĐỘ ĐỒ ÁN'); r.bold=True; r.font.size=Pt(18); r.font.color.rgb=RGBColor(30,58,138)
+p=doc.add_paragraph(); p.alignment=WD_ALIGN_PARAGRAPH.CENTER
+r=p.add_run('TUẦN 9–11 | HUẤN LUYỆN, ĐÁNH GIÁ VÀ TINH CHỈNH YOLOv8n'); r.bold=True; r.font.size=Pt(11); r.font.color.rgb=RGBColor(15,118,110)
+
+t=doc.add_table(rows=3, cols=2); t.alignment=WD_TABLE_ALIGNMENT.CENTER; t.style='Light Shading Accent 1'
+for row, vals in zip(t.rows,[('Sinh viên','Nguyễn Đức Tài Năng — MSSV 20224083'),('Đề tài','Hệ thống phát hiện biển quảng cáo lấn chiếm vỉa hè qua camera CCTV'),('Ngày lập','03/11/2026')]):
+    for c,v in zip(row.cells, vals): c.text=v; c.vertical_alignment=WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+doc.add_heading('1. Mục tiêu giai đoạn', level=1)
+doc.add_paragraph('Huấn luyện YOLOv8n trên dữ liệu biển hiệu/biển quảng cáo; đánh giá bằng Precision, Recall, mAP; rà soát nhu cầu làm sạch hoặc bổ sung dữ liệu.')
+doc.add_heading('2. Công việc và kết quả', level=1)
+items=[
+('Huấn luyện mô hình.',' Cấu hình tại runs/detect/train_v13/args.yaml: tối đa 100 epoch, ảnh 1280×1280, batch 8, optimizer AdamW. Nhật ký results.csv ghi 51 epoch hoàn tất; epoch 49 là tốt nhất theo mAP@0.5.'),
+('Đánh giá detector.',' Tại epoch 49: Precision 90.45%, Recall 82.87%, mAP@0.5 90.03%, mAP@0.5:0.95 61.69%. Đây là metric validation trong quá trình huấn luyện, không phải đánh giá video thực địa.'),
+('Sản phẩm.',' Có models/best.pt (6,611,242 byte) và models/best.onnx (13,053,904 byte). Cấu hình hệ thống dùng models/best.pt và imgsz=640.'),
+('Minh chứng.',' Có 3 ảnh nhận diện trong data/images/output_v13/. Ảnh minh họa kết quả chạy trên ảnh hiện trường, không thay thế phép đo Precision/Recall.'),
+('Việc cần rà soát.',' Kiểm tra riêng lỗi bỏ sót biển nhỏ/xa, độ tin cậy theo bối cảnh và hiệu chuẩn ROI trước khi chốt kết quả cấp hệ thống. Không đưa số lượng ảnh dataset vào báo cáo do chưa kiểm kê trực tiếp trong lần lập này.')]
+for head,body in items:
+    p=doc.add_paragraph(style='List Bullet'); rr=p.add_run(head); rr.bold=True; p.add_run(body)
+
+doc.add_heading('3. Đánh giá chung', level=1)
+doc.add_paragraph('Đã có checkpoint YOLOv8n và bộ chỉ số validation cụ thể; mAP@0.5 của checkpoint tốt nhất đạt 90.03%. Recall 82.87% cho thấy cần rà soát các trường hợp bị bỏ sót. Chỉ số detector được trình bày riêng, không gộp với chỉ số phán quyết vi phạm của toàn pipeline.')
+doc.add_heading('4. Kế hoạch tiếp theo', level=1)
+for x in ['Đối chiếu lỗi dự đoán với nhãn trên tập test độc lập; phân loại false positive và false negative.','Bổ sung hoặc làm sạch mẫu khó khi có bằng chứng lỗi, ưu tiên biển nhỏ, che khuất và điều kiện ánh sáng khác nhau.','Đo lại metric sau tinh chỉnh, ghi rõ tập dữ liệu, checkpoint, cấu hình và ngưỡng.','Đánh giá riêng detector–tracking–ROI trên video theo Precision/Recall cấp sự kiện và tốc độ xử lý.']:
+    doc.add_paragraph(x, style='List Bullet')
+doc.add_heading('5. Nguồn số liệu', level=1)
+doc.add_paragraph('runs/detect/train_v13/results.csv; runs/detect/train_v13/args.yaml; configs/settings.yaml; models/best.pt; models/best.onnx; data/images/output_v13/.')
+p=doc.add_paragraph(); p.alignment=WD_ALIGN_PARAGRAPH.CENTER
+r=p.add_run('Báo cáo được tổng hợp từ các tệp nguồn của đồ án; không đọc hoặc sử dụng tài liệu trong thư mục reports.'); r.italic=True; r.font.size=Pt(8); r.font.color.rgb=RGBColor(100,116,139)
+doc.save(out)
+print(out)
+
+
+================================================================================
 FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 ================================================================================
 
 # BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG TRÊN VIDEO THỰC TẾ (SYSTEM-LEVEL METRICS)
 
-> **Thời gian chạy kiểm thử:** 2026-11-03 09:06:59  
+> **Thời gian chạy kiểm thử:** 2026-11-03 15:42:39  
 > **Người thực hiện:** Nguyễn Đức Tài Năng (ĐATN 20224083)  
 > **Cơ chế đo đạc:** Chạy tự động từ `evaluation/evaluate_videos.py`, đối chiếu với `configs/video_ground_truth.json` và trích xuất `reports/system_eval_results.json`.
 
@@ -12469,8 +12583,8 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 ## 2. Kết Quả Chi Tiết Từng Video Thực Địa
 
 ### Video: `data/videos/video test.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **35.4 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 47.02 ms (p50: 40.65 ms, p95: 76.32 ms); Verifier Mean = 1.86 ms; Tổng khung hình infer = 51.68 ms (Frame khởi động: 2232.47 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **33.4 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 47.36 ms (p50: 43.30 ms, p95: 70.10 ms); Verifier Mean = 2.01 ms; Tổng khung hình infer = 53.08 ms (Frame khởi động: 2365.01 ms)
 * **Kết quả:** **4 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -12478,15 +12592,15 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 | **#1** | 80 | 86.8% | 78.9% | `CONFIRMED` | `track_1_conf87.jpg` |
 | **#2** | 80 | 86.2% | 100.0% | `CONFIRMED` | `track_2_conf87.jpg` |
 | **#3** | 80 | 80.1% | 100.0% | `CONFIRMED` | `track_3_conf82.jpg` |
-| **#4** | 75 | 73.9% | 100.0% | `CONFIRMED` | `track_4_conf78.jpg` |
+| **#4** | 76 | 73.1% | 100.0% | `CONFIRMED` | `track_4_conf78.jpg` |
 | **#5** | 80 | 60.5% | 20.3% | `NORMAL` | `track_5_conf68.jpg` |
-| **#6** | 1 | 61.5% | 100.0% | `SUSPECTED` | `track_6_conf61.jpg` |
+| **#6** | 2 | 38.2% | 100.0% | `SUSPECTED` | `track_6_conf61.jpg` |
 
 ---
 
 ### Video: `data/videos/videotesst2.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **42.4 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 58.43 ms (p50: 46.93 ms, p95: 103.73 ms); Verifier Mean = 1.21 ms; Tổng khung hình infer = 62.82 ms (Frame khởi động: 236.97 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **51.9 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 45.46 ms (p50: 43.10 ms, p95: 59.77 ms); Verifier Mean = 1.15 ms; Tổng khung hình infer = 50.30 ms (Frame khởi động: 154.29 ms)
 * **Kết quả:** **3 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **0 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -12494,13 +12608,13 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 | **#1** | 80 | 84.5% | 74.9% | `CONFIRMED` | `track_1_conf87.jpg` |
 | **#2** | 80 | 71.5% | 100.0% | `CONFIRMED` | `track_2_conf81.jpg` |
 | **#3** | 80 | 63.8% | 100.0% | `CONFIRMED` | `track_3_conf68.jpg` |
-| **#20** | 19 | 30.7% | 91.9% | `SUSPECTED` | `track_20_conf37.jpg` |
+| **#20** | 41 | 24.0% | 91.7% | `SUSPECTED` | `track_20_conf37.jpg` |
 
 ---
 
 ### Video: `data/videos/video test3.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **43.9 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 55.11 ms (p50: 48.72 ms, p95: 88.30 ms); Verifier Mean = 2.60 ms; Tổng khung hình infer = 60.86 ms (Frame khởi động: 163.4 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **30.1 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 85.37 ms (p50: 56.79 ms, p95: 231.47 ms); Verifier Mean = 2.89 ms; Tổng khung hình infer = 92.00 ms (Frame khởi động: 146.74 ms)
 * **Kết quả:** **7 Vi phạm (Confirmed)** | **2 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -12511,10 +12625,10 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 | **#4** | 80 | 80.5% | 97.7% | `CONFIRMED` | `track_4_conf83.jpg` |
 | **#5** | 80 | 69.8% | 100.0% | `CONFIRMED` | `track_5_conf75.jpg` |
 | **#6** | 80 | 59.6% | 100.0% | `CONFIRMED` | `track_6_conf64.jpg` |
-| **#7** | 76 | 41.5% | 100.0% | `CONFIRMED` | `track_7_conf56.jpg` |
-| **#8** | 77 | 49.1% | 0.0% | `NORMAL` | `track_8_conf64.jpg` |
-| **#9** | 23 | 29.2% | 100.0% | `SUSPECTED` | `track_9_conf34.jpg` |
-| **#10** | 4 | 31.3% | 100.0% | `SUSPECTED` | `track_10_conf33.jpg` |
+| **#7** | 80 | 40.4% | 100.0% | `CONFIRMED` | `track_7_conf56.jpg` |
+| **#8** | 80 | 48.1% | 0.0% | `NORMAL` | `track_8_conf64.jpg` |
+| **#9** | 80 | 23.5% | 100.0% | `SUSPECTED` | `track_9_conf34.jpg` |
+| **#10** | 8 | 19.3% | 100.0% | `SUSPECTED` | `track_10_conf33.jpg` |
 
 ---
 
@@ -12522,24 +12636,24 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 
 | Video | Ground Truth ID | ByteTrack ID | Tên biển hiệu / Đối tượng | Độ tin cậy ghép nối (IoU/Conf) | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | Ground Truth Thực tế | Phân loại Đánh giá |
 | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- | :---: |
-| **Video 1** | **GT #1** | **Track #1** | Biển bạt lớn dựng đứng trước cửa hàng số 1 | `IoU: 1.00 (Conf: 1.30)` | 80 | 86.8% | 78.9% | `CONFIRMED` | Biển bạt lớn dựng cố định trên hè phố trước cửa hàng, chiếm dụng hoàn toàn không gian vỉa hè dành cho người đi bộ. | **True Positive (TP)** |
-| **Video 1** | **GT #2** | **Track #2** | Biển hiệu dạng hộp đứng sát vách cửa hàng | `IoU: 1.00 (Conf: 1.30)` | 80 | 86.2% | 100.0% | `CONFIRMED` | Biển hiệu dạng hộp đứng trực tiếp trên mặt vỉa hè sát vách cửa hàng, cản trở lối lưu thông của người đi bộ. | **True Positive (TP)** |
-| **Video 1** | **GT #3** | **Track #3** | Biển Standee chữ A chân sắt đặt trên lối đi bộ | `IoU: 1.00 (Conf: 1.30)` | 80 | 80.1% | 100.0% | `CONFIRMED` | Biển Standee chữ A khung sắt đặt trực tiếp trên lối đi lát gạch của vỉa hè, chiếm dụng không gian lưu thông công cộng. | **True Positive (TP)** |
-| **Video 1** | **GT #4** | **Track #4** | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | `IoU: 1.00 (Conf: 1.28)` | 75 | 73.9% | 100.0% | `CONFIRMED` | Biển quảng cáo dạng tấm dọc dựng sát gốc cây trên vỉa hè, cản trở lối đi bộ. | **True Positive (TP)** |
-| **Video 1** | **GT #5** | **Track #5** | Biển hiệu treo thụt sâu trong lòng nhà | `IoU: 1.00 (Conf: 1.30)` | 80 | 60.5% | 20.3% | `NORMAL` | Biển hiệu treo sâu bên trong khuôn viên nhà dân, không cắm chân hay đặt trên mặt vỉa hè dành cho người đi bộ. | **True Negative (TN)** |
-| **Video 2** | **GT #1** | **Track #1** | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | `IoU: 1.00 (Conf: 1.29)` | 80 | 84.5% | 74.9% | `CONFIRMED` | Biển hộp đèn lớn cắm chân cố định trên mặt vỉa hè trước cửa hàng, cản trở lối đi bộ. | **True Positive (TP)** |
-| **Video 2** | **GT #2** | **Track #2** | Biển quảng cáo di động chân bánh xe | `IoU: 1.00 (Conf: 1.29)` | 80 | 71.5% | 100.0% | `CONFIRMED` | Biển quảng cáo di động chân bánh xe đặt trên vỉa hè trước cửa hàng, chiếm dụng lối lưu thông. | **True Positive (TP)** |
-| **Video 2** | **GT #3** | **Track #3** | Biển bạt nhỏ kê trước bậc thềm | `IoU: 1.00 (Conf: 1.30)` | 80 | 63.8% | 100.0% | `CONFIRMED` | Biển bạt nhỏ kê trước bậc thềm chiếm dụng mặt cắt vỉa hè công cộng. | **True Positive (TP)** |
-| **Video 2** | **GT #23** | **Track #20** | Biển hiệu dạng khung sắt tầm thấp ven đường | `IoU: 1.00 (Conf: 1.08)` | 19 | 30.7% | 91.9% | `SUSPECTED` | Biển hiệu dạng khung sắt tầm thấp cắm chân trên vỉa hè ven đường trước cửa hàng. | **False Negative (FN)** |
+| **Video 1** | **GT #1** | **Track #1** | Biển bạt lớn dựng đứng trước cửa hàng số 1 | `IoU: 0.98 (Conf: 1.29)` | 80 | 86.8% | 78.9% | `CONFIRMED` | Biển bạt lớn dựng cố định trên hè phố trước cửa hàng, chiếm dụng hoàn toàn không gian vỉa hè dành cho người đi bộ. | **True Positive (TP)** |
+| **Video 1** | **GT #2** | **Track #2** | Biển hiệu dạng hộp đứng sát vách cửa hàng | `IoU: 0.97 (Conf: 1.28)` | 80 | 86.2% | 100.0% | `CONFIRMED` | Biển hiệu dạng hộp đứng trực tiếp trên mặt vỉa hè sát vách cửa hàng, cản trở lối lưu thông của người đi bộ. | **True Positive (TP)** |
+| **Video 1** | **GT #3** | **Track #3** | Biển Standee chữ A chân sắt đặt trên lối đi bộ | `IoU: 0.97 (Conf: 1.28)` | 80 | 80.1% | 100.0% | `CONFIRMED` | Biển Standee chữ A khung sắt đặt trực tiếp trên lối đi lát gạch của vỉa hè, chiếm dụng không gian lưu thông công cộng. | **True Positive (TP)** |
+| **Video 1** | **GT #4** | **Track #4** | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | `IoU: 0.95 (Conf: 1.26)` | 76 | 73.1% | 100.0% | `CONFIRMED` | Biển quảng cáo dạng tấm dọc dựng sát gốc cây trên vỉa hè, cản trở lối đi bộ. | **True Positive (TP)** |
+| **Video 1** | **GT #5** | **Track #5** | Biển hiệu treo thụt sâu trong lòng nhà | `IoU: 0.98 (Conf: 1.29)` | 80 | 60.5% | 20.3% | `NORMAL` | Biển hiệu treo sâu bên trong khuôn viên nhà dân, không cắm chân hay đặt trên mặt vỉa hè dành cho người đi bộ. | **True Negative (TN)** |
+| **Video 2** | **GT #1** | **Track #1** | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | `IoU: 0.86 (Conf: 1.24)` | 80 | 84.5% | 74.9% | `CONFIRMED` | Biển hộp đèn lớn cắm chân cố định trên mặt vỉa hè trước cửa hàng, cản trở lối đi bộ. | **True Positive (TP)** |
+| **Video 2** | **GT #2** | **Track #2** | Biển quảng cáo di động chân bánh xe | `IoU: 0.93 (Conf: 1.27)` | 80 | 71.5% | 100.0% | `CONFIRMED` | Biển quảng cáo di động chân bánh xe đặt trên vỉa hè trước cửa hàng, chiếm dụng lối lưu thông. | **True Positive (TP)** |
+| **Video 2** | **GT #3** | **Track #3** | Biển bạt nhỏ kê trước bậc thềm | `IoU: 0.96 (Conf: 1.28)` | 80 | 63.8% | 100.0% | `CONFIRMED` | Biển bạt nhỏ kê trước bậc thềm chiếm dụng mặt cắt vỉa hè công cộng. | **True Positive (TP)** |
+| **Video 2** | **GT #23** | **Track #20** | Biển hiệu dạng khung sắt tầm thấp ven đường | `IoU: 0.87 (Conf: 1.11)` | 41 | 24.0% | 91.7% | `SUSPECTED` | Biển hiệu dạng khung sắt tầm thấp cắm chân trên vỉa hè ven đường trước cửa hàng. | **False Negative (FN)** |
 | **Video 2** | **GT #33** | **Track #None** | Biển hiệu cửa hàng ở góc phải khung hình | `unmatched` | 0 | 0.0% | 0.0% | `UNKNOWN` | Biển hiệu đặt trên vỉa hè xuất hiện ở phần cuối đoạn video, chiếm dụng lối đi bộ. | **False Negative (FN)** |
-| **Video 3** | **GT #1** | **Track #1** | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | `IoU: 1.00 (Conf: 1.30)` | 80 | 89.8% | 100.0% | `CONFIRMED` | Biển quảng cáo pano lớn đặt chiếm dụng phần lớn bề rộng vỉa hè trước cửa hàng. | **True Positive (TP)** |
-| **Video 3** | **GT #2** | **Track #2** | Biển hộp đèn đứng góc trái | `IoU: 1.00 (Conf: 1.30)` | 80 | 88.4% | 66.7% | `CONFIRMED` | Biển hộp đèn đứng đặt trên vỉa hè chiếm dụng lối đi bộ. | **True Positive (TP)** |
-| **Video 3** | **GT #3** | **Track #3** | Biển vẫy thấp đặt cạnh gốc cây | `IoU: 1.00 (Conf: 1.30)` | 80 | 85.5% | 100.0% | `CONFIRMED` | Biển vẫy thấp đặt cạnh gốc cây trên vỉa hè chiếm dụng lối đi bộ. | **True Positive (TP)** |
-| **Video 3** | **GT #4** | **Track #4** | Biển bạt chữ nhật kê ngoài thềm | `IoU: 1.00 (Conf: 1.30)` | 80 | 80.5% | 97.7% | `CONFIRMED` | Biển bạt chữ nhật kê ngoài thềm chiếm dụng vỉa hè công cộng. | **True Positive (TP)** |
-| **Video 3** | **GT #5** | **Track #5** | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | `IoU: 1.00 (Conf: 1.14)` | 80 | 69.8% | 100.0% | `CONFIRMED` | Biển hiệu nhỏ ở cự ly xa đặt trên vỉa hè trước cửa hàng. | **True Positive (TP)** |
-| **Video 3** | **GT #8** | **Track #8** | Biển gắn tường tầng thấp phía bên phải | `IoU: 1.00 (Conf: 1.30)` | 77 | 49.1% | 0.0% | `NORMAL` | Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè. | **True Negative (TN)** |
+| **Video 3** | **GT #1** | **Track #1** | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | `IoU: 0.97 (Conf: 1.29)` | 80 | 89.8% | 100.0% | `CONFIRMED` | Biển quảng cáo pano lớn đặt chiếm dụng phần lớn bề rộng vỉa hè trước cửa hàng. | **True Positive (TP)** |
+| **Video 3** | **GT #2** | **Track #2** | Biển hộp đèn đứng góc trái | `IoU: 0.97 (Conf: 1.28)` | 80 | 88.4% | 66.7% | `CONFIRMED` | Biển hộp đèn đứng đặt trên vỉa hè chiếm dụng lối đi bộ. | **True Positive (TP)** |
+| **Video 3** | **GT #3** | **Track #3** | Biển vẫy thấp đặt cạnh gốc cây | `IoU: 0.95 (Conf: 1.27)` | 80 | 85.5% | 100.0% | `CONFIRMED` | Biển vẫy thấp đặt cạnh gốc cây trên vỉa hè chiếm dụng lối đi bộ. | **True Positive (TP)** |
+| **Video 3** | **GT #4** | **Track #4** | Biển bạt chữ nhật kê ngoài thềm | `IoU: 0.96 (Conf: 1.28)` | 80 | 80.5% | 97.7% | `CONFIRMED` | Biển bạt chữ nhật kê ngoài thềm chiếm dụng vỉa hè công cộng. | **True Positive (TP)** |
+| **Video 3** | **GT #5** | **Track #5** | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | `IoU: 0.93 (Conf: 1.12)` | 80 | 69.8% | 100.0% | `CONFIRMED` | Biển hiệu nhỏ ở cự ly xa đặt trên vỉa hè trước cửa hàng. | **True Positive (TP)** |
+| **Video 3** | **GT #8** | **Track #8** | Biển gắn tường tầng thấp phía bên phải | `IoU: 0.95 (Conf: 1.28)` | 80 | 48.1% | 0.0% | `NORMAL` | Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè. | **True Negative (TN)** |
 | **Video 3** | **GT #None** | **Track #6** | Track #6 ngoài Ground Truth bị kết luận nhầm là vi phạm | `unmatched_false_positive` | 80 | 59.6% | 100.0% | `CONFIRMED` | Báo động giả (False Positive) từ vật thể ngoài tập nhãn chuẩn. | **False Positive (FP)** |
-| **Video 3** | **GT #None** | **Track #7** | Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm | `unmatched_false_positive` | 76 | 41.5% | 100.0% | `CONFIRMED` | Báo động giả (False Positive) từ vật thể ngoài tập nhãn chuẩn. | **False Positive (FP)** |
+| **Video 3** | **GT #None** | **Track #7** | Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm | `unmatched_false_positive` | 80 | 40.4% | 100.0% | `CONFIRMED` | Báo động giả (False Positive) từ vật thể ngoài tập nhãn chuẩn. | **False Positive (FP)** |
 
 ### Giải Trình Khoa Học Về Trường Hợp Biển Standee #3 (Video 1):
 * **Trong thử nghiệm sơ khai (Version A):** Vùng ROI ban đầu được vẽ hẹp ở mép trong (`configs/roi_video_test_version_a.json`). Khi đó biển Standee #3 có độ đè trung bình là 100.0%, nhưng điểm chân đế tiếp đất rơi ra ngoài đa giác ROI (`base_in_roi = False`) nên hệ thống kết luận `NORMAL`. Đối chiếu với Ground Truth thực tế (VIOLATION), đây là một trường hợp bỏ sót (False Negative - FN), khiến Recall của Version A đạt 78.57% (11/14).
@@ -12547,8 +12661,8 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 * Để bảo đảm tính minh bạch và liêm chính học thuật, đề tài công bố công khai cả hai phiên bản trong bảng tổng hợp dưới đây.
 
 ### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):
-1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #33):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.
-2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #23):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.
+1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.
+2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.
 3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).
 
 ---
@@ -12567,9 +12681,9 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 | **System Recall** | $\frac{TP}{TP + FN}$ | 78.57% (11/14) | **85.71%** (12/14) | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System F1-Score** | $2 \cdot \frac{P \cdot R}{P + R}$ | 81.48% | **85.71%** | Cân bằng điều hòa tối ưu |
 | **Cảnh báo sai trong mẫu** | FP / 30s | 2 cảnh báo sai | **2 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
-| **Thông lượng Pipeline** | Throughput | 35.4 – 43.9 FPS | **35.4 – 43.9 FPS** | Ổn định: 44.4 – 53.3 FPS |
-| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~11.8 – 14.6 Hz | **~11.8 – 14.6 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
-| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 55.1 ms | **55.1 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 53.5 ms; loại trừ frame khởi động) |
+| **Thông lượng Pipeline** | Throughput | 30.1 – 51.9 FPS | **30.1 – 51.9 FPS** | Ổn định: 30.6 – 53.9 FPS |
+| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~10.0 – 17.3 Hz | **~10.0 – 17.3 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
+| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 47.4 ms | **47.4 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 59.4 ms; loại trừ frame khởi động) |
 
 ---
 
@@ -12606,7 +12720,7 @@ Nhằm trả lời chất vấn của Hội đồng về tính ổn định và 
 
 * **Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency):** **100.0% (18/18 đối tượng)**
 * **Tính ổn định của chỉ số đánh giá (System Metrics Consistency):** Cả 3 lần chạy đều đạt đồng nhất **12 TP, 2 FP, 2 FN, 2 TN** (Recall: 85.71%, Precision: 85.71%).
-* **Độ ổn định thông lượng xử lý:** Trial 1: 35.4–43.9 FPS (Ổn định 44.4–53.3 FPS), Trial 2: 43.2–48.8 FPS (Ổn định 44.6–50.4 FPS), Trial 3: 38.8–46.8 FPS (Ổn định 40.0–48.2 FPS).
+* **Độ ổn định thông lượng xử lý:** Trial 1: 30.1–51.9 FPS (Ổn định 30.6–53.9 FPS), Trial 2: 35.7–40.9 FPS (Ổn định 36.7–42.1 FPS), Trial 3: 36.1–47.4 FPS (Ổn định 37.5–49.6 FPS).
 
 ---
 
@@ -13303,7 +13417,7 @@ FILE: reports\evaluation_run.log
 
 ===============================================================================
 NHAT KY THUC NGHIEM DANH GIA TOAN DIEN HE THONG (EVALUATION RUN LOG)
-Thoi gian thuc hien: 2026-11-03 09:05:58
+Thoi gian thuc hien: 2026-11-03 15:41:33
 He dieu hanh: Windows-11-10.0.26200-SP0 | Python: 3.12.10
 Phan cung CPU: Intel64 Family 6 Model 165 Stepping 2, GenuineIntel
 Ground Truth: configs/video_ground_truth.json
@@ -13402,12 +13516,12 @@ Ground Truth: configs/video_ground_truth.json
   [TRACE F238 - 9.92s] Track #03: conf=0.81, running_avg_conf=0.801, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 35.4 FPS (Tong thoi gian: 6.774s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 2232.47 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 47.02 ms | p50 = 40.65 ms | p95 = 76.32 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.86 ms | p50 = 1.54 ms | p95 = 1.98 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 51.68 ms | p50 = 45.52 ms | p95 = 81.18 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.25 ms
+[THONG LUONG] Pipeline Throughput: 33.4 FPS (Tong thoi gian: 7.175s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 2365.01 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 47.36 ms | p50 = 43.3 ms | p95 = 70.1 ms
+   - Spatial Check + Verifier (Python):           Mean = 2.01 ms | p50 = 1.44 ms | p95 = 2.47 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 53.08 ms | p50 = 49.96 ms | p95 = 76.04 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.07 ms
 [TRACKS] Tong so Track ID theo doi duoc: 6
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -13415,9 +13529,9 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #1         | 80       |  86.8%    |   78.9%      | [VI PHAM] CONFIRMED
 #2         | 80       |  86.2%    |  100.0%      | [VI PHAM] CONFIRMED
 #3         | 80       |  80.1%    |  100.0%      | [VI PHAM] CONFIRMED
-#4         | 75       |  73.9%    |  100.0%      | [VI PHAM] CONFIRMED
+#4         | 76       |  73.1%    |  100.0%      | [VI PHAM] CONFIRMED
 #5         | 80       |  60.5%    |   20.3%      | [HOP LE] NORMAL
-#6         | 1        |  61.5%    |  100.0%      | [NGHI VAN] SUSPECTED
+#6         | 2        |  38.2%    |  100.0%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 4 | SUSPECTED (Nghi van): 1 | NORMAL (Hop le): 1
 ===========================================================================
@@ -13514,12 +13628,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.45, running_avg_conf=0.638, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 42.4 FPS (Tong thoi gian: 5.660s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 236.97 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 58.43 ms | p50 = 46.93 ms | p95 = 103.73 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.21 ms | p50 = 1.09 ms | p95 = 1.71 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 62.82 ms | p50 = 51.38 ms | p95 = 107.88 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.42 ms
+[THONG LUONG] Pipeline Throughput: 51.9 FPS (Tong thoi gian: 4.621s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 154.29 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 45.46 ms | p50 = 43.1 ms | p95 = 59.77 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.15 ms | p50 = 1.17 ms | p95 = 1.51 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 50.3 ms | p50 = 47.94 ms | p95 = 66.1 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.65 ms
 [TRACKS] Tong so Track ID theo doi duoc: 4
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -13527,7 +13641,7 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #1         | 80       |  84.5%    |   74.9%      | [VI PHAM] CONFIRMED
 #2         | 80       |  71.5%    |  100.0%      | [VI PHAM] CONFIRMED
 #3         | 80       |  63.8%    |  100.0%      | [VI PHAM] CONFIRMED
-#20        | 19       |  30.7%    |   91.9%      | [NGHI VAN] SUSPECTED
+#20        | 41       |  24.0%    |   91.7%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 3 | SUSPECTED (Nghi van): 1 | NORMAL (Hop le): 0
 ===========================================================================
@@ -13625,171 +13739,179 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F076 - 3.17s] Track #07: conf=0.29, running_avg_conf=0.443, streak=26, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F076 - 3.17s] Track #08: conf=0.53, running_avg_conf=0.532, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F079 - 3.29s] Track #03: conf=0.85, running_avg_conf=0.849, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F079 - 3.29s] Track #07: conf=0.22, running_avg_conf=0.435, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F079 - 3.29s] Track #08: conf=0.56, running_avg_conf=0.561, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F082 - 3.42s] Track #03: conf=0.85, running_avg_conf=0.849, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F082 - 3.42s] Track #07: conf=0.21, running_avg_conf=0.427, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F082 - 3.42s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F085 - 3.54s] Track #03: conf=0.85, running_avg_conf=0.849, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F085 - 3.54s] Track #07: conf=0.19, running_avg_conf=0.419, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F085 - 3.54s] Track #08: conf=0.58, running_avg_conf=0.577, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F088 - 3.67s] Track #03: conf=0.85, running_avg_conf=0.849, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F088 - 3.67s] Track #07: conf=0.22, running_avg_conf=0.412, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F088 - 3.67s] Track #08: conf=0.59, running_avg_conf=0.586, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F091 - 3.79s] Track #03: conf=0.85, running_avg_conf=0.849, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F091 - 3.79s] Track #07: conf=0.29, running_avg_conf=0.408, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F091 - 3.79s] Track #08: conf=0.56, running_avg_conf=0.565, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F091 (3.79s) | streak=1 frames, running_avg_conf=0.288 (gate=0.40)
-  [TRACE F091 - 3.79s] Track #07: conf=0.29, running_avg_conf=0.288, streak=1, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F094 - 3.92s] Track #03: conf=0.85, running_avg_conf=0.849, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F094 - 3.92s] Track #07: conf=0.29, running_avg_conf=0.404, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F094 - 3.92s] Track #08: conf=0.56, running_avg_conf=0.561, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F094 - 3.92s] Track #07: conf=0.29, running_avg_conf=0.289, streak=2, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F097 - 4.04s] Track #03: conf=0.85, running_avg_conf=0.849, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F097 - 4.04s] Track #07: conf=0.33, running_avg_conf=0.402, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F097 - 4.04s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F097 - 4.04s] Track #07: conf=0.33, running_avg_conf=0.304, streak=3, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F100 - 4.17s] Track #03: conf=0.85, running_avg_conf=0.849, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F100 - 4.17s] Track #07: conf=0.35, running_avg_conf=0.401, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F100 - 4.17s] Track #08: conf=0.59, running_avg_conf=0.592, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F100 - 4.17s] Track #07: conf=0.35, running_avg_conf=0.315, streak=4, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F103 - 4.29s] Track #03: conf=0.85, running_avg_conf=0.849, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F103 (4.29s) | streak=35 frames, running_avg_conf=0.398 (gate=0.40)
+  [TRACE F103 - 4.29s] Track #07: conf=0.30, running_avg_conf=0.398, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F103 - 4.29s] Track #08: conf=0.58, running_avg_conf=0.576, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F103 - 4.29s] Track #07: conf=0.30, running_avg_conf=0.313, streak=5, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F106 - 4.42s] Track #03: conf=0.85, running_avg_conf=0.849, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F106 - 4.42s] Track #07: conf=0.28, running_avg_conf=0.395, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F106 - 4.42s] Track #08: conf=0.58, running_avg_conf=0.585, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F106 - 4.42s] Track #07: conf=0.28, running_avg_conf=0.308, streak=6, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F109 - 4.54s] Track #03: conf=0.86, running_avg_conf=0.850, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F109 - 4.54s] Track #07: conf=0.32, running_avg_conf=0.393, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F109 - 4.54s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F109 - 4.54s] Track #07: conf=0.32, running_avg_conf=0.310, streak=7, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F112 - 4.67s] Track #03: conf=0.85, running_avg_conf=0.850, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F112 - 4.67s] Track #07: conf=0.35, running_avg_conf=0.392, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F112 - 4.67s] Track #08: conf=0.56, running_avg_conf=0.558, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F112 - 4.67s] Track #07: conf=0.35, running_avg_conf=0.315, streak=8, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F115 - 4.79s] Track #03: conf=0.85, running_avg_conf=0.850, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F115 - 4.79s] Track #07: conf=0.44, running_avg_conf=0.393, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F115 - 4.79s] Track #08: conf=0.58, running_avg_conf=0.575, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F115 - 4.79s] Track #07: conf=0.44, running_avg_conf=0.329, streak=9, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F118 - 4.92s] Track #03: conf=0.85, running_avg_conf=0.850, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F118 - 4.92s] Track #07: conf=0.51, running_avg_conf=0.396, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F118 - 4.92s] Track #08: conf=0.58, running_avg_conf=0.577, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F118 - 4.92s] Track #07: conf=0.51, running_avg_conf=0.347, streak=10, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F121 - 5.04s] Track #03: conf=0.85, running_avg_conf=0.850, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F121 - 5.04s] Track #07: conf=0.49, running_avg_conf=0.398, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F121 - 5.04s] Track #08: conf=0.59, running_avg_conf=0.592, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F121 - 5.04s] Track #07: conf=0.49, running_avg_conf=0.360, streak=11, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F124 - 5.17s] Track #03: conf=0.85, running_avg_conf=0.850, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F124 - 5.17s] Track #07: conf=0.44, running_avg_conf=0.399, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F124 - 5.17s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F124 - 5.17s] Track #07: conf=0.44, running_avg_conf=0.366, streak=12, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F127 - 5.29s] Track #03: conf=0.85, running_avg_conf=0.850, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F127 - 5.29s] Track #07: conf=0.44, running_avg_conf=0.400, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F127 - 5.29s] Track #08: conf=0.57, running_avg_conf=0.566, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F127 - 5.29s] Track #07: conf=0.44, running_avg_conf=0.372, streak=13, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F130 - 5.42s] Track #03: conf=0.86, running_avg_conf=0.850, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F130 (5.42s) | streak=44 frames, running_avg_conf=0.401 (gate=0.40)
+  [TRACE F130 - 5.42s] Track #07: conf=0.47, running_avg_conf=0.401, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F130 - 5.42s] Track #08: conf=0.54, running_avg_conf=0.539, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F130 - 5.42s] Track #07: conf=0.47, running_avg_conf=0.379, streak=14, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F133 - 5.54s] Track #03: conf=0.86, running_avg_conf=0.850, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F133 - 5.54s] Track #07: conf=0.44, running_avg_conf=0.402, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F133 - 5.54s] Track #08: conf=0.45, running_avg_conf=0.448, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F133 - 5.54s] Track #07: conf=0.44, running_avg_conf=0.383, streak=15, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F136 - 5.67s] Track #03: conf=0.86, running_avg_conf=0.851, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F136 - 5.67s] Track #07: conf=0.43, running_avg_conf=0.403, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F136 - 5.67s] Track #08: conf=0.40, running_avg_conf=0.397, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F136 - 5.67s] Track #07: conf=0.43, running_avg_conf=0.386, streak=16, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F139 - 5.79s] Track #03: conf=0.86, running_avg_conf=0.851, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F139 - 5.79s] Track #07: conf=0.45, running_avg_conf=0.404, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F139 - 5.79s] Track #08: conf=0.31, running_avg_conf=0.312, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F139 - 5.79s] Track #07: conf=0.45, running_avg_conf=0.390, streak=17, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F142 - 5.92s] Track #03: conf=0.86, running_avg_conf=0.851, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F142 - 5.92s] Track #07: conf=0.42, running_avg_conf=0.391, streak=18, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F142 - 5.92s] Track #07: conf=0.42, running_avg_conf=0.404, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F142 - 5.92s] Track #08: conf=0.23, running_avg_conf=0.228, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F145 - 6.04s] Track #03: conf=0.86, running_avg_conf=0.851, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F145 - 6.04s] Track #07: conf=0.39, running_avg_conf=0.391, streak=19, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F145 - 6.04s] Track #07: conf=0.39, running_avg_conf=0.404, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F145 - 6.04s] Track #08: conf=0.21, running_avg_conf=0.214, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F148 - 6.17s] Track #03: conf=0.86, running_avg_conf=0.851, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F148 - 6.17s] Track #07: conf=0.39, running_avg_conf=0.391, streak=20, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F148 - 6.17s] Track #07: conf=0.39, running_avg_conf=0.404, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F148 - 6.17s] Track #08: conf=0.24, running_avg_conf=0.237, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F151 - 6.29s] Track #03: conf=0.86, running_avg_conf=0.852, streak=51, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F151 - 6.29s] Track #07: conf=0.41, running_avg_conf=0.392, streak=21, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F151 - 6.29s] Track #07: conf=0.41, running_avg_conf=0.404, streak=51, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F151 - 6.29s] Track #08: conf=0.25, running_avg_conf=0.251, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F154 - 6.42s] Track #03: conf=0.87, running_avg_conf=0.852, streak=52, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F154 - 6.42s] Track #07: conf=0.40, running_avg_conf=0.392, streak=22, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F154 - 6.42s] Track #07: conf=0.40, running_avg_conf=0.404, streak=52, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F154 - 6.42s] Track #08: conf=0.25, running_avg_conf=0.253, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F157 - 6.54s] Track #03: conf=0.87, running_avg_conf=0.852, streak=53, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F157 - 6.54s] Track #07: conf=0.41, running_avg_conf=0.393, streak=23, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F157 - 6.54s] Track #07: conf=0.41, running_avg_conf=0.404, streak=53, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F157 - 6.54s] Track #08: conf=0.28, running_avg_conf=0.282, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F160 - 6.67s] Track #03: conf=0.87, running_avg_conf=0.853, streak=54, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F160 - 6.67s] Track #07: conf=0.37, running_avg_conf=0.392, streak=24, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F160 - 6.67s] Track #07: conf=0.37, running_avg_conf=0.403, streak=54, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F160 - 6.67s] Track #08: conf=0.30, running_avg_conf=0.297, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F163 - 6.79s] Track #03: conf=0.87, running_avg_conf=0.853, streak=55, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F163 - 6.79s] Track #07: conf=0.25, running_avg_conf=0.387, streak=25, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F163 - 6.79s] Track #07: conf=0.25, running_avg_conf=0.400, streak=55, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F163 - 6.79s] Track #08: conf=0.36, running_avg_conf=0.355, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F166 - 6.92s] Track #03: conf=0.87, running_avg_conf=0.853, streak=56, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F166 - 6.92s] Track #07: conf=0.27, running_avg_conf=0.382, streak=26, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F166 (6.92s) | streak=56 frames, running_avg_conf=0.398 (gate=0.40)
+  [TRACE F166 - 6.92s] Track #07: conf=0.27, running_avg_conf=0.398, streak=56, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F166 - 6.92s] Track #08: conf=0.39, running_avg_conf=0.387, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F169 - 7.04s] Track #03: conf=0.87, running_avg_conf=0.853, streak=57, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F169 - 7.04s] Track #07: conf=0.29, running_avg_conf=0.379, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F169 - 7.04s] Track #07: conf=0.29, running_avg_conf=0.396, streak=57, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F169 - 7.04s] Track #08: conf=0.47, running_avg_conf=0.471, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F172 - 7.17s] Track #03: conf=0.87, running_avg_conf=0.854, streak=58, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F172 - 7.17s] Track #07: conf=0.31, running_avg_conf=0.376, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F172 - 7.17s] Track #07: conf=0.31, running_avg_conf=0.395, streak=58, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F172 - 7.17s] Track #08: conf=0.46, running_avg_conf=0.464, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F175 - 7.29s] Track #03: conf=0.87, running_avg_conf=0.854, streak=59, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F175 - 7.29s] Track #07: conf=0.31, running_avg_conf=0.374, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F175 - 7.29s] Track #07: conf=0.31, running_avg_conf=0.393, streak=59, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F175 - 7.29s] Track #08: conf=0.39, running_avg_conf=0.392, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F178 - 7.42s] Track #03: conf=0.87, running_avg_conf=0.854, streak=60, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F178 - 7.42s] Track #07: conf=0.37, running_avg_conf=0.374, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F178 - 7.42s] Track #07: conf=0.37, running_avg_conf=0.393, streak=60, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F178 - 7.42s] Track #08: conf=0.46, running_avg_conf=0.459, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F181 - 7.54s] Track #03: conf=0.87, running_avg_conf=0.854, streak=61, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F181 - 7.54s] Track #07: conf=0.45, running_avg_conf=0.376, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F181 - 7.54s] Track #07: conf=0.45, running_avg_conf=0.394, streak=61, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F181 - 7.54s] Track #08: conf=0.50, running_avg_conf=0.496, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F184 - 7.67s] Track #03: conf=0.87, running_avg_conf=0.855, streak=62, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F184 - 7.67s] Track #07: conf=0.46, running_avg_conf=0.379, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F184 - 7.67s] Track #07: conf=0.46, running_avg_conf=0.395, streak=62, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F184 - 7.67s] Track #08: conf=0.48, running_avg_conf=0.480, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F187 - 7.79s] Track #03: conf=0.87, running_avg_conf=0.855, streak=63, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F187 - 7.79s] Track #07: conf=0.45, running_avg_conf=0.381, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F187 - 7.79s] Track #07: conf=0.45, running_avg_conf=0.396, streak=63, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F187 - 7.79s] Track #08: conf=0.49, running_avg_conf=0.489, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F190 - 7.92s] Track #03: conf=0.87, running_avg_conf=0.855, streak=64, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F190 - 7.92s] Track #07: conf=0.45, running_avg_conf=0.383, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F190 - 7.92s] Track #07: conf=0.45, running_avg_conf=0.397, streak=64, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F190 - 7.92s] Track #08: conf=0.48, running_avg_conf=0.478, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F193 - 8.04s] Track #03: conf=0.86, running_avg_conf=0.855, streak=65, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F193 - 8.04s] Track #07: conf=0.49, running_avg_conf=0.386, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F193 - 8.04s] Track #07: conf=0.49, running_avg_conf=0.398, streak=65, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F193 - 8.04s] Track #08: conf=0.55, running_avg_conf=0.554, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F196 - 8.17s] Track #03: conf=0.86, running_avg_conf=0.855, streak=66, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F196 - 8.17s] Track #07: conf=0.49, running_avg_conf=0.389, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F196 - 8.17s] Track #07: conf=0.49, running_avg_conf=0.399, streak=66, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F196 - 8.17s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F199 - 8.29s] Track #03: conf=0.86, running_avg_conf=0.855, streak=67, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F199 - 8.29s] Track #07: conf=0.48, running_avg_conf=0.391, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F199 (8.29s) | streak=67 frames, running_avg_conf=0.401 (gate=0.40)
+  [TRACE F199 - 8.29s] Track #07: conf=0.48, running_avg_conf=0.401, streak=67, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F199 - 8.29s] Track #08: conf=0.58, running_avg_conf=0.582, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F202 - 8.42s] Track #03: conf=0.85, running_avg_conf=0.855, streak=68, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F202 - 8.42s] Track #07: conf=0.45, running_avg_conf=0.393, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F202 - 8.42s] Track #07: conf=0.45, running_avg_conf=0.401, streak=68, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F202 - 8.42s] Track #08: conf=0.63, running_avg_conf=0.627, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F205 - 8.54s] Track #03: conf=0.85, running_avg_conf=0.855, streak=69, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F205 - 8.54s] Track #07: conf=0.42, running_avg_conf=0.394, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F205 - 8.54s] Track #07: conf=0.42, running_avg_conf=0.402, streak=69, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F205 - 8.54s] Track #08: conf=0.61, running_avg_conf=0.613, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F208 - 8.67s] Track #03: conf=0.85, running_avg_conf=0.855, streak=70, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F208 - 8.67s] Track #07: conf=0.43, running_avg_conf=0.395, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F208 - 8.67s] Track #07: conf=0.43, running_avg_conf=0.402, streak=70, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F208 - 8.67s] Track #08: conf=0.65, running_avg_conf=0.645, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F211 - 8.79s] Track #03: conf=0.85, running_avg_conf=0.855, streak=71, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F211 - 8.79s] Track #07: conf=0.41, running_avg_conf=0.395, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F211 - 8.79s] Track #07: conf=0.41, running_avg_conf=0.402, streak=71, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F211 - 8.79s] Track #08: conf=0.64, running_avg_conf=0.636, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F214 - 8.92s] Track #03: conf=0.85, running_avg_conf=0.855, streak=72, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F214 - 8.92s] Track #07: conf=0.36, running_avg_conf=0.394, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F214 - 8.92s] Track #07: conf=0.36, running_avg_conf=0.402, streak=72, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F214 - 8.92s] Track #08: conf=0.62, running_avg_conf=0.621, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F217 - 9.04s] Track #03: conf=0.85, running_avg_conf=0.855, streak=73, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F217 - 9.04s] Track #07: conf=0.35, running_avg_conf=0.393, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F217 - 9.04s] Track #07: conf=0.35, running_avg_conf=0.401, streak=73, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F217 - 9.04s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F220 - 9.17s] Track #03: conf=0.85, running_avg_conf=0.855, streak=74, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F220 - 9.17s] Track #07: conf=0.40, running_avg_conf=0.393, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F220 - 9.17s] Track #07: conf=0.40, running_avg_conf=0.401, streak=74, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F220 - 9.17s] Track #08: conf=0.57, running_avg_conf=0.572, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F223 - 9.29s] Track #03: conf=0.85, running_avg_conf=0.855, streak=75, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F223 - 9.29s] Track #07: conf=0.39, running_avg_conf=0.393, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F223 - 9.29s] Track #07: conf=0.39, running_avg_conf=0.401, streak=75, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F223 - 9.29s] Track #08: conf=0.55, running_avg_conf=0.555, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F226 - 9.42s] Track #03: conf=0.85, running_avg_conf=0.855, streak=76, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F226 - 9.42s] Track #07: conf=0.50, running_avg_conf=0.396, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F226 - 9.42s] Track #07: conf=0.50, running_avg_conf=0.402, streak=76, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F226 - 9.42s] Track #08: conf=0.51, running_avg_conf=0.509, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F229 - 9.54s] Track #03: conf=0.86, running_avg_conf=0.855, streak=77, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F229 - 9.54s] Track #07: conf=0.50, running_avg_conf=0.398, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F229 - 9.54s] Track #07: conf=0.50, running_avg_conf=0.403, streak=77, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F229 - 9.54s] Track #08: conf=0.44, running_avg_conf=0.440, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F232 - 9.67s] Track #03: conf=0.86, running_avg_conf=0.855, streak=78, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F232 (9.67s) | streak=48 frames, running_avg_conf=0.401 (gate=0.40)
-  [TRACE F232 - 9.67s] Track #07: conf=0.53, running_avg_conf=0.401, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F232 - 9.67s] Track #07: conf=0.53, running_avg_conf=0.405, streak=78, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F232 - 9.67s] Track #08: conf=0.35, running_avg_conf=0.353, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F235 - 9.79s] Track #03: conf=0.85, running_avg_conf=0.855, streak=79, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F235 - 9.79s] Track #07: conf=0.43, running_avg_conf=0.401, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F235 - 9.79s] Track #07: conf=0.43, running_avg_conf=0.405, streak=79, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F235 - 9.79s] Track #08: conf=0.36, running_avg_conf=0.365, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F238 - 9.92s] Track #03: conf=0.85, running_avg_conf=0.855, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F238 (9.92s) | streak=50 frames, running_avg_conf=0.400 (gate=0.40)
-  [TRACE F238 - 9.92s] Track #07: conf=0.33, running_avg_conf=0.400, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F238 - 9.92s] Track #07: conf=0.33, running_avg_conf=0.404, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F238 - 9.92s] Track #08: conf=0.31, running_avg_conf=0.309, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 43.9 FPS (Tong thoi gian: 5.464s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 163.4 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 55.11 ms | p50 = 48.72 ms | p95 = 88.3 ms
-   - Spatial Check + Verifier (Python):           Mean = 2.6 ms | p50 = 2.55 ms | p95 = 3.09 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 60.86 ms | p50 = 55.32 ms | p95 = 93.65 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.35 ms
+[THONG LUONG] Pipeline Throughput: 30.1 FPS (Tong thoi gian: 7.980s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 146.74 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 85.37 ms | p50 = 56.79 ms | p95 = 231.47 ms
+   - Spatial Check + Verifier (Python):           Mean = 2.89 ms | p50 = 2.59 ms | p95 = 3.59 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 92.0 ms | p50 = 63.01 ms | p95 = 237.67 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.77 ms
 [TRACKS] Tong so Track ID theo doi duoc: 10
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -13800,10 +13922,10 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #4         | 80       |  80.5%    |   97.7%      | [VI PHAM] CONFIRMED
 #5         | 80       |  69.8%    |  100.0%      | [VI PHAM] CONFIRMED
 #6         | 80       |  59.6%    |  100.0%      | [VI PHAM] CONFIRMED
-#7         | 76       |  41.5%    |  100.0%      | [VI PHAM] CONFIRMED
-#8         | 77       |  49.1%    |    0.0%      | [HOP LE] NORMAL
-#9         | 23       |  29.2%    |  100.0%      | [NGHI VAN] SUSPECTED
-#10        | 4        |  31.3%    |  100.0%      | [NGHI VAN] SUSPECTED
+#7         | 80       |  40.4%    |  100.0%      | [VI PHAM] CONFIRMED
+#8         | 80       |  48.1%    |    0.0%      | [HOP LE] NORMAL
+#9         | 80       |  23.5%    |  100.0%      | [NGHI VAN] SUSPECTED
+#10        | 8        |  19.3%    |  100.0%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 7 | SUSPECTED (Nghi van): 2 | NORMAL (Hop le): 1
 ===========================================================================
@@ -13902,12 +14024,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.81, running_avg_conf=0.801, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 44.6 FPS (Tong thoi gian: 5.384s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 139.37 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 55.88 ms | p50 = 51.11 ms | p95 = 87.26 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.59 ms | p50 = 1.55 ms | p95 = 1.98 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 60.7 ms | p50 = 57.63 ms | p95 = 92.17 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.33 ms
+[THONG LUONG] Pipeline Throughput: 36.2 FPS (Tong thoi gian: 6.631s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 237.62 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 66.63 ms | p50 = 58.83 ms | p95 = 110.05 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.81 ms | p50 = 1.72 ms | p95 = 2.28 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 73.0 ms | p50 = 64.49 ms | p95 = 119.22 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.16 ms
 [TRACKS] Tong so Track ID theo doi duoc: 6
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -13915,9 +14037,9 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #1         | 80       |  86.8%    |   68.3%      | [HOP LE] NORMAL
 #2         | 80       |  86.2%    |  100.0%      | [VI PHAM] CONFIRMED
 #3         | 80       |  80.1%    |  100.0%      | [VI PHAM] CONFIRMED
-#4         | 75       |  73.9%    |  100.0%      | [VI PHAM] CONFIRMED
+#4         | 76       |  73.1%    |  100.0%      | [VI PHAM] CONFIRMED
 #5         | 80       |  60.5%    |   20.3%      | [HOP LE] NORMAL
-#6         | 1        |  61.5%    |  100.0%      | [NGHI VAN] SUSPECTED
+#6         | 2        |  38.2%    |  100.0%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 3 | SUSPECTED (Nghi van): 1 | NORMAL (Hop le): 2
 ===========================================================================
@@ -14021,12 +14143,12 @@ DO LUONG DO ON DINH QUA 3 LAN CHAY LAP DOC LAP (STABILITY ANALYSIS)
   [TRACE F238 - 9.92s] Track #03: conf=0.81, running_avg_conf=0.801, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 48.8 FPS (Tong thoi gian: 4.915s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 134.5 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 49.77 ms | p50 = 43.12 ms | p95 = 86.32 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.67 ms | p50 = 1.59 ms | p95 = 2.16 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 54.56 ms | p50 = 48.2 ms | p95 = 91.2 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.45 ms
+[THONG LUONG] Pipeline Throughput: 40.9 FPS (Tong thoi gian: 5.870s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 162.3 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 58.19 ms | p50 = 51.2 ms | p95 = 94.12 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.9 ms | p50 = 1.8 ms | p95 = 2.55 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 64.46 ms | p50 = 57.45 ms | p95 = 100.42 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.27 ms
 [TRACKS] Tong so Track ID theo doi duoc: 6
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14034,9 +14156,9 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #1         | 80       |  86.8%    |   78.9%      | [VI PHAM] CONFIRMED
 #2         | 80       |  86.2%    |  100.0%      | [VI PHAM] CONFIRMED
 #3         | 80       |  80.1%    |  100.0%      | [VI PHAM] CONFIRMED
-#4         | 75       |  73.9%    |  100.0%      | [VI PHAM] CONFIRMED
+#4         | 76       |  73.1%    |  100.0%      | [VI PHAM] CONFIRMED
 #5         | 80       |  60.5%    |   20.3%      | [HOP LE] NORMAL
-#6         | 1        |  61.5%    |  100.0%      | [NGHI VAN] SUSPECTED
+#6         | 2        |  38.2%    |  100.0%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 4 | SUSPECTED (Nghi van): 1 | NORMAL (Hop le): 1
 ===========================================================================
@@ -14133,12 +14255,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.45, running_avg_conf=0.638, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 45.8 FPS (Tong thoi gian: 5.236s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 139.26 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 54.44 ms | p50 = 47.45 ms | p95 = 98.97 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.23 ms | p50 = 1.11 ms | p95 = 1.91 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 58.82 ms | p50 = 51.57 ms | p95 = 104.53 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.38 ms
+[THONG LUONG] Pipeline Throughput: 35.7 FPS (Tong thoi gian: 6.729s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 173.97 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 70.33 ms | p50 = 65.37 ms | p95 = 106.71 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.37 ms | p50 = 1.39 ms | p95 = 1.83 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 75.86 ms | p50 = 71.19 ms | p95 = 112.69 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.0 ms
 [TRACKS] Tong so Track ID theo doi duoc: 4
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14146,7 +14268,7 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #1         | 80       |  84.5%    |   74.9%      | [VI PHAM] CONFIRMED
 #2         | 80       |  71.5%    |  100.0%      | [VI PHAM] CONFIRMED
 #3         | 80       |  63.8%    |  100.0%      | [VI PHAM] CONFIRMED
-#20        | 19       |  30.7%    |   91.9%      | [NGHI VAN] SUSPECTED
+#20        | 41       |  24.0%    |   91.7%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 3 | SUSPECTED (Nghi van): 1 | NORMAL (Hop le): 0
 ===========================================================================
@@ -14244,171 +14366,179 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F076 - 3.17s] Track #07: conf=0.29, running_avg_conf=0.443, streak=26, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F076 - 3.17s] Track #08: conf=0.53, running_avg_conf=0.532, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F079 - 3.29s] Track #03: conf=0.85, running_avg_conf=0.849, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F079 - 3.29s] Track #07: conf=0.22, running_avg_conf=0.435, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F079 - 3.29s] Track #08: conf=0.56, running_avg_conf=0.561, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F082 - 3.42s] Track #03: conf=0.85, running_avg_conf=0.849, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F082 - 3.42s] Track #07: conf=0.21, running_avg_conf=0.427, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F082 - 3.42s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F085 - 3.54s] Track #03: conf=0.85, running_avg_conf=0.849, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F085 - 3.54s] Track #07: conf=0.19, running_avg_conf=0.419, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F085 - 3.54s] Track #08: conf=0.58, running_avg_conf=0.577, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F088 - 3.67s] Track #03: conf=0.85, running_avg_conf=0.849, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F088 - 3.67s] Track #07: conf=0.22, running_avg_conf=0.412, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F088 - 3.67s] Track #08: conf=0.59, running_avg_conf=0.586, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F091 - 3.79s] Track #03: conf=0.85, running_avg_conf=0.849, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F091 - 3.79s] Track #07: conf=0.29, running_avg_conf=0.408, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F091 - 3.79s] Track #08: conf=0.56, running_avg_conf=0.565, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F091 (3.79s) | streak=1 frames, running_avg_conf=0.288 (gate=0.40)
-  [TRACE F091 - 3.79s] Track #07: conf=0.29, running_avg_conf=0.288, streak=1, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F094 - 3.92s] Track #03: conf=0.85, running_avg_conf=0.849, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F094 - 3.92s] Track #07: conf=0.29, running_avg_conf=0.404, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F094 - 3.92s] Track #08: conf=0.56, running_avg_conf=0.561, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F094 - 3.92s] Track #07: conf=0.29, running_avg_conf=0.289, streak=2, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F097 - 4.04s] Track #03: conf=0.85, running_avg_conf=0.849, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F097 - 4.04s] Track #07: conf=0.33, running_avg_conf=0.402, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F097 - 4.04s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F097 - 4.04s] Track #07: conf=0.33, running_avg_conf=0.304, streak=3, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F100 - 4.17s] Track #03: conf=0.85, running_avg_conf=0.849, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F100 - 4.17s] Track #07: conf=0.35, running_avg_conf=0.401, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F100 - 4.17s] Track #08: conf=0.59, running_avg_conf=0.592, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F100 - 4.17s] Track #07: conf=0.35, running_avg_conf=0.315, streak=4, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F103 - 4.29s] Track #03: conf=0.85, running_avg_conf=0.849, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F103 (4.29s) | streak=35 frames, running_avg_conf=0.398 (gate=0.40)
+  [TRACE F103 - 4.29s] Track #07: conf=0.30, running_avg_conf=0.398, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F103 - 4.29s] Track #08: conf=0.58, running_avg_conf=0.576, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F103 - 4.29s] Track #07: conf=0.30, running_avg_conf=0.313, streak=5, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F106 - 4.42s] Track #03: conf=0.85, running_avg_conf=0.849, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F106 - 4.42s] Track #07: conf=0.28, running_avg_conf=0.395, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F106 - 4.42s] Track #08: conf=0.58, running_avg_conf=0.585, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F106 - 4.42s] Track #07: conf=0.28, running_avg_conf=0.308, streak=6, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F109 - 4.54s] Track #03: conf=0.86, running_avg_conf=0.850, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F109 - 4.54s] Track #07: conf=0.32, running_avg_conf=0.393, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F109 - 4.54s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F109 - 4.54s] Track #07: conf=0.32, running_avg_conf=0.310, streak=7, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F112 - 4.67s] Track #03: conf=0.85, running_avg_conf=0.850, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F112 - 4.67s] Track #07: conf=0.35, running_avg_conf=0.392, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F112 - 4.67s] Track #08: conf=0.56, running_avg_conf=0.558, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F112 - 4.67s] Track #07: conf=0.35, running_avg_conf=0.315, streak=8, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F115 - 4.79s] Track #03: conf=0.85, running_avg_conf=0.850, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F115 - 4.79s] Track #07: conf=0.44, running_avg_conf=0.393, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F115 - 4.79s] Track #08: conf=0.58, running_avg_conf=0.575, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F115 - 4.79s] Track #07: conf=0.44, running_avg_conf=0.329, streak=9, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F118 - 4.92s] Track #03: conf=0.85, running_avg_conf=0.850, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F118 - 4.92s] Track #07: conf=0.51, running_avg_conf=0.396, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F118 - 4.92s] Track #08: conf=0.58, running_avg_conf=0.577, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F118 - 4.92s] Track #07: conf=0.51, running_avg_conf=0.347, streak=10, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F121 - 5.04s] Track #03: conf=0.85, running_avg_conf=0.850, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F121 - 5.04s] Track #07: conf=0.49, running_avg_conf=0.398, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F121 - 5.04s] Track #08: conf=0.59, running_avg_conf=0.592, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F121 - 5.04s] Track #07: conf=0.49, running_avg_conf=0.360, streak=11, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F124 - 5.17s] Track #03: conf=0.85, running_avg_conf=0.850, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F124 - 5.17s] Track #07: conf=0.44, running_avg_conf=0.399, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F124 - 5.17s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F124 - 5.17s] Track #07: conf=0.44, running_avg_conf=0.366, streak=12, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F127 - 5.29s] Track #03: conf=0.85, running_avg_conf=0.850, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F127 - 5.29s] Track #07: conf=0.44, running_avg_conf=0.400, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F127 - 5.29s] Track #08: conf=0.57, running_avg_conf=0.566, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F127 - 5.29s] Track #07: conf=0.44, running_avg_conf=0.372, streak=13, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F130 - 5.42s] Track #03: conf=0.86, running_avg_conf=0.850, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F130 (5.42s) | streak=44 frames, running_avg_conf=0.401 (gate=0.40)
+  [TRACE F130 - 5.42s] Track #07: conf=0.47, running_avg_conf=0.401, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F130 - 5.42s] Track #08: conf=0.54, running_avg_conf=0.539, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F130 - 5.42s] Track #07: conf=0.47, running_avg_conf=0.379, streak=14, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F133 - 5.54s] Track #03: conf=0.86, running_avg_conf=0.850, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F133 - 5.54s] Track #07: conf=0.44, running_avg_conf=0.402, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F133 - 5.54s] Track #08: conf=0.45, running_avg_conf=0.448, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F133 - 5.54s] Track #07: conf=0.44, running_avg_conf=0.383, streak=15, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F136 - 5.67s] Track #03: conf=0.86, running_avg_conf=0.851, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F136 - 5.67s] Track #07: conf=0.43, running_avg_conf=0.403, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F136 - 5.67s] Track #08: conf=0.40, running_avg_conf=0.397, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F136 - 5.67s] Track #07: conf=0.43, running_avg_conf=0.386, streak=16, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F139 - 5.79s] Track #03: conf=0.86, running_avg_conf=0.851, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F139 - 5.79s] Track #07: conf=0.45, running_avg_conf=0.404, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F139 - 5.79s] Track #08: conf=0.31, running_avg_conf=0.312, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F139 - 5.79s] Track #07: conf=0.45, running_avg_conf=0.390, streak=17, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F142 - 5.92s] Track #03: conf=0.86, running_avg_conf=0.851, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F142 - 5.92s] Track #07: conf=0.42, running_avg_conf=0.391, streak=18, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F142 - 5.92s] Track #07: conf=0.42, running_avg_conf=0.404, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F142 - 5.92s] Track #08: conf=0.23, running_avg_conf=0.228, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F145 - 6.04s] Track #03: conf=0.86, running_avg_conf=0.851, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F145 - 6.04s] Track #07: conf=0.39, running_avg_conf=0.391, streak=19, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F145 - 6.04s] Track #07: conf=0.39, running_avg_conf=0.404, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F145 - 6.04s] Track #08: conf=0.21, running_avg_conf=0.214, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F148 - 6.17s] Track #03: conf=0.86, running_avg_conf=0.851, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F148 - 6.17s] Track #07: conf=0.39, running_avg_conf=0.391, streak=20, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F148 - 6.17s] Track #07: conf=0.39, running_avg_conf=0.404, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F148 - 6.17s] Track #08: conf=0.24, running_avg_conf=0.237, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F151 - 6.29s] Track #03: conf=0.86, running_avg_conf=0.852, streak=51, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F151 - 6.29s] Track #07: conf=0.41, running_avg_conf=0.392, streak=21, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F151 - 6.29s] Track #07: conf=0.41, running_avg_conf=0.404, streak=51, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F151 - 6.29s] Track #08: conf=0.25, running_avg_conf=0.251, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F154 - 6.42s] Track #03: conf=0.87, running_avg_conf=0.852, streak=52, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F154 - 6.42s] Track #07: conf=0.40, running_avg_conf=0.392, streak=22, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F154 - 6.42s] Track #07: conf=0.40, running_avg_conf=0.404, streak=52, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F154 - 6.42s] Track #08: conf=0.25, running_avg_conf=0.253, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F157 - 6.54s] Track #03: conf=0.87, running_avg_conf=0.852, streak=53, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F157 - 6.54s] Track #07: conf=0.41, running_avg_conf=0.393, streak=23, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F157 - 6.54s] Track #07: conf=0.41, running_avg_conf=0.404, streak=53, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F157 - 6.54s] Track #08: conf=0.28, running_avg_conf=0.282, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F160 - 6.67s] Track #03: conf=0.87, running_avg_conf=0.853, streak=54, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F160 - 6.67s] Track #07: conf=0.37, running_avg_conf=0.392, streak=24, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F160 - 6.67s] Track #07: conf=0.37, running_avg_conf=0.403, streak=54, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F160 - 6.67s] Track #08: conf=0.30, running_avg_conf=0.297, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F163 - 6.79s] Track #03: conf=0.87, running_avg_conf=0.853, streak=55, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F163 - 6.79s] Track #07: conf=0.25, running_avg_conf=0.387, streak=25, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F163 - 6.79s] Track #07: conf=0.25, running_avg_conf=0.400, streak=55, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F163 - 6.79s] Track #08: conf=0.36, running_avg_conf=0.355, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F166 - 6.92s] Track #03: conf=0.87, running_avg_conf=0.853, streak=56, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F166 - 6.92s] Track #07: conf=0.27, running_avg_conf=0.382, streak=26, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F166 (6.92s) | streak=56 frames, running_avg_conf=0.398 (gate=0.40)
+  [TRACE F166 - 6.92s] Track #07: conf=0.27, running_avg_conf=0.398, streak=56, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F166 - 6.92s] Track #08: conf=0.39, running_avg_conf=0.387, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F169 - 7.04s] Track #03: conf=0.87, running_avg_conf=0.853, streak=57, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F169 - 7.04s] Track #07: conf=0.29, running_avg_conf=0.379, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F169 - 7.04s] Track #07: conf=0.29, running_avg_conf=0.396, streak=57, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F169 - 7.04s] Track #08: conf=0.47, running_avg_conf=0.471, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F172 - 7.17s] Track #03: conf=0.87, running_avg_conf=0.854, streak=58, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F172 - 7.17s] Track #07: conf=0.31, running_avg_conf=0.376, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F172 - 7.17s] Track #07: conf=0.31, running_avg_conf=0.395, streak=58, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F172 - 7.17s] Track #08: conf=0.46, running_avg_conf=0.464, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F175 - 7.29s] Track #03: conf=0.87, running_avg_conf=0.854, streak=59, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F175 - 7.29s] Track #07: conf=0.31, running_avg_conf=0.374, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F175 - 7.29s] Track #07: conf=0.31, running_avg_conf=0.393, streak=59, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F175 - 7.29s] Track #08: conf=0.39, running_avg_conf=0.392, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F178 - 7.42s] Track #03: conf=0.87, running_avg_conf=0.854, streak=60, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F178 - 7.42s] Track #07: conf=0.37, running_avg_conf=0.374, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F178 - 7.42s] Track #07: conf=0.37, running_avg_conf=0.393, streak=60, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F178 - 7.42s] Track #08: conf=0.46, running_avg_conf=0.459, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F181 - 7.54s] Track #03: conf=0.87, running_avg_conf=0.854, streak=61, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F181 - 7.54s] Track #07: conf=0.45, running_avg_conf=0.376, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F181 - 7.54s] Track #07: conf=0.45, running_avg_conf=0.394, streak=61, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F181 - 7.54s] Track #08: conf=0.50, running_avg_conf=0.496, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F184 - 7.67s] Track #03: conf=0.87, running_avg_conf=0.855, streak=62, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F184 - 7.67s] Track #07: conf=0.46, running_avg_conf=0.379, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F184 - 7.67s] Track #07: conf=0.46, running_avg_conf=0.395, streak=62, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F184 - 7.67s] Track #08: conf=0.48, running_avg_conf=0.480, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F187 - 7.79s] Track #03: conf=0.87, running_avg_conf=0.855, streak=63, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F187 - 7.79s] Track #07: conf=0.45, running_avg_conf=0.381, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F187 - 7.79s] Track #07: conf=0.45, running_avg_conf=0.396, streak=63, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F187 - 7.79s] Track #08: conf=0.49, running_avg_conf=0.489, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F190 - 7.92s] Track #03: conf=0.87, running_avg_conf=0.855, streak=64, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F190 - 7.92s] Track #07: conf=0.45, running_avg_conf=0.383, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F190 - 7.92s] Track #07: conf=0.45, running_avg_conf=0.397, streak=64, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F190 - 7.92s] Track #08: conf=0.48, running_avg_conf=0.478, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F193 - 8.04s] Track #03: conf=0.86, running_avg_conf=0.855, streak=65, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F193 - 8.04s] Track #07: conf=0.49, running_avg_conf=0.386, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F193 - 8.04s] Track #07: conf=0.49, running_avg_conf=0.398, streak=65, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F193 - 8.04s] Track #08: conf=0.55, running_avg_conf=0.554, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F196 - 8.17s] Track #03: conf=0.86, running_avg_conf=0.855, streak=66, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F196 - 8.17s] Track #07: conf=0.49, running_avg_conf=0.389, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F196 - 8.17s] Track #07: conf=0.49, running_avg_conf=0.399, streak=66, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F196 - 8.17s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F199 - 8.29s] Track #03: conf=0.86, running_avg_conf=0.855, streak=67, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F199 - 8.29s] Track #07: conf=0.48, running_avg_conf=0.391, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F199 (8.29s) | streak=67 frames, running_avg_conf=0.401 (gate=0.40)
+  [TRACE F199 - 8.29s] Track #07: conf=0.48, running_avg_conf=0.401, streak=67, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F199 - 8.29s] Track #08: conf=0.58, running_avg_conf=0.582, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F202 - 8.42s] Track #03: conf=0.85, running_avg_conf=0.855, streak=68, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F202 - 8.42s] Track #07: conf=0.45, running_avg_conf=0.393, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F202 - 8.42s] Track #07: conf=0.45, running_avg_conf=0.401, streak=68, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F202 - 8.42s] Track #08: conf=0.63, running_avg_conf=0.627, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F205 - 8.54s] Track #03: conf=0.85, running_avg_conf=0.855, streak=69, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F205 - 8.54s] Track #07: conf=0.42, running_avg_conf=0.394, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F205 - 8.54s] Track #07: conf=0.42, running_avg_conf=0.402, streak=69, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F205 - 8.54s] Track #08: conf=0.61, running_avg_conf=0.613, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F208 - 8.67s] Track #03: conf=0.85, running_avg_conf=0.855, streak=70, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F208 - 8.67s] Track #07: conf=0.43, running_avg_conf=0.395, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F208 - 8.67s] Track #07: conf=0.43, running_avg_conf=0.402, streak=70, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F208 - 8.67s] Track #08: conf=0.65, running_avg_conf=0.645, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F211 - 8.79s] Track #03: conf=0.85, running_avg_conf=0.855, streak=71, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F211 - 8.79s] Track #07: conf=0.41, running_avg_conf=0.395, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F211 - 8.79s] Track #07: conf=0.41, running_avg_conf=0.402, streak=71, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F211 - 8.79s] Track #08: conf=0.64, running_avg_conf=0.636, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F214 - 8.92s] Track #03: conf=0.85, running_avg_conf=0.855, streak=72, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F214 - 8.92s] Track #07: conf=0.36, running_avg_conf=0.394, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F214 - 8.92s] Track #07: conf=0.36, running_avg_conf=0.402, streak=72, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F214 - 8.92s] Track #08: conf=0.62, running_avg_conf=0.621, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F217 - 9.04s] Track #03: conf=0.85, running_avg_conf=0.855, streak=73, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F217 - 9.04s] Track #07: conf=0.35, running_avg_conf=0.393, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F217 - 9.04s] Track #07: conf=0.35, running_avg_conf=0.401, streak=73, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F217 - 9.04s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F220 - 9.17s] Track #03: conf=0.85, running_avg_conf=0.855, streak=74, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F220 - 9.17s] Track #07: conf=0.40, running_avg_conf=0.393, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F220 - 9.17s] Track #07: conf=0.40, running_avg_conf=0.401, streak=74, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F220 - 9.17s] Track #08: conf=0.57, running_avg_conf=0.572, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F223 - 9.29s] Track #03: conf=0.85, running_avg_conf=0.855, streak=75, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F223 - 9.29s] Track #07: conf=0.39, running_avg_conf=0.393, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F223 - 9.29s] Track #07: conf=0.39, running_avg_conf=0.401, streak=75, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F223 - 9.29s] Track #08: conf=0.55, running_avg_conf=0.555, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F226 - 9.42s] Track #03: conf=0.85, running_avg_conf=0.855, streak=76, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F226 - 9.42s] Track #07: conf=0.50, running_avg_conf=0.396, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F226 - 9.42s] Track #07: conf=0.50, running_avg_conf=0.402, streak=76, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F226 - 9.42s] Track #08: conf=0.51, running_avg_conf=0.509, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F229 - 9.54s] Track #03: conf=0.86, running_avg_conf=0.855, streak=77, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F229 - 9.54s] Track #07: conf=0.50, running_avg_conf=0.398, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F229 - 9.54s] Track #07: conf=0.50, running_avg_conf=0.403, streak=77, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F229 - 9.54s] Track #08: conf=0.44, running_avg_conf=0.440, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F232 - 9.67s] Track #03: conf=0.86, running_avg_conf=0.855, streak=78, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F232 (9.67s) | streak=48 frames, running_avg_conf=0.401 (gate=0.40)
-  [TRACE F232 - 9.67s] Track #07: conf=0.53, running_avg_conf=0.401, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F232 - 9.67s] Track #07: conf=0.53, running_avg_conf=0.405, streak=78, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F232 - 9.67s] Track #08: conf=0.35, running_avg_conf=0.353, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F235 - 9.79s] Track #03: conf=0.85, running_avg_conf=0.855, streak=79, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F235 - 9.79s] Track #07: conf=0.43, running_avg_conf=0.401, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F235 - 9.79s] Track #07: conf=0.43, running_avg_conf=0.405, streak=79, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F235 - 9.79s] Track #08: conf=0.36, running_avg_conf=0.365, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F238 - 9.92s] Track #03: conf=0.85, running_avg_conf=0.855, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F238 (9.92s) | streak=50 frames, running_avg_conf=0.400 (gate=0.40)
-  [TRACE F238 - 9.92s] Track #07: conf=0.33, running_avg_conf=0.400, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F238 - 9.92s] Track #07: conf=0.33, running_avg_conf=0.404, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F238 - 9.92s] Track #08: conf=0.31, running_avg_conf=0.309, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 43.2 FPS (Tong thoi gian: 5.553s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 156.56 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 56.23 ms | p50 = 48.88 ms | p95 = 87.13 ms
-   - Spatial Check + Verifier (Python):           Mean = 2.57 ms | p50 = 2.54 ms | p95 = 3.02 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 62.03 ms | p50 = 54.23 ms | p95 = 93.27 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.36 ms
+[THONG LUONG] Pipeline Throughput: 36.0 FPS (Tong thoi gian: 6.661s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 181.29 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 66.58 ms | p50 = 59.57 ms | p95 = 119.03 ms
+   - Spatial Check + Verifier (Python):           Mean = 3.3 ms | p50 = 3.2 ms | p95 = 4.15 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 73.8 ms | p50 = 68.39 ms | p95 = 126.31 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.07 ms
 [TRACKS] Tong so Track ID theo doi duoc: 10
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14419,10 +14549,10 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #4         | 80       |  80.5%    |   97.7%      | [VI PHAM] CONFIRMED
 #5         | 80       |  69.8%    |  100.0%      | [VI PHAM] CONFIRMED
 #6         | 80       |  59.6%    |  100.0%      | [VI PHAM] CONFIRMED
-#7         | 76       |  41.5%    |  100.0%      | [VI PHAM] CONFIRMED
-#8         | 77       |  49.1%    |    0.0%      | [HOP LE] NORMAL
-#9         | 23       |  29.2%    |  100.0%      | [NGHI VAN] SUSPECTED
-#10        | 4        |  31.3%    |  100.0%      | [NGHI VAN] SUSPECTED
+#7         | 80       |  40.4%    |  100.0%      | [VI PHAM] CONFIRMED
+#8         | 80       |  48.1%    |    0.0%      | [HOP LE] NORMAL
+#9         | 80       |  23.5%    |  100.0%      | [NGHI VAN] SUSPECTED
+#10        | 8        |  19.3%    |  100.0%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 7 | SUSPECTED (Nghi van): 2 | NORMAL (Hop le): 1
 ===========================================================================
@@ -14522,12 +14652,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.81, running_avg_conf=0.801, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 46.8 FPS (Tong thoi gian: 5.129s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 131.15 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 50.67 ms | p50 = 46.69 ms | p95 = 79.29 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.81 ms | p50 = 1.71 ms | p95 = 2.45 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 56.26 ms | p50 = 52.39 ms | p95 = 84.63 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.97 ms
+[THONG LUONG] Pipeline Throughput: 47.4 FPS (Tong thoi gian: 5.063s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 210.79 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 49.59 ms | p50 = 48.63 ms | p95 = 62.48 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.86 ms | p50 = 1.77 ms | p95 = 2.34 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 54.92 ms | p50 = 53.68 ms | p95 = 67.57 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.63 ms
 [TRACKS] Tong so Track ID theo doi duoc: 6
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14535,9 +14665,9 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #1         | 80       |  86.8%    |   78.9%      | [VI PHAM] CONFIRMED
 #2         | 80       |  86.2%    |  100.0%      | [VI PHAM] CONFIRMED
 #3         | 80       |  80.1%    |  100.0%      | [VI PHAM] CONFIRMED
-#4         | 75       |  73.9%    |  100.0%      | [VI PHAM] CONFIRMED
+#4         | 76       |  73.1%    |  100.0%      | [VI PHAM] CONFIRMED
 #5         | 80       |  60.5%    |   20.3%      | [HOP LE] NORMAL
-#6         | 1        |  61.5%    |  100.0%      | [NGHI VAN] SUSPECTED
+#6         | 2        |  38.2%    |  100.0%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 4 | SUSPECTED (Nghi van): 1 | NORMAL (Hop le): 1
 ===========================================================================
@@ -14634,12 +14764,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.45, running_avg_conf=0.638, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 46.4 FPS (Tong thoi gian: 5.175s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 180.18 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 52.59 ms | p50 = 45.9 ms | p95 = 78.29 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.27 ms | p50 = 1.17 ms | p95 = 1.79 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 57.16 ms | p50 = 50.52 ms | p95 = 83.17 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.51 ms
+[THONG LUONG] Pipeline Throughput: 44.9 FPS (Tong thoi gian: 5.343s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 183.06 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 54.15 ms | p50 = 51.11 ms | p95 = 75.22 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.46 ms | p50 = 1.47 ms | p95 = 2.18 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 59.11 ms | p50 = 55.81 ms | p95 = 80.25 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.6 ms
 [TRACKS] Tong so Track ID theo doi duoc: 4
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14647,7 +14777,7 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #1         | 80       |  84.5%    |   74.9%      | [VI PHAM] CONFIRMED
 #2         | 80       |  71.5%    |  100.0%      | [VI PHAM] CONFIRMED
 #3         | 80       |  63.8%    |  100.0%      | [VI PHAM] CONFIRMED
-#20        | 19       |  30.7%    |   91.9%      | [NGHI VAN] SUSPECTED
+#20        | 41       |  24.0%    |   91.7%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 3 | SUSPECTED (Nghi van): 1 | NORMAL (Hop le): 0
 ===========================================================================
@@ -14745,171 +14875,179 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F076 - 3.17s] Track #07: conf=0.29, running_avg_conf=0.443, streak=26, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F076 - 3.17s] Track #08: conf=0.53, running_avg_conf=0.532, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F079 - 3.29s] Track #03: conf=0.85, running_avg_conf=0.849, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F079 - 3.29s] Track #07: conf=0.22, running_avg_conf=0.435, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F079 - 3.29s] Track #08: conf=0.56, running_avg_conf=0.561, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F082 - 3.42s] Track #03: conf=0.85, running_avg_conf=0.849, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F082 - 3.42s] Track #07: conf=0.21, running_avg_conf=0.427, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F082 - 3.42s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F085 - 3.54s] Track #03: conf=0.85, running_avg_conf=0.849, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F085 - 3.54s] Track #07: conf=0.19, running_avg_conf=0.419, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F085 - 3.54s] Track #08: conf=0.58, running_avg_conf=0.577, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F088 - 3.67s] Track #03: conf=0.85, running_avg_conf=0.849, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F088 - 3.67s] Track #07: conf=0.22, running_avg_conf=0.412, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F088 - 3.67s] Track #08: conf=0.59, running_avg_conf=0.586, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F091 - 3.79s] Track #03: conf=0.85, running_avg_conf=0.849, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F091 - 3.79s] Track #07: conf=0.29, running_avg_conf=0.408, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F091 - 3.79s] Track #08: conf=0.56, running_avg_conf=0.565, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F091 (3.79s) | streak=1 frames, running_avg_conf=0.288 (gate=0.40)
-  [TRACE F091 - 3.79s] Track #07: conf=0.29, running_avg_conf=0.288, streak=1, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F094 - 3.92s] Track #03: conf=0.85, running_avg_conf=0.849, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F094 - 3.92s] Track #07: conf=0.29, running_avg_conf=0.404, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F094 - 3.92s] Track #08: conf=0.56, running_avg_conf=0.561, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F094 - 3.92s] Track #07: conf=0.29, running_avg_conf=0.289, streak=2, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F097 - 4.04s] Track #03: conf=0.85, running_avg_conf=0.849, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F097 - 4.04s] Track #07: conf=0.33, running_avg_conf=0.402, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F097 - 4.04s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F097 - 4.04s] Track #07: conf=0.33, running_avg_conf=0.304, streak=3, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F100 - 4.17s] Track #03: conf=0.85, running_avg_conf=0.849, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F100 - 4.17s] Track #07: conf=0.35, running_avg_conf=0.401, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F100 - 4.17s] Track #08: conf=0.59, running_avg_conf=0.592, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F100 - 4.17s] Track #07: conf=0.35, running_avg_conf=0.315, streak=4, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F103 - 4.29s] Track #03: conf=0.85, running_avg_conf=0.849, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F103 (4.29s) | streak=35 frames, running_avg_conf=0.398 (gate=0.40)
+  [TRACE F103 - 4.29s] Track #07: conf=0.30, running_avg_conf=0.398, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F103 - 4.29s] Track #08: conf=0.58, running_avg_conf=0.576, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F103 - 4.29s] Track #07: conf=0.30, running_avg_conf=0.313, streak=5, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F106 - 4.42s] Track #03: conf=0.85, running_avg_conf=0.849, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F106 - 4.42s] Track #07: conf=0.28, running_avg_conf=0.395, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F106 - 4.42s] Track #08: conf=0.58, running_avg_conf=0.585, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F106 - 4.42s] Track #07: conf=0.28, running_avg_conf=0.308, streak=6, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F109 - 4.54s] Track #03: conf=0.86, running_avg_conf=0.850, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F109 - 4.54s] Track #07: conf=0.32, running_avg_conf=0.393, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F109 - 4.54s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F109 - 4.54s] Track #07: conf=0.32, running_avg_conf=0.310, streak=7, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F112 - 4.67s] Track #03: conf=0.85, running_avg_conf=0.850, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F112 - 4.67s] Track #07: conf=0.35, running_avg_conf=0.392, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F112 - 4.67s] Track #08: conf=0.56, running_avg_conf=0.558, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F112 - 4.67s] Track #07: conf=0.35, running_avg_conf=0.315, streak=8, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F115 - 4.79s] Track #03: conf=0.85, running_avg_conf=0.850, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F115 - 4.79s] Track #07: conf=0.44, running_avg_conf=0.393, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F115 - 4.79s] Track #08: conf=0.58, running_avg_conf=0.575, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F115 - 4.79s] Track #07: conf=0.44, running_avg_conf=0.329, streak=9, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F118 - 4.92s] Track #03: conf=0.85, running_avg_conf=0.850, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F118 - 4.92s] Track #07: conf=0.51, running_avg_conf=0.396, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F118 - 4.92s] Track #08: conf=0.58, running_avg_conf=0.577, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F118 - 4.92s] Track #07: conf=0.51, running_avg_conf=0.347, streak=10, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F121 - 5.04s] Track #03: conf=0.85, running_avg_conf=0.850, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F121 - 5.04s] Track #07: conf=0.49, running_avg_conf=0.398, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F121 - 5.04s] Track #08: conf=0.59, running_avg_conf=0.592, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F121 - 5.04s] Track #07: conf=0.49, running_avg_conf=0.360, streak=11, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F124 - 5.17s] Track #03: conf=0.85, running_avg_conf=0.850, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F124 - 5.17s] Track #07: conf=0.44, running_avg_conf=0.399, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F124 - 5.17s] Track #08: conf=0.59, running_avg_conf=0.588, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F124 - 5.17s] Track #07: conf=0.44, running_avg_conf=0.366, streak=12, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F127 - 5.29s] Track #03: conf=0.85, running_avg_conf=0.850, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F127 - 5.29s] Track #07: conf=0.44, running_avg_conf=0.400, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F127 - 5.29s] Track #08: conf=0.57, running_avg_conf=0.566, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F127 - 5.29s] Track #07: conf=0.44, running_avg_conf=0.372, streak=13, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F130 - 5.42s] Track #03: conf=0.86, running_avg_conf=0.850, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F130 (5.42s) | streak=44 frames, running_avg_conf=0.401 (gate=0.40)
+  [TRACE F130 - 5.42s] Track #07: conf=0.47, running_avg_conf=0.401, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F130 - 5.42s] Track #08: conf=0.54, running_avg_conf=0.539, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F130 - 5.42s] Track #07: conf=0.47, running_avg_conf=0.379, streak=14, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F133 - 5.54s] Track #03: conf=0.86, running_avg_conf=0.850, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F133 - 5.54s] Track #07: conf=0.44, running_avg_conf=0.402, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F133 - 5.54s] Track #08: conf=0.45, running_avg_conf=0.448, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F133 - 5.54s] Track #07: conf=0.44, running_avg_conf=0.383, streak=15, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F136 - 5.67s] Track #03: conf=0.86, running_avg_conf=0.851, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F136 - 5.67s] Track #07: conf=0.43, running_avg_conf=0.403, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F136 - 5.67s] Track #08: conf=0.40, running_avg_conf=0.397, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F136 - 5.67s] Track #07: conf=0.43, running_avg_conf=0.386, streak=16, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F139 - 5.79s] Track #03: conf=0.86, running_avg_conf=0.851, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F139 - 5.79s] Track #07: conf=0.45, running_avg_conf=0.404, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F139 - 5.79s] Track #08: conf=0.31, running_avg_conf=0.312, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
-  [TRACE F139 - 5.79s] Track #07: conf=0.45, running_avg_conf=0.390, streak=17, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
   [TRACE F142 - 5.92s] Track #03: conf=0.86, running_avg_conf=0.851, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F142 - 5.92s] Track #07: conf=0.42, running_avg_conf=0.391, streak=18, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F142 - 5.92s] Track #07: conf=0.42, running_avg_conf=0.404, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F142 - 5.92s] Track #08: conf=0.23, running_avg_conf=0.228, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F145 - 6.04s] Track #03: conf=0.86, running_avg_conf=0.851, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F145 - 6.04s] Track #07: conf=0.39, running_avg_conf=0.391, streak=19, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F145 - 6.04s] Track #07: conf=0.39, running_avg_conf=0.404, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F145 - 6.04s] Track #08: conf=0.21, running_avg_conf=0.214, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F148 - 6.17s] Track #03: conf=0.86, running_avg_conf=0.851, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F148 - 6.17s] Track #07: conf=0.39, running_avg_conf=0.391, streak=20, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F148 - 6.17s] Track #07: conf=0.39, running_avg_conf=0.404, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F148 - 6.17s] Track #08: conf=0.24, running_avg_conf=0.237, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F151 - 6.29s] Track #03: conf=0.86, running_avg_conf=0.852, streak=51, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F151 - 6.29s] Track #07: conf=0.41, running_avg_conf=0.392, streak=21, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F151 - 6.29s] Track #07: conf=0.41, running_avg_conf=0.404, streak=51, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F151 - 6.29s] Track #08: conf=0.25, running_avg_conf=0.251, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F154 - 6.42s] Track #03: conf=0.87, running_avg_conf=0.852, streak=52, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F154 - 6.42s] Track #07: conf=0.40, running_avg_conf=0.392, streak=22, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F154 - 6.42s] Track #07: conf=0.40, running_avg_conf=0.404, streak=52, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F154 - 6.42s] Track #08: conf=0.25, running_avg_conf=0.253, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F157 - 6.54s] Track #03: conf=0.87, running_avg_conf=0.852, streak=53, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F157 - 6.54s] Track #07: conf=0.41, running_avg_conf=0.393, streak=23, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F157 - 6.54s] Track #07: conf=0.41, running_avg_conf=0.404, streak=53, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F157 - 6.54s] Track #08: conf=0.28, running_avg_conf=0.282, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F160 - 6.67s] Track #03: conf=0.87, running_avg_conf=0.853, streak=54, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F160 - 6.67s] Track #07: conf=0.37, running_avg_conf=0.392, streak=24, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED
+  [TRACE F160 - 6.67s] Track #07: conf=0.37, running_avg_conf=0.403, streak=54, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F160 - 6.67s] Track #08: conf=0.30, running_avg_conf=0.297, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F163 - 6.79s] Track #03: conf=0.87, running_avg_conf=0.853, streak=55, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F163 - 6.79s] Track #07: conf=0.25, running_avg_conf=0.387, streak=25, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F163 - 6.79s] Track #07: conf=0.25, running_avg_conf=0.400, streak=55, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F163 - 6.79s] Track #08: conf=0.36, running_avg_conf=0.355, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F166 - 6.92s] Track #03: conf=0.87, running_avg_conf=0.853, streak=56, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F166 - 6.92s] Track #07: conf=0.27, running_avg_conf=0.382, streak=26, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F166 (6.92s) | streak=56 frames, running_avg_conf=0.398 (gate=0.40)
+  [TRACE F166 - 6.92s] Track #07: conf=0.27, running_avg_conf=0.398, streak=56, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F166 - 6.92s] Track #08: conf=0.39, running_avg_conf=0.387, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F169 - 7.04s] Track #03: conf=0.87, running_avg_conf=0.853, streak=57, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F169 - 7.04s] Track #07: conf=0.29, running_avg_conf=0.379, streak=27, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F169 - 7.04s] Track #07: conf=0.29, running_avg_conf=0.396, streak=57, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F169 - 7.04s] Track #08: conf=0.47, running_avg_conf=0.471, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F172 - 7.17s] Track #03: conf=0.87, running_avg_conf=0.854, streak=58, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F172 - 7.17s] Track #07: conf=0.31, running_avg_conf=0.376, streak=28, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F172 - 7.17s] Track #07: conf=0.31, running_avg_conf=0.395, streak=58, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F172 - 7.17s] Track #08: conf=0.46, running_avg_conf=0.464, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F175 - 7.29s] Track #03: conf=0.87, running_avg_conf=0.854, streak=59, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F175 - 7.29s] Track #07: conf=0.31, running_avg_conf=0.374, streak=29, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F175 - 7.29s] Track #07: conf=0.31, running_avg_conf=0.393, streak=59, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F175 - 7.29s] Track #08: conf=0.39, running_avg_conf=0.392, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F178 - 7.42s] Track #03: conf=0.87, running_avg_conf=0.854, streak=60, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F178 - 7.42s] Track #07: conf=0.37, running_avg_conf=0.374, streak=30, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F178 - 7.42s] Track #07: conf=0.37, running_avg_conf=0.393, streak=60, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F178 - 7.42s] Track #08: conf=0.46, running_avg_conf=0.459, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F181 - 7.54s] Track #03: conf=0.87, running_avg_conf=0.854, streak=61, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F181 - 7.54s] Track #07: conf=0.45, running_avg_conf=0.376, streak=31, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F181 - 7.54s] Track #07: conf=0.45, running_avg_conf=0.394, streak=61, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F181 - 7.54s] Track #08: conf=0.50, running_avg_conf=0.496, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F184 - 7.67s] Track #03: conf=0.87, running_avg_conf=0.855, streak=62, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F184 - 7.67s] Track #07: conf=0.46, running_avg_conf=0.379, streak=32, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 37%<40%]
+  [TRACE F184 - 7.67s] Track #07: conf=0.46, running_avg_conf=0.395, streak=62, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F184 - 7.67s] Track #08: conf=0.48, running_avg_conf=0.480, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F187 - 7.79s] Track #03: conf=0.87, running_avg_conf=0.855, streak=63, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F187 - 7.79s] Track #07: conf=0.45, running_avg_conf=0.381, streak=33, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F187 - 7.79s] Track #07: conf=0.45, running_avg_conf=0.396, streak=63, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F187 - 7.79s] Track #08: conf=0.49, running_avg_conf=0.489, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F190 - 7.92s] Track #03: conf=0.87, running_avg_conf=0.855, streak=64, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F190 - 7.92s] Track #07: conf=0.45, running_avg_conf=0.383, streak=34, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F190 - 7.92s] Track #07: conf=0.45, running_avg_conf=0.397, streak=64, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F190 - 7.92s] Track #08: conf=0.48, running_avg_conf=0.478, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F193 - 8.04s] Track #03: conf=0.86, running_avg_conf=0.855, streak=65, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F193 - 8.04s] Track #07: conf=0.49, running_avg_conf=0.386, streak=35, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F193 - 8.04s] Track #07: conf=0.49, running_avg_conf=0.398, streak=65, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F193 - 8.04s] Track #08: conf=0.55, running_avg_conf=0.554, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F196 - 8.17s] Track #03: conf=0.86, running_avg_conf=0.855, streak=66, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F196 - 8.17s] Track #07: conf=0.49, running_avg_conf=0.389, streak=36, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 38%<40%]
+  [TRACE F196 - 8.17s] Track #07: conf=0.49, running_avg_conf=0.399, streak=66, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
   [TRACE F196 - 8.17s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F199 - 8.29s] Track #03: conf=0.86, running_avg_conf=0.855, streak=67, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F199 - 8.29s] Track #07: conf=0.48, running_avg_conf=0.391, streak=37, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F199 (8.29s) | streak=67 frames, running_avg_conf=0.401 (gate=0.40)
+  [TRACE F199 - 8.29s] Track #07: conf=0.48, running_avg_conf=0.401, streak=67, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F199 - 8.29s] Track #08: conf=0.58, running_avg_conf=0.582, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F202 - 8.42s] Track #03: conf=0.85, running_avg_conf=0.855, streak=68, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F202 - 8.42s] Track #07: conf=0.45, running_avg_conf=0.393, streak=38, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F202 - 8.42s] Track #07: conf=0.45, running_avg_conf=0.401, streak=68, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F202 - 8.42s] Track #08: conf=0.63, running_avg_conf=0.627, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F205 - 8.54s] Track #03: conf=0.85, running_avg_conf=0.855, streak=69, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F205 - 8.54s] Track #07: conf=0.42, running_avg_conf=0.394, streak=39, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F205 - 8.54s] Track #07: conf=0.42, running_avg_conf=0.402, streak=69, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F205 - 8.54s] Track #08: conf=0.61, running_avg_conf=0.613, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F208 - 8.67s] Track #03: conf=0.85, running_avg_conf=0.855, streak=70, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F208 - 8.67s] Track #07: conf=0.43, running_avg_conf=0.395, streak=40, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F208 - 8.67s] Track #07: conf=0.43, running_avg_conf=0.402, streak=70, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F208 - 8.67s] Track #08: conf=0.65, running_avg_conf=0.645, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F211 - 8.79s] Track #03: conf=0.85, running_avg_conf=0.855, streak=71, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F211 - 8.79s] Track #07: conf=0.41, running_avg_conf=0.395, streak=41, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F211 - 8.79s] Track #07: conf=0.41, running_avg_conf=0.402, streak=71, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F211 - 8.79s] Track #08: conf=0.64, running_avg_conf=0.636, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F214 - 8.92s] Track #03: conf=0.85, running_avg_conf=0.855, streak=72, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F214 - 8.92s] Track #07: conf=0.36, running_avg_conf=0.394, streak=42, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F214 - 8.92s] Track #07: conf=0.36, running_avg_conf=0.402, streak=72, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F214 - 8.92s] Track #08: conf=0.62, running_avg_conf=0.621, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F217 - 9.04s] Track #03: conf=0.85, running_avg_conf=0.855, streak=73, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F217 - 9.04s] Track #07: conf=0.35, running_avg_conf=0.393, streak=43, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F217 - 9.04s] Track #07: conf=0.35, running_avg_conf=0.401, streak=73, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F217 - 9.04s] Track #08: conf=0.58, running_avg_conf=0.581, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F220 - 9.17s] Track #03: conf=0.85, running_avg_conf=0.855, streak=74, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F220 - 9.17s] Track #07: conf=0.40, running_avg_conf=0.393, streak=44, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F220 - 9.17s] Track #07: conf=0.40, running_avg_conf=0.401, streak=74, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F220 - 9.17s] Track #08: conf=0.57, running_avg_conf=0.572, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F223 - 9.29s] Track #03: conf=0.85, running_avg_conf=0.855, streak=75, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F223 - 9.29s] Track #07: conf=0.39, running_avg_conf=0.393, streak=45, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F223 - 9.29s] Track #07: conf=0.39, running_avg_conf=0.401, streak=75, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F223 - 9.29s] Track #08: conf=0.55, running_avg_conf=0.555, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F226 - 9.42s] Track #03: conf=0.85, running_avg_conf=0.855, streak=76, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F226 - 9.42s] Track #07: conf=0.50, running_avg_conf=0.396, streak=46, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F226 - 9.42s] Track #07: conf=0.50, running_avg_conf=0.402, streak=76, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F226 - 9.42s] Track #08: conf=0.51, running_avg_conf=0.509, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F229 - 9.54s] Track #03: conf=0.86, running_avg_conf=0.855, streak=77, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F229 - 9.54s] Track #07: conf=0.50, running_avg_conf=0.398, streak=47, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F229 - 9.54s] Track #07: conf=0.50, running_avg_conf=0.403, streak=77, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F229 - 9.54s] Track #08: conf=0.44, running_avg_conf=0.440, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F232 - 9.67s] Track #03: conf=0.86, running_avg_conf=0.855, streak=78, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  >>> [STATUS CHANGE] Track #07: SUSPECTED -> CONFIRMED tai F232 (9.67s) | streak=48 frames, running_avg_conf=0.401 (gate=0.40)
-  [TRACE F232 - 9.67s] Track #07: conf=0.53, running_avg_conf=0.401, streak=48, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F232 - 9.67s] Track #07: conf=0.53, running_avg_conf=0.405, streak=78, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F232 - 9.67s] Track #08: conf=0.35, running_avg_conf=0.353, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F235 - 9.79s] Track #03: conf=0.85, running_avg_conf=0.855, streak=79, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  [TRACE F235 - 9.79s] Track #07: conf=0.43, running_avg_conf=0.401, streak=49, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
+  [TRACE F235 - 9.79s] Track #07: conf=0.43, running_avg_conf=0.405, streak=79, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F235 - 9.79s] Track #08: conf=0.36, running_avg_conf=0.365, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
   [TRACE F238 - 9.92s] Track #03: conf=0.85, running_avg_conf=0.855, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
-  >>> [STATUS CHANGE] Track #07: CONFIRMED -> SUSPECTED tai F238 (9.92s) | streak=50 frames, running_avg_conf=0.400 (gate=0.40)
-  [TRACE F238 - 9.92s] Track #07: conf=0.33, running_avg_conf=0.400, streak=50, overlap=100.0%, base_in_roi=True, is_viol=True, status=SUSPECTED [REASON: CONF 39%<40%]
+  [TRACE F238 - 9.92s] Track #07: conf=0.33, running_avg_conf=0.404, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
   [TRACE F238 - 9.92s] Track #08: conf=0.31, running_avg_conf=0.309, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 38.8 FPS (Tong thoi gian: 6.190s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 155.28 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 63.25 ms | p50 = 54.55 ms | p95 = 100.97 ms
-   - Spatial Check + Verifier (Python):           Mean = 2.72 ms | p50 = 2.69 ms | p95 = 3.15 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 69.46 ms | p50 = 60.14 ms | p95 = 111.09 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.54 ms
+[THONG LUONG] Pipeline Throughput: 36.1 FPS (Tong thoi gian: 6.655s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 232.08 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 65.93 ms | p50 = 56.07 ms | p95 = 111.68 ms
+   - Spatial Check + Verifier (Python):           Mean = 3.5 ms | p50 = 3.28 ms | p95 = 4.51 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 73.37 ms | p50 = 64.06 ms | p95 = 119.69 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.98 ms
 [TRACKS] Tong so Track ID theo doi duoc: 10
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14920,10 +15058,10 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
 #4         | 80       |  80.5%    |   97.7%      | [VI PHAM] CONFIRMED
 #5         | 80       |  69.8%    |  100.0%      | [VI PHAM] CONFIRMED
 #6         | 80       |  59.6%    |  100.0%      | [VI PHAM] CONFIRMED
-#7         | 76       |  41.5%    |  100.0%      | [VI PHAM] CONFIRMED
-#8         | 77       |  49.1%    |    0.0%      | [HOP LE] NORMAL
-#9         | 23       |  29.2%    |  100.0%      | [NGHI VAN] SUSPECTED
-#10        | 4        |  31.3%    |  100.0%      | [NGHI VAN] SUSPECTED
+#7         | 80       |  40.4%    |  100.0%      | [VI PHAM] CONFIRMED
+#8         | 80       |  48.1%    |    0.0%      | [HOP LE] NORMAL
+#9         | 80       |  23.5%    |  100.0%      | [NGHI VAN] SUSPECTED
+#10        | 8        |  19.3%    |  100.0%      | [NGHI VAN] SUSPECTED
 ---------------------------------------------------------------------------
 [KET QUA] CONFIRMED (Vi pham): 7 | SUSPECTED (Nghi van): 2 | NORMAL (Hop le): 1
 ===========================================================================
@@ -15228,7 +15366,7 @@ FILE: reports\system_eval_results.json
 
 {
   "metadata": {
-    "generated_at": "2026-11-03 09:06:59",
+    "generated_at": "2026-11-03 15:42:39",
     "generator_script": "evaluation/evaluate_videos.py",
     "ground_truth_file": "configs/video_ground_truth.json",
     "hardware_platform": "Windows-11-10.0.26200-SP0",
@@ -15285,13 +15423,13 @@ FILE: reports\system_eval_results.json
     "false_alarms_in_sample": 2,
     "standee_3_v1_avg_overlap": 100.0,
     "standee_3_v1_status": "CONFIRMED",
-    "pipeline_throughput_fps_min": 35.4,
-    "pipeline_throughput_fps_max": 43.9,
-    "pipeline_steady_state_fps_min": 44.4,
-    "pipeline_steady_state_fps_max": 53.3,
-    "estimated_inference_rate_hz": "~11.8 - 14.6 Hz",
-    "measured_tracker_mean_ms": 53.52,
-    "measured_inferred_frame_mean_ms": 58.45,
+    "pipeline_throughput_fps_min": 30.1,
+    "pipeline_throughput_fps_max": 51.9,
+    "pipeline_steady_state_fps_min": 30.6,
+    "pipeline_steady_state_fps_max": 53.9,
+    "estimated_inference_rate_hz": "~10.0 - 17.3 Hz",
+    "measured_tracker_mean_ms": 59.4,
+    "measured_inferred_frame_mean_ms": 65.13,
     "item_evaluations": [
       {
         "object_id": "V1_OBJ_1",
@@ -15299,8 +15437,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 1,
         "expected_track_id": 1,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.29,
+        "spatial_iou": 0.985,
         "temporal_iou": 0.988,
         "description": "Biển bạt lớn dựng đứng trước cửa hàng số 1",
         "gt_label": "VIOLATION",
@@ -15318,8 +15456,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 2,
         "expected_track_id": 2,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.283,
+        "spatial_iou": 0.968,
         "temporal_iou": 0.988,
         "description": "Biển hiệu dạng hộp đứng sát vách cửa hàng",
         "gt_label": "VIOLATION",
@@ -15337,8 +15475,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 3,
         "expected_track_id": 3,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.283,
+        "spatial_iou": 0.967,
         "temporal_iou": 0.988,
         "description": "Biển Standee chữ A chân sắt đặt trên lối đi bộ",
         "gt_label": "VIOLATION",
@@ -15356,16 +15494,16 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 4,
         "expected_track_id": 4,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.277,
-        "spatial_iou": 1.0,
-        "temporal_iou": 0.925,
+        "match_confidence": 1.261,
+        "spatial_iou": 0.951,
+        "temporal_iou": 0.938,
         "description": "Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè",
         "gt_label": "VIOLATION",
         "system_status": "CONFIRMED",
         "eval_result": "TP",
         "justification": "Biển quảng cáo dạng tấm dọc dựng sát gốc cây trên vỉa hè, cản trở lối đi bộ.",
-        "total_detections": 75,
-        "avg_conf": 0.739,
+        "total_detections": 76,
+        "avg_conf": 0.731,
         "avg_overlap": 100.0,
         "best_crop_path": "reports/video_eval_crops/video_test/track_4_conf78.jpg"
       },
@@ -15375,8 +15513,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 5,
         "expected_track_id": 5,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.289,
+        "spatial_iou": 0.981,
         "temporal_iou": 0.988,
         "description": "Biển hiệu treo thụt sâu trong lòng nhà",
         "gt_label": "NORMAL",
@@ -15394,8 +15532,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 1,
         "expected_track_id": 1,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.293,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.238,
+        "spatial_iou": 0.862,
         "temporal_iou": 0.988,
         "description": "Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai",
         "gt_label": "VIOLATION",
@@ -15413,8 +15551,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 2,
         "expected_track_id": 2,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.295,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.267,
+        "spatial_iou": 0.929,
         "temporal_iou": 0.988,
         "description": "Biển quảng cáo di động chân bánh xe",
         "gt_label": "VIOLATION",
@@ -15432,8 +15570,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 3,
         "expected_track_id": 3,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.28,
+        "spatial_iou": 0.961,
         "temporal_iou": 0.988,
         "description": "Biển bạt nhỏ kê trước bậc thềm",
         "gt_label": "VIOLATION",
@@ -15451,17 +15589,17 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 20,
         "expected_track_id": 23,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.082,
-        "spatial_iou": 1.0,
-        "temporal_iou": 0.275,
+        "match_confidence": 1.113,
+        "spatial_iou": 0.872,
+        "temporal_iou": 0.551,
         "description": "Biển hiệu dạng khung sắt tầm thấp ven đường",
         "gt_label": "VIOLATION",
         "system_status": "SUSPECTED",
         "eval_result": "FN",
         "justification": "Biển hiệu dạng khung sắt tầm thấp cắm chân trên vỉa hè ven đường trước cửa hàng.",
-        "total_detections": 19,
-        "avg_conf": 0.307,
-        "avg_overlap": 91.9,
+        "total_detections": 41,
+        "avg_conf": 0.24,
+        "avg_overlap": 91.7,
         "best_crop_path": "reports/video_eval_crops/videotesst2/track_20_conf37.jpg"
       },
       {
@@ -15489,8 +15627,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 1,
         "expected_track_id": 1,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.286,
+        "spatial_iou": 0.975,
         "temporal_iou": 0.988,
         "description": "Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa",
         "gt_label": "VIOLATION",
@@ -15508,8 +15646,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 2,
         "expected_track_id": 2,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.285,
+        "spatial_iou": 0.974,
         "temporal_iou": 0.988,
         "description": "Biển hộp đèn đứng góc trái",
         "gt_label": "VIOLATION",
@@ -15527,8 +15665,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 3,
         "expected_track_id": 3,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.274,
+        "spatial_iou": 0.947,
         "temporal_iou": 0.988,
         "description": "Biển vẫy thấp đặt cạnh gốc cây",
         "gt_label": "VIOLATION",
@@ -15546,8 +15684,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 4,
         "expected_track_id": 4,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.281,
+        "spatial_iou": 0.962,
         "temporal_iou": 0.988,
         "description": "Biển bạt chữ nhật kê ngoài thềm",
         "gt_label": "VIOLATION",
@@ -15565,8 +15703,8 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 5,
         "expected_track_id": 5,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.144,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.117,
+        "spatial_iou": 0.933,
         "temporal_iou": 0.481,
         "description": "Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố",
         "gt_label": "VIOLATION",
@@ -15584,16 +15722,16 @@ FILE: reports\system_eval_results.json
         "matched_track_id": 8,
         "expected_track_id": 8,
         "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.296,
-        "spatial_iou": 1.0,
+        "match_confidence": 1.276,
+        "spatial_iou": 0.95,
         "temporal_iou": 0.988,
         "description": "Biển gắn tường tầng thấp phía bên phải",
         "gt_label": "NORMAL",
         "system_status": "NORMAL",
         "eval_result": "TN",
         "justification": "Biển hiệu dạng biển vẫy gắn cố định trên tường nhà, không cắm chân hay đặt trên mặt vỉa hè.",
-        "total_detections": 77,
-        "avg_conf": 0.491,
+        "total_detections": 80,
+        "avg_conf": 0.481,
         "avg_overlap": 0.0,
         "best_crop_path": "reports/video_eval_crops/video_test3/track_8_conf64.jpg"
       },
@@ -15630,8 +15768,8 @@ FILE: reports\system_eval_results.json
         "system_status": "CONFIRMED",
         "eval_result": "FP",
         "justification": "Báo động giả (False Positive) từ vật thể ngoài tập nhãn chuẩn.",
-        "total_detections": 76,
-        "avg_conf": 0.415,
+        "total_detections": 80,
+        "avg_conf": 0.404,
         "avg_overlap": 100.0,
         "best_crop_path": "reports/video_eval_crops/video_test3/track_7_conf56.jpg"
       }
@@ -15698,27 +15836,27 @@ FILE: reports\system_eval_results.json
     "throughput_across_trials": [
       {
         "trial": 1,
-        "fps_min": 35.4,
-        "fps_max": 43.9,
-        "fps_mean": 40.6,
-        "steady_fps_min": 44.4,
-        "steady_fps_max": 53.3
+        "fps_min": 30.1,
+        "fps_max": 51.9,
+        "fps_mean": 38.5,
+        "steady_fps_min": 30.6,
+        "steady_fps_max": 53.9
       },
       {
         "trial": 2,
-        "fps_min": 43.2,
-        "fps_max": 48.8,
-        "fps_mean": 46.0,
-        "steady_fps_min": 44.6,
-        "steady_fps_max": 50.4
+        "fps_min": 35.7,
+        "fps_max": 40.9,
+        "fps_mean": 37.5,
+        "steady_fps_min": 36.7,
+        "steady_fps_max": 42.1
       },
       {
         "trial": 3,
-        "fps_min": 38.8,
-        "fps_max": 46.8,
-        "fps_mean": 44.0,
-        "steady_fps_min": 40.0,
-        "steady_fps_max": 48.2
+        "fps_min": 36.1,
+        "fps_max": 47.4,
+        "fps_mean": 42.8,
+        "steady_fps_min": 37.5,
+        "steady_fps_max": 49.6
       }
     ],
     "object_stability_details": [
@@ -16166,21 +16304,21 @@ FILE: reports\system_eval_results.json
       "roi_sha256": "8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 35.4,
+      "fps_throughput": 33.4,
       "latency_stats": {
-        "warmup_frame_ms": 2232.47,
-        "steady_state_fps": 53.3,
-        "overall_fps": 35.4,
-        "tracker_mean_ms": 47.02,
-        "tracker_p50_ms": 40.65,
-        "tracker_p95_ms": 76.32,
-        "verifier_mean_ms": 1.86,
-        "verifier_p50_ms": 1.54,
-        "verifier_p95_ms": 1.98,
-        "inferred_frame_mean_ms": 51.68,
-        "inferred_frame_p50_ms": 45.52,
-        "inferred_frame_p95_ms": 81.18,
-        "skipped_frame_mean_ms": 2.25
+        "warmup_frame_ms": 2365.01,
+        "steady_state_fps": 50.4,
+        "overall_fps": 33.4,
+        "tracker_mean_ms": 47.36,
+        "tracker_p50_ms": 43.3,
+        "tracker_p95_ms": 70.1,
+        "verifier_mean_ms": 2.01,
+        "verifier_p50_ms": 1.44,
+        "verifier_p95_ms": 2.47,
+        "inferred_frame_mean_ms": 53.08,
+        "inferred_frame_p50_ms": 49.96,
+        "inferred_frame_p95_ms": 76.04,
+        "skipped_frame_mean_ms": 3.07
       },
       "tracks_count": 6,
       "confirmed_count": 4,
@@ -16213,8 +16351,8 @@ FILE: reports\system_eval_results.json
         },
         {
           "track_id": 4,
-          "detections": 75,
-          "avg_conf": 0.739,
+          "detections": 76,
+          "avg_conf": 0.731,
           "avg_overlap": 100.0,
           "status": "CONFIRMED",
           "best_crop_path": "reports/video_eval_crops\\video_test\\track_4_conf78.jpg"
@@ -16229,8 +16367,8 @@ FILE: reports\system_eval_results.json
         },
         {
           "track_id": 6,
-          "detections": 1,
-          "avg_conf": 0.615,
+          "detections": 2,
+          "avg_conf": 0.382,
           "avg_overlap": 100.0,
           "status": "SUSPECTED",
           "best_crop_path": "reports/video_eval_crops\\video_test\\track_6_conf61.jpg"
@@ -16245,21 +16383,21 @@ FILE: reports\system_eval_results.json
       "roi_sha256": "79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 42.4,
+      "fps_throughput": 51.9,
       "latency_stats": {
-        "warmup_frame_ms": 236.97,
-        "steady_state_fps": 44.4,
-        "overall_fps": 42.4,
-        "tracker_mean_ms": 58.43,
-        "tracker_p50_ms": 46.93,
-        "tracker_p95_ms": 103.73,
-        "verifier_mean_ms": 1.21,
-        "verifier_p50_ms": 1.09,
-        "verifier_p95_ms": 1.71,
-        "inferred_frame_mean_ms": 62.82,
-        "inferred_frame_p50_ms": 51.38,
-        "inferred_frame_p95_ms": 107.88,
-        "skipped_frame_mean_ms": 2.42
+        "warmup_frame_ms": 154.29,
+        "steady_state_fps": 53.9,
+        "overall_fps": 51.9,
+        "tracker_mean_ms": 45.46,
+        "tracker_p50_ms": 43.1,
+        "tracker_p95_ms": 59.77,
+        "verifier_mean_ms": 1.15,
+        "verifier_p50_ms": 1.17,
+        "verifier_p95_ms": 1.51,
+        "inferred_frame_mean_ms": 50.3,
+        "inferred_frame_p50_ms": 47.94,
+        "inferred_frame_p95_ms": 66.1,
+        "skipped_frame_mean_ms": 2.65
       },
       "tracks_count": 4,
       "confirmed_count": 3,
@@ -16292,9 +16430,9 @@ FILE: reports\system_eval_results.json
         },
         {
           "track_id": 20,
-          "detections": 19,
-          "avg_conf": 0.307,
-          "avg_overlap": 91.9,
+          "detections": 41,
+          "avg_conf": 0.24,
+          "avg_overlap": 91.7,
           "status": "SUSPECTED",
           "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_20_conf37.jpg"
         }
@@ -16308,21 +16446,21 @@ FILE: reports\system_eval_results.json
       "roi_sha256": "529ee774742c5d8b5f6a7730dec484f85f0a72755f323e3f9e626b5ae00b9fd9",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 43.9,
+      "fps_throughput": 30.1,
       "latency_stats": {
-        "warmup_frame_ms": 163.4,
-        "steady_state_fps": 45.4,
-        "overall_fps": 43.9,
-        "tracker_mean_ms": 55.11,
-        "tracker_p50_ms": 48.72,
-        "tracker_p95_ms": 88.3,
-        "verifier_mean_ms": 2.6,
-        "verifier_p50_ms": 2.55,
-        "verifier_p95_ms": 3.09,
-        "inferred_frame_mean_ms": 60.86,
-        "inferred_frame_p50_ms": 55.32,
-        "inferred_frame_p95_ms": 93.65,
-        "skipped_frame_mean_ms": 2.35
+        "warmup_frame_ms": 146.74,
+        "steady_state_fps": 30.6,
+        "overall_fps": 30.1,
+        "tracker_mean_ms": 85.37,
+        "tracker_p50_ms": 56.79,
+        "tracker_p95_ms": 231.47,
+        "verifier_mean_ms": 2.89,
+        "verifier_p50_ms": 2.59,
+        "verifier_p95_ms": 3.59,
+        "inferred_frame_mean_ms": 92.0,
+        "inferred_frame_p50_ms": 63.01,
+        "inferred_frame_p95_ms": 237.67,
+        "skipped_frame_mean_ms": 2.77
       },
       "tracks_count": 10,
       "confirmed_count": 7,
@@ -16379,32 +16517,32 @@ FILE: reports\system_eval_results.json
         },
         {
           "track_id": 7,
-          "detections": 76,
-          "avg_conf": 0.415,
+          "detections": 80,
+          "avg_conf": 0.404,
           "avg_overlap": 100.0,
           "status": "CONFIRMED",
           "best_crop_path": "reports/video_eval_crops\\video_test3\\track_7_conf56.jpg"
         },
         {
           "track_id": 8,
-          "detections": 77,
-          "avg_conf": 0.491,
+          "detections": 80,
+          "avg_conf": 0.481,
           "avg_overlap": 0.0,
           "status": "NORMAL",
           "best_crop_path": "reports/video_eval_crops\\video_test3\\track_8_conf64.jpg"
         },
         {
           "track_id": 9,
-          "detections": 23,
-          "avg_conf": 0.292,
+          "detections": 80,
+          "avg_conf": 0.235,
           "avg_overlap": 100.0,
           "status": "SUSPECTED",
           "best_crop_path": "reports/video_eval_crops\\video_test3\\track_9_conf34.jpg"
         },
         {
           "track_id": 10,
-          "detections": 4,
-          "avg_conf": 0.313,
+          "detections": 8,
+          "avg_conf": 0.193,
           "avg_overlap": 100.0,
           "status": "SUSPECTED",
           "best_crop_path": "reports/video_eval_crops\\video_test3\\track_10_conf33.jpg"
@@ -25120,10 +25258,10 @@ def build_essentials():
     p()
 
     p("### Phân tích sâu các trường hợp False Negative (FN) — Giữ an toàn ở diện Nghi vấn (SUSPECTED):")
-    p("1. Track #33 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #33):")
+    p("1. Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):")
     p("   - Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận confirm_seconds = 3.0s.")
     p("   - Đây là hiệu ứng cắt cụt dữ liệu biên thời gian (Right-Censoring) của clip ngắn 10.0 giây. Hệ thống giữ ở SUSPECTED thay vì kết luận vội vã.")
-    p("2. Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #23):")
+    p("2. Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):")
     p("   - Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track chỉ đạt 0.307, thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.")
     p("   - Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống kiên quyết giữ đối tượng ở diện SUSPECTED để bảo đảm nguyên tắc thận trọng pháp lý, tránh báo sai.")
     p("3. Standee #3 (Video 1 - chỉ xảy ra ở Version A):")
@@ -25133,7 +25271,7 @@ def build_essentials():
 
     p("### Phân tích 2 trường hợp True Negative (TN) — Nhận diện đúng hợp lệ, không phạt nhầm:")
     p("1. Track #5 (Video 1 - Biển hiệu treo thụt sâu trong lòng nhà):")
-    p("   - Tỷ lệ đè vỉa hè chỉ đạt 22.3% (thấp hơn ngưỡng 30%) và điểm chân đế nằm hoàn toàn trong khuôn viên nhà dân.")
+    p("   - Tỷ lệ đè vỉa hè chỉ đạt 20.3% (thấp hơn ngưỡng 30%) và điểm chân đế nằm hoàn toàn trong khuôn viên nhà dân.")
     p("   - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian -> True Negative (TN).")
     p("2. Track #8 (Video 3 - Biển gắn tường tầng thấp phía bên phải, GT #8):")
     p("   - Biển gắn cố định trên phần tường thấp sát mặt đất, không cắm chân hay đặt trên mặt vỉa hè.")
@@ -25193,7 +25331,7 @@ def build_essentials():
     p("      khác nhau mỗi chân đế kim loại mỏng dễ bị che khuất. Nếu ép YOLO phân loại 2 class sẽ gây nhập nhằng nhãn (class confusion).")
     p("   2. Hệ thống áp dụng kiến trúc Phòng thủ nhiều lớp (Defense-in-Depth):")
     p("      - Lớp 1 (Spatial Rule Engine): Kiểm tra Overlap >= 30% và chân đế tiếp đất 3 điểm (base_in_roi), loại trừ ngay 100% biển treo")
-    p("        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 22.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 77 frames) -> xếp NORMAL.")
+    p("        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 77 frames) -> xếp NORMAL.")
     p("      - Lớp 2 (Temporal Verifier & Calibration): Với các trường hợp biên (Corner Case) góc nghiêng camera làm đáy Box chiếu sát mép vỉa hè,")
     p("        tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đóng vai trò chốt chặn an toàn giữ đối tượng ở diện SUSPECTED (không bao giờ phạt nhầm),")
     p("        kết hợp quy trình hiệu chuẩn lùi biên ROI cách chân tường 10-15px trên Web ROI Studio.")
@@ -33906,21 +34044,23 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = None, imgsz: int = 640, allowed_classes: list = None, iou: float = 0.50, device: str = None):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = None, imgsz: int = 640, allowed_classes: list = None, iou: float = 0.50, device: str = None, track_low_thresh: float = 0.10):
         """
         Khởi tạo ObjectTracker.
         
         Args:
             model_path: Đường dẫn file trọng số YOLO (vd: 'models/best.pt', 'models/best.onnx')
-            conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.25 = 25% theo chuẩn đánh giá hệ thống)
+            conf_threshold: Ngưỡng độ tin cậy tối thiểu cho vi phạm (mặc định 0.25 = 25%)
             tracker_type: File cấu hình tracker ('configs/bytetrack_custom.yaml', 'bytetrack.yaml' hoặc 'botsort.yaml')
             imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
             allowed_classes: Danh sách class_id hoặc tên class được phép bám vết (None = tất cả)
             iou: Ngưỡng NMS IoU (mặc định 0.50)
             device: Thiết bị chạy suy luận ('cpu' hoặc 'cuda:0')
+            track_low_thresh: Ngưỡng phát hiện vòng 2 của ByteTrack (mặc định 0.10 để phục hồi vết khi che khuất)
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
+        self.track_low_thresh = track_low_thresh
         if tracker_type is None:
             custom_cfg = "configs/bytetrack_custom.yaml"
             self.tracker_type = custom_cfg if os.path.exists(custom_cfg) else "bytetrack.yaml"
@@ -33934,7 +34074,7 @@ class ObjectTracker:
         if not os.path.exists(model_path) and not model_path.endswith("yolov8n.pt"):
             raise FileNotFoundError(f"Không tìm thấy file trọng số mô hình: {model_path}")
             
-        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {self.tracker_type} (Conf: {conf_threshold}, Imgsz: {imgsz}, NMS IoU: {iou})")
+        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {self.tracker_type} (Conf: {conf_threshold}, Low-Thresh: {track_low_thresh}, Imgsz: {imgsz}, NMS IoU: {iou})")
         self.model = YOLO(model_path)
         self.class_names = self.model.names
 
@@ -33962,11 +34102,13 @@ class ObjectTracker:
         """
         target_conf = conf if conf is not None else self.conf_threshold
         target_imgsz = imgsz if imgsz is not None else self.imgsz
+        # Nạp ngưỡng low_thresh vào model.track() để ByteTrack nhận đủ box vòng 2 phục hồi khi che khuất
+        infer_conf = min(target_conf, self.track_low_thresh)
         track_kwargs = {
             "source": frame,
             "persist": True,
             "tracker": self.tracker_type,
-            "conf": target_conf,
+            "conf": infer_conf,
             "imgsz": target_imgsz,
             "iou": self.iou,
             "verbose": False
@@ -33999,6 +34141,10 @@ class ObjectTracker:
                 track_id = int(box.id[0].cpu().numpy())
             else:
                 track_id = -1  # Vật thể mới xuất hiện chưa đủ độ tin cậy để gán ID
+
+            # Lọc bỏ detection tự do (chưa gán track) nếu conf thấp hơn target_conf
+            if track_id <= 0 and conf < target_conf:
+                continue
 
             tracked_objects.append({
                 "track_id": track_id,
@@ -34261,6 +34407,7 @@ class TemporalVerifier:
                     "status": TrackState.NORMAL,
                     "last_seen": self.current_frame_index,
                     "last_alert_time": None,
+                    "alerted": False,
                     "non_viol_streak": 0,
                     "stationary_since": None,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
@@ -34329,31 +34476,29 @@ class TemporalVerifier:
                         record["status"] = TrackState.CONFIRMED
                         suspect_reason = ""
 
-                    # Spatial & temporal deduplication
+                    # Spatial & temporal deduplication (khử trùng lặp theo vụ việc/incident)
                     if record["status"] == TrackState.CONFIRMED:
-                        is_spatially_cooldown = any(
-                            ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
-                            and (current_timestamp - c["time"]) < self.cooldown_seconds
-                            for c in self.confirmed_locations
-                        )
-                        time_ok = (record.get("last_alert_time") is None) or (
-                            (current_timestamp - record["last_alert_time"]) >= self.cooldown_seconds
-                        )
-
-                        if not is_spatially_cooldown and time_ok:
-                            is_new_alert = True
-                            record["last_alert_time"] = current_timestamp
-                            self.confirmed_locations.append({
-                                "cx": cx,
-                                "cy": cy,
-                                "time": current_timestamp,
-                                "track_id": track_id,
-                            })
-                            # Dọn dẹp mốc cũ
-                            self.confirmed_locations = [
-                                c for c in self.confirmed_locations
-                                if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
-                            ]
+                        if not record.get("alerted", False):
+                            is_spatially_cooldown = any(
+                                ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
+                                and (current_timestamp - c["time"]) < self.cooldown_seconds
+                                for c in self.confirmed_locations
+                            )
+                            if not is_spatially_cooldown:
+                                is_new_alert = True
+                                record["alerted"] = True
+                                record["last_alert_time"] = current_timestamp
+                                self.confirmed_locations.append({
+                                    "cx": cx,
+                                    "cy": cy,
+                                    "time": current_timestamp,
+                                    "track_id": track_id,
+                                })
+                                # Dọn dẹp mốc cũ
+                                self.confirmed_locations = [
+                                    c for c in self.confirmed_locations
+                                    if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
+                                ]
                 else:
                     if record["status"] != TrackState.CONFIRMED:
                         record["status"] = TrackState.SUSPECTED
@@ -34375,6 +34520,7 @@ class TemporalVerifier:
                     record["viol_start_time"] = None
                     record["last_viol_timestamp"] = None
                     record["status"] = TrackState.NORMAL
+                    record["alerted"] = False
                 else:
                     # Trong ngưỡng dung sai (1-2 frame flicker): trừ conf tương ứng khi decay
                     if record["viol_confs"]:
@@ -34384,6 +34530,7 @@ class TemporalVerifier:
                         record["viol_start_time"] = None
                         record["last_viol_timestamp"] = None
                         record["status"] = TrackState.NORMAL
+                        record["alerted"] = False
                     else:
                         record["viol_start_time"] = record["viol_confs"][0][0]
 
@@ -34412,6 +34559,7 @@ class TemporalVerifier:
                 if missing_exceeded:
                     if missing_streak > (self.max_missing_frames // 2):
                         r["status"] = TrackState.NORMAL
+                        r["alerted"] = False
                         r["viol_confs"].clear()
                         r["count"] = 0
                         r["viol_start_time"] = None
@@ -34661,8 +34809,11 @@ class ViolationChecker:
                 intersection = sidewalk_poly.intersection(box_poly)
                 # Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
                 overlap_ratio = float(intersection.area / box_poly.area)
-        except Exception:
+        except Exception as e_geom:
             overlap_ratio = 0.0
+            if not hasattr(self, '_last_geom_warn') or (time.time() - getattr(self, '_last_geom_warn', 0) > 10.0):
+                print(f"[CẢNH BÁO HÌNH HỌC] Lỗi tính diện tích giao cắt Shapely: {e_geom}")
+                self._last_geom_warn = time.time()
 
         # ---------------------------------------------------------------------
         # RA QUYẾT ĐỊNH (DECISION RULE)

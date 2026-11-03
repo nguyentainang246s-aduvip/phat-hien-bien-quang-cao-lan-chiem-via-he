@@ -18,21 +18,23 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = None, imgsz: int = 640, allowed_classes: list = None, iou: float = 0.50, device: str = None):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = None, imgsz: int = 640, allowed_classes: list = None, iou: float = 0.50, device: str = None, track_low_thresh: float = 0.10):
         """
         Khởi tạo ObjectTracker.
         
         Args:
             model_path: Đường dẫn file trọng số YOLO (vd: 'models/best.pt', 'models/best.onnx')
-            conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.25 = 25% theo chuẩn đánh giá hệ thống)
+            conf_threshold: Ngưỡng độ tin cậy tối thiểu cho vi phạm (mặc định 0.25 = 25%)
             tracker_type: File cấu hình tracker ('configs/bytetrack_custom.yaml', 'bytetrack.yaml' hoặc 'botsort.yaml')
             imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
             allowed_classes: Danh sách class_id hoặc tên class được phép bám vết (None = tất cả)
             iou: Ngưỡng NMS IoU (mặc định 0.50)
             device: Thiết bị chạy suy luận ('cpu' hoặc 'cuda:0')
+            track_low_thresh: Ngưỡng phát hiện vòng 2 của ByteTrack (mặc định 0.10 để phục hồi vết khi che khuất)
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
+        self.track_low_thresh = track_low_thresh
         if tracker_type is None:
             custom_cfg = "configs/bytetrack_custom.yaml"
             self.tracker_type = custom_cfg if os.path.exists(custom_cfg) else "bytetrack.yaml"
@@ -46,7 +48,7 @@ class ObjectTracker:
         if not os.path.exists(model_path) and not model_path.endswith("yolov8n.pt"):
             raise FileNotFoundError(f"Không tìm thấy file trọng số mô hình: {model_path}")
             
-        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {self.tracker_type} (Conf: {conf_threshold}, Imgsz: {imgsz}, NMS IoU: {iou})")
+        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {self.tracker_type} (Conf: {conf_threshold}, Low-Thresh: {track_low_thresh}, Imgsz: {imgsz}, NMS IoU: {iou})")
         self.model = YOLO(model_path)
         self.class_names = self.model.names
 
@@ -74,11 +76,13 @@ class ObjectTracker:
         """
         target_conf = conf if conf is not None else self.conf_threshold
         target_imgsz = imgsz if imgsz is not None else self.imgsz
+        # Nạp ngưỡng low_thresh vào model.track() để ByteTrack nhận đủ box vòng 2 phục hồi khi che khuất
+        infer_conf = min(target_conf, self.track_low_thresh)
         track_kwargs = {
             "source": frame,
             "persist": True,
             "tracker": self.tracker_type,
-            "conf": target_conf,
+            "conf": infer_conf,
             "imgsz": target_imgsz,
             "iou": self.iou,
             "verbose": False
@@ -111,6 +115,10 @@ class ObjectTracker:
                 track_id = int(box.id[0].cpu().numpy())
             else:
                 track_id = -1  # Vật thể mới xuất hiện chưa đủ độ tin cậy để gán ID
+
+            # Lọc bỏ detection tự do (chưa gán track) nếu conf thấp hơn target_conf
+            if track_id <= 0 and conf < target_conf:
+                continue
 
             tracked_objects.append({
                 "track_id": track_id,

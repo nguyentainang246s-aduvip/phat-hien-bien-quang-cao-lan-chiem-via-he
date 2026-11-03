@@ -90,30 +90,30 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 --------------------------------------------------------------------------------
 | Video | Ground Truth ID | ByteTrack ID | Tên biển hiệu / Đối tượng | Ghép nối (IoU/Conf) | Số frames | Conf TB | Overlap TB | Kết luận Hệ thống | Ground Truth | Đánh giá |
 | :--- | :---: | :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- | :---: |
-| Video 1 | GT #1 | Track #1 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | IoU:1.00 | 80 | 86.8% | 78.9% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | IoU:1.00 | 80 | 86.2% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | IoU:1.00 | 80 | 80.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | IoU:1.00 | 75 | 73.9% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | IoU:1.00 | 80 | 60.5% | 20.3% | `NORMAL` | NORMAL | **TN** |
-| Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | IoU:1.00 | 80 | 84.5% | 74.9% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | IoU:1.00 | 80 | 71.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | IoU:1.00 | 80 | 63.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #23 | Track #20 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:1.00 | 19 | 30.7% | 91.9% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 1 | GT #1 | Track #1 | Biển bạt lớn dựng đứng trước cửa hàng số 1 | IoU:0.98 | 80 | 86.8% | 78.9% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | IoU:0.97 | 80 | 86.2% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | IoU:0.97 | 80 | 80.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | IoU:0.95 | 76 | 73.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | IoU:0.98 | 80 | 60.5% | 20.3% | `NORMAL` | NORMAL | **TN** |
+| Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | IoU:0.86 | 80 | 84.5% | 74.9% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | IoU:0.93 | 80 | 71.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | IoU:0.96 | 80 | 63.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 2 | GT #23 | Track #20 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:0.87 | 41 | 24.0% | 91.7% | `SUSPECTED` | VIOLATION | **FN** |
 | Video 2 | GT #33 | Track #None | Biển hiệu cửa hàng ở góc phải khung hình | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
-| Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | IoU:1.00 | 80 | 89.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | IoU:1.00 | 80 | 88.4% | 66.7% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | IoU:1.00 | 80 | 85.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #4 | Track #4 | Biển bạt chữ nhật kê ngoài thềm | IoU:1.00 | 80 | 80.5% | 97.7% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #5 | Track #5 | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | IoU:1.00 | 80 | 69.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 3 | GT #8 | Track #8 | Biển gắn tường tầng thấp phía bên phải | IoU:1.00 | 77 | 49.1% | 0.0% | `NORMAL` | NORMAL | **TN** |
+| Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | IoU:0.97 | 80 | 89.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | IoU:0.97 | 80 | 88.4% | 66.7% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | IoU:0.95 | 80 | 85.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #4 | Track #4 | Biển bạt chữ nhật kê ngoài thềm | IoU:0.96 | 80 | 80.5% | 97.7% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #5 | Track #5 | Biển hiệu nhỏ ở cự ly xa phía cuối dãy phố | IoU:0.93 | 80 | 69.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
+| Video 3 | GT #8 | Track #8 | Biển gắn tường tầng thấp phía bên phải | IoU:0.95 | 80 | 48.1% | 0.0% | `NORMAL` | NORMAL | **TN** |
 | Video 3 | GT #None | Track #6 | Track #6 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 59.6% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
-| Video 3 | GT #None | Track #7 | Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 76 | 41.5% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
+| Video 3 | GT #None | Track #7 | Track #7 ngoài Ground Truth bị kết luận nhầm là vi phạm | unmatched_false_positive | 80 | 40.4% | 100.0% | `CONFIRMED` | BACKGROUND | **FP** |
 
 ### Phân tích sâu các trường hợp False Negative (FN) — Giữ an toàn ở diện Nghi vấn (SUSPECTED):
-1. Track #33 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #33):
+1. Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):
    - Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận confirm_seconds = 3.0s.
    - Đây là hiệu ứng cắt cụt dữ liệu biên thời gian (Right-Censoring) của clip ngắn 10.0 giây. Hệ thống giữ ở SUSPECTED thay vì kết luận vội vã.
-2. Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #23):
+2. Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):
    - Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track chỉ đạt 0.307, thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.
    - Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống kiên quyết giữ đối tượng ở diện SUSPECTED để bảo đảm nguyên tắc thận trọng pháp lý, tránh báo sai.
 3. Standee #3 (Video 1 - chỉ xảy ra ở Version A):
@@ -122,7 +122,7 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 
 ### Phân tích 2 trường hợp True Negative (TN) — Nhận diện đúng hợp lệ, không phạt nhầm:
 1. Track #5 (Video 1 - Biển hiệu treo thụt sâu trong lòng nhà):
-   - Tỷ lệ đè vỉa hè chỉ đạt 22.3% (thấp hơn ngưỡng 30%) và điểm chân đế nằm hoàn toàn trong khuôn viên nhà dân.
+   - Tỷ lệ đè vỉa hè chỉ đạt 20.3% (thấp hơn ngưỡng 30%) và điểm chân đế nằm hoàn toàn trong khuôn viên nhà dân.
    - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian -> True Negative (TN).
 2. Track #8 (Video 3 - Biển gắn tường tầng thấp phía bên phải, GT #8):
    - Biển gắn cố định trên phần tường thấp sát mặt đất, không cắm chân hay đặt trên mặt vỉa hè.
@@ -181,7 +181,7 @@ Câu hỏi 2: Tại sao em chỉ gán nhãn biển đứng trên Roboflow mà kh
       khác nhau mỗi chân đế kim loại mỏng dễ bị che khuất. Nếu ép YOLO phân loại 2 class sẽ gây nhập nhằng nhãn (class confusion).
    2. Hệ thống áp dụng kiến trúc Phòng thủ nhiều lớp (Defense-in-Depth):
       - Lớp 1 (Spatial Rule Engine): Kiểm tra Overlap >= 30% và chân đế tiếp đất 3 điểm (base_in_roi), loại trừ ngay 100% biển treo
-        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 22.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 77 frames) -> xếp NORMAL.
+        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 77 frames) -> xếp NORMAL.
       - Lớp 2 (Temporal Verifier & Calibration): Với các trường hợp biên (Corner Case) góc nghiêng camera làm đáy Box chiếu sát mép vỉa hè,
         tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đóng vai trò chốt chặn an toàn giữ đối tượng ở diện SUSPECTED (không bao giờ phạt nhầm),
         kết hợp quy trình hiệu chuẩn lùi biên ROI cách chân tường 10-15px trên Web ROI Studio.
@@ -516,6 +516,7 @@ class TemporalVerifier:
                     "status": TrackState.NORMAL,
                     "last_seen": self.current_frame_index,
                     "last_alert_time": None,
+                    "alerted": False,
                     "non_viol_streak": 0,
                     "stationary_since": None,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
@@ -584,31 +585,29 @@ class TemporalVerifier:
                         record["status"] = TrackState.CONFIRMED
                         suspect_reason = ""
 
-                    # Spatial & temporal deduplication
+                    # Spatial & temporal deduplication (khử trùng lặp theo vụ việc/incident)
                     if record["status"] == TrackState.CONFIRMED:
-                        is_spatially_cooldown = any(
-                            ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
-                            and (current_timestamp - c["time"]) < self.cooldown_seconds
-                            for c in self.confirmed_locations
-                        )
-                        time_ok = (record.get("last_alert_time") is None) or (
-                            (current_timestamp - record["last_alert_time"]) >= self.cooldown_seconds
-                        )
-
-                        if not is_spatially_cooldown and time_ok:
-                            is_new_alert = True
-                            record["last_alert_time"] = current_timestamp
-                            self.confirmed_locations.append({
-                                "cx": cx,
-                                "cy": cy,
-                                "time": current_timestamp,
-                                "track_id": track_id,
-                            })
-                            # Dọn dẹp mốc cũ
-                            self.confirmed_locations = [
-                                c for c in self.confirmed_locations
-                                if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
-                            ]
+                        if not record.get("alerted", False):
+                            is_spatially_cooldown = any(
+                                ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
+                                and (current_timestamp - c["time"]) < self.cooldown_seconds
+                                for c in self.confirmed_locations
+                            )
+                            if not is_spatially_cooldown:
+                                is_new_alert = True
+                                record["alerted"] = True
+                                record["last_alert_time"] = current_timestamp
+                                self.confirmed_locations.append({
+                                    "cx": cx,
+                                    "cy": cy,
+                                    "time": current_timestamp,
+                                    "track_id": track_id,
+                                })
+                                # Dọn dẹp mốc cũ
+                                self.confirmed_locations = [
+                                    c for c in self.confirmed_locations
+                                    if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
+                                ]
                 else:
                     if record["status"] != TrackState.CONFIRMED:
                         record["status"] = TrackState.SUSPECTED
@@ -630,6 +629,7 @@ class TemporalVerifier:
                     record["viol_start_time"] = None
                     record["last_viol_timestamp"] = None
                     record["status"] = TrackState.NORMAL
+                    record["alerted"] = False
                 else:
                     # Trong ngưỡng dung sai (1-2 frame flicker): trừ conf tương ứng khi decay
                     if record["viol_confs"]:
@@ -639,6 +639,7 @@ class TemporalVerifier:
                         record["viol_start_time"] = None
                         record["last_viol_timestamp"] = None
                         record["status"] = TrackState.NORMAL
+                        record["alerted"] = False
                     else:
                         record["viol_start_time"] = record["viol_confs"][0][0]
 
@@ -667,6 +668,7 @@ class TemporalVerifier:
                 if missing_exceeded:
                     if missing_streak > (self.max_missing_frames // 2):
                         r["status"] = TrackState.NORMAL
+                        r["alerted"] = False
                         r["viol_confs"].clear()
                         r["count"] = 0
                         r["viol_start_time"] = None
@@ -730,16 +732,16 @@ def _compute_best_spatial_iou(gbox: list, t_info: dict) -> tuple:
     Xét cả best_box lẫn toàn bộ lịch sử boxes của track để tránh sai lệch tại 1 frame đơn lẻ.
     """
     tbox = t_info.get("best_box", [0, 0, 0, 0])
-    s_iou = compute_box_iou(gbox, tbox)
-
     all_boxes = t_info.get("boxes", [])
     if all_boxes:
-        max_hist_iou = max(compute_box_iou(gbox, b) for b in all_boxes)
-        s_iou = max(s_iou, max_hist_iou)
+        # Tính Median IoU trên chuỗi lịch sử quan sát thực tế (phản ánh độ chính xác định vị tự nhiên, không lấy max 1.00)
+        ious = [compute_box_iou(gbox, b) for b in all_boxes]
+        s_iou = float(np.median(ious)) if ious else compute_box_iou(gbox, tbox)
         med_cx = float(np.median([(b[0] + b[2]) / 2.0 for b in all_boxes]))
         med_cy = float(np.median([(b[1] + b[3]) / 2.0 for b in all_boxes]))
         c_tr = (med_cx, med_cy)
     else:
+        s_iou = compute_box_iou(gbox, tbox)
         c_tr = ((tbox[0] + tbox[2]) / 2.0, (tbox[1] + tbox[3]) / 2.0)
 
     c_gt = ((gbox[0] + gbox[2]) / 2.0, (gbox[1] + gbox[3]) / 2.0)

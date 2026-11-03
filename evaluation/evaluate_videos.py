@@ -90,16 +90,16 @@ def _compute_best_spatial_iou(gbox: list, t_info: dict) -> tuple:
     Xét cả best_box lẫn toàn bộ lịch sử boxes của track để tránh sai lệch tại 1 frame đơn lẻ.
     """
     tbox = t_info.get("best_box", [0, 0, 0, 0])
-    s_iou = compute_box_iou(gbox, tbox)
-
     all_boxes = t_info.get("boxes", [])
     if all_boxes:
-        max_hist_iou = max(compute_box_iou(gbox, b) for b in all_boxes)
-        s_iou = max(s_iou, max_hist_iou)
+        # Tính Median IoU trên chuỗi lịch sử quan sát thực tế (phản ánh độ chính xác định vị tự nhiên, không lấy max 1.00)
+        ious = [compute_box_iou(gbox, b) for b in all_boxes]
+        s_iou = float(np.median(ious)) if ious else compute_box_iou(gbox, tbox)
         med_cx = float(np.median([(b[0] + b[2]) / 2.0 for b in all_boxes]))
         med_cy = float(np.median([(b[1] + b[3]) / 2.0 for b in all_boxes]))
         c_tr = (med_cx, med_cy)
     else:
+        s_iou = compute_box_iou(gbox, tbox)
         c_tr = ((tbox[0] + tbox[2]) / 2.0, (tbox[1] + tbox[3]) / 2.0)
 
     c_gt = ((gbox[0] + gbox[2]) / 2.0, (gbox[1] + gbox[3]) / 2.0)
@@ -1014,8 +1014,8 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write("* Để bảo đảm tính minh bạch và liêm chính học thuật, đề tài công bố công khai cả hai phiên bản trong bảng tổng hợp dưới đây.\n\n")
 
             mf.write("### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):\n")
-            mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #33):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
-            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #23):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
+            mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
+            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
             mf.write("3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).\n\n")
 
             mf.write("---\n\n")

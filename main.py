@@ -105,14 +105,21 @@ def run_monitor_mode(args):
             config_path = candidate_1
         elif os.path.exists(candidate_2):
             config_path = candidate_2
+        elif is_live_stream:
+            print(f"[LỖI CẤU HÌNH] Nguồn camera trực tiếp '{source}' chưa được chỉ định cấu hình ROI.")
+            print("Vui lòng truyền tường minh tham số: --config configs/roi_<camera_id>.json")
+            return False
         elif os.path.exists("configs/roi_camera1.json"):
             config_path = "configs/roi_camera1.json"
         else:
-            roi_files = sorted(f for f in os.listdir("configs") if f.startswith("roi_") and f.endswith(".json"))
-            config_path = os.path.join("configs", roi_files[0]) if roi_files else "configs/roi_camera1.json"
+            print(f"[LỖI CẤU HÌNH] Không tìm thấy tệp cấu hình ROI vỉa hè nào trong thư mục configs/.")
+            return False
 
     roi_manager = ROIManager(config_path)
     total_pts = sum(len(p) for p in roi_manager.polygons)
+    if total_pts == 0:
+        print(f"[LỖI CẤU HÌNH] Tệp ROI '{config_path}' không chứa đa giác vỉa hè nào! Hệ thống từ chối chạy ở trạng thái mù.")
+        return False
 
     # 3. Nạp cấu hình tham số tập trung (settings.yaml)
     cfg = _load_settings()
@@ -365,29 +372,32 @@ def run_monitor_mode(args):
                         label = f"VI PHAM VH#{sw_idx} ({sp['overlap_pct']}%)"
 
                         if is_new_alert:
-                            is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5)
-                            if is_dup:
-                                print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi tương tự trong 5 phút gần đây)")
-                            else:
-                                total_confirmed_events += 1
-                                ev_res = evidence_saver.save_evidence(
-                                    clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
-                                    roi_frame=base_roi_frame
-                                )
-                                if ev_res:
-                                    rec_id = db.insert_violation(
-                                        camera_id=roi_manager.camera_id,
-                                        track_id=track_id,
-                                        timestamp=ev_res["timestamp"],
-                                        confidence=conf,
-                                        overlap_pct=sp["overlap_pct"],
-                                        full_image_path=ev_res["full_path"],
-                                        crop_image_path=ev_res.get("crop_path", ""),
-                                        bbox=box,
-                                        sidewalk_index=sw_idx
+                            try:
+                                is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=60)
+                                if is_dup:
+                                    print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi còn hiệu lực hoặc đã được xử lý)")
+                                else:
+                                    total_confirmed_events += 1
+                                    ev_res = evidence_saver.save_evidence(
+                                        clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
+                                        roi_frame=base_roi_frame
                                     )
-                                    print(f" [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
-                                    print(f"    Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
+                                    if ev_res:
+                                        rec_id = db.insert_violation(
+                                            camera_id=roi_manager.camera_id,
+                                            track_id=track_id,
+                                            timestamp=ev_res["timestamp"],
+                                            confidence=conf,
+                                            overlap_pct=sp["overlap_pct"],
+                                            full_image_path=ev_res["full_path"],
+                                            crop_image_path=ev_res.get("crop_path", ""),
+                                            bbox=box,
+                                            sidewalk_index=sw_idx
+                                        )
+                                        print(f" [CẢNH BÁO VI PHẠM MỚI] ID #{track_id} lấn chiếm vỉa hè #{sw_idx} ({sp['overlap_pct']}%)")
+                                        print(f"    Ảnh bằng chứng: {ev_res['full_path']} | DB Record #{rec_id}")
+                            except Exception as e_rec:
+                                print(f"[CẢNH BÁO LƯU TRỮ] Không thể ghi nhận bằng chứng vi phạm ID #{track_id}: {e_rec}")
 
                     elif temporal_status == TrackState.SUSPECTED:
                         current_frame_suspected += 1

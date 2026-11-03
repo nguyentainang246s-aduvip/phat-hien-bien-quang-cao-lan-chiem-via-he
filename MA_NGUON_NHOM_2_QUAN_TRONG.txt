@@ -799,11 +799,12 @@ class ViolationDatabase:
         finally:
             conn.close()
 
-    def is_duplicate_violation(self, camera_id: str, bbox: tuple, time_window_minutes: int = 5) -> bool:
+    def is_duplicate_violation(self, camera_id: str, bbox: tuple, time_window_minutes: int = 60) -> bool:
         """
-        ISSUE 09 FIX: Kiểm tra xem đã có bản ghi vi phạm tương tự trong DB chưa
-        (để tránh ghi trùng khi hệ thống restart).
-        So sánh: cùng camera + bbox gần giống + trong vòng N phút.
+        Kiểm tra xem đã có bản ghi vi phạm tương tự trong DB chưa (khử trùng lặp theo vụ việc/incident):
+        1. Cùng camera và tọa độ bbox tương đồng.
+        2. Nếu đang có hồ sơ 'pending' hoặc 'confirmed' trong vòng time_window_minutes (mặc định 60 phút).
+        3. Nếu hồ sơ tại vị trí này đã được cán bộ duyệt 'dismissed' (có giấy phép) trong 24 giờ qua thì không báo lại.
         """
         x1, y1, x2, y2 = bbox if bbox else (0, 0, 0, 0)
         # Tách riêng biên độ pixel theo trục X và trục Y để thích nghi với biển dạng đứng
@@ -820,7 +821,10 @@ class ViolationDatabase:
                   AND ABS(bbox_y1 - ?) <= ?
                   AND ABS(bbox_x2 - ?) <= ?
                   AND ABS(bbox_y2 - ?) <= ?
-                  AND timestamp >= datetime('now', 'localtime', ?)
+                  AND (
+                      (status IN ('pending', 'confirmed') AND timestamp >= datetime('now', 'localtime', ?))
+                      OR (status = 'dismissed' AND timestamp >= datetime('now', 'localtime', '-24 hours'))
+                  )
             """, (
                 camera_id,
                 x1, margin_x, y1, margin_y, x2, margin_x, y2, margin_y,

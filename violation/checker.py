@@ -97,8 +97,11 @@ class ViolationChecker:
                 intersection = sidewalk_poly.intersection(box_poly)
                 # Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
                 overlap_ratio = float(intersection.area / box_poly.area)
-        except Exception:
+        except Exception as e_geom:
             overlap_ratio = 0.0
+            if not hasattr(self, '_last_geom_warn') or (time.time() - getattr(self, '_last_geom_warn', 0) > 10.0):
+                print(f"[CẢNH BÁO HÌNH HỌC] Lỗi tính diện tích giao cắt Shapely: {e_geom}")
+                self._last_geom_warn = time.time()
 
         # ---------------------------------------------------------------------
         # RA QUYẾT ĐỊNH (DECISION RULE)

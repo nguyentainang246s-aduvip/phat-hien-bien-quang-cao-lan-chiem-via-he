@@ -120,8 +120,11 @@ class ViolationChecker:
                 intersection = sidewalk_poly.intersection(box_poly)
                 # Mẫu số là diện tích BOUNDING BOX (không phải IoU, không phải ROI area).
                 overlap_ratio = float(intersection.area / box_poly.area)
-        except Exception:
+        except Exception as e_geom:
             overlap_ratio = 0.0
+            if not hasattr(self, '_last_geom_warn') or (time.time() - getattr(self, '_last_geom_warn', 0) > 10.0):
+                print(f"[CẢNH BÁO HÌNH HỌC] Lỗi tính diện tích giao cắt Shapely: {e_geom}")
+                self._last_geom_warn = time.time()
 
         # ---------------------------------------------------------------------
         # RA QUYẾT ĐỊNH (DECISION RULE)
@@ -283,16 +286,16 @@ def _compute_best_spatial_iou(gbox: list, t_info: dict) -> tuple:
     Xét cả best_box lẫn toàn bộ lịch sử boxes của track để tránh sai lệch tại 1 frame đơn lẻ.
     """
     tbox = t_info.get("best_box", [0, 0, 0, 0])
-    s_iou = compute_box_iou(gbox, tbox)
-
     all_boxes = t_info.get("boxes", [])
     if all_boxes:
-        max_hist_iou = max(compute_box_iou(gbox, b) for b in all_boxes)
-        s_iou = max(s_iou, max_hist_iou)
+        # Tính Median IoU trên chuỗi lịch sử quan sát thực tế (phản ánh độ chính xác định vị tự nhiên, không lấy max 1.00)
+        ious = [compute_box_iou(gbox, b) for b in all_boxes]
+        s_iou = float(np.median(ious)) if ious else compute_box_iou(gbox, tbox)
         med_cx = float(np.median([(b[0] + b[2]) / 2.0 for b in all_boxes]))
         med_cy = float(np.median([(b[1] + b[3]) / 2.0 for b in all_boxes]))
         c_tr = (med_cx, med_cy)
     else:
+        s_iou = compute_box_iou(gbox, tbox)
         c_tr = ((tbox[0] + tbox[2]) / 2.0, (tbox[1] + tbox[3]) / 2.0)
 
     c_gt = ((gbox[0] + gbox[2]) / 2.0, (gbox[1] + gbox[3]) / 2.0)
@@ -1207,8 +1210,8 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
             mf.write("* Để bảo đảm tính minh bạch và liêm chính học thuật, đề tài công bố công khai cả hai phiên bản trong bảng tổng hợp dưới đây.\n\n")
 
             mf.write("### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):\n")
-            mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, matched Track #33):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
-            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #23):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
+            mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
+            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
             mf.write("3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).\n\n")
 
             mf.write("---\n\n")
@@ -1767,21 +1770,23 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = None, imgsz: int = 640, allowed_classes: list = None, iou: float = 0.50, device: str = None):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = None, imgsz: int = 640, allowed_classes: list = None, iou: float = 0.50, device: str = None, track_low_thresh: float = 0.10):
         """
         Khởi tạo ObjectTracker.
         
         Args:
             model_path: Đường dẫn file trọng số YOLO (vd: 'models/best.pt', 'models/best.onnx')
-            conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.25 = 25% theo chuẩn đánh giá hệ thống)
+            conf_threshold: Ngưỡng độ tin cậy tối thiểu cho vi phạm (mặc định 0.25 = 25%)
             tracker_type: File cấu hình tracker ('configs/bytetrack_custom.yaml', 'bytetrack.yaml' hoặc 'botsort.yaml')
             imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
             allowed_classes: Danh sách class_id hoặc tên class được phép bám vết (None = tất cả)
             iou: Ngưỡng NMS IoU (mặc định 0.50)
             device: Thiết bị chạy suy luận ('cpu' hoặc 'cuda:0')
+            track_low_thresh: Ngưỡng phát hiện vòng 2 của ByteTrack (mặc định 0.10 để phục hồi vết khi che khuất)
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
+        self.track_low_thresh = track_low_thresh
         if tracker_type is None:
             custom_cfg = "configs/bytetrack_custom.yaml"
             self.tracker_type = custom_cfg if os.path.exists(custom_cfg) else "bytetrack.yaml"
@@ -1795,7 +1800,7 @@ class ObjectTracker:
         if not os.path.exists(model_path) and not model_path.endswith("yolov8n.pt"):
             raise FileNotFoundError(f"Không tìm thấy file trọng số mô hình: {model_path}")
             
-        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {self.tracker_type} (Conf: {conf_threshold}, Imgsz: {imgsz}, NMS IoU: {iou})")
+        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {self.tracker_type} (Conf: {conf_threshold}, Low-Thresh: {track_low_thresh}, Imgsz: {imgsz}, NMS IoU: {iou})")
         self.model = YOLO(model_path)
         self.class_names = self.model.names
 
@@ -1823,11 +1828,13 @@ class ObjectTracker:
         """
         target_conf = conf if conf is not None else self.conf_threshold
         target_imgsz = imgsz if imgsz is not None else self.imgsz
+        # Nạp ngưỡng low_thresh vào model.track() để ByteTrack nhận đủ box vòng 2 phục hồi khi che khuất
+        infer_conf = min(target_conf, self.track_low_thresh)
         track_kwargs = {
             "source": frame,
             "persist": True,
             "tracker": self.tracker_type,
-            "conf": target_conf,
+            "conf": infer_conf,
             "imgsz": target_imgsz,
             "iou": self.iou,
             "verbose": False
@@ -1860,6 +1867,10 @@ class ObjectTracker:
                 track_id = int(box.id[0].cpu().numpy())
             else:
                 track_id = -1  # Vật thể mới xuất hiện chưa đủ độ tin cậy để gán ID
+
+            # Lọc bỏ detection tự do (chưa gán track) nếu conf thấp hơn target_conf
+            if track_id <= 0 and conf < target_conf:
+                continue
 
             tracked_objects.append({
                 "track_id": track_id,
@@ -2123,6 +2134,7 @@ class TemporalVerifier:
                     "status": TrackState.NORMAL,
                     "last_seen": self.current_frame_index,
                     "last_alert_time": None,
+                    "alerted": False,
                     "non_viol_streak": 0,
                     "stationary_since": None,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
@@ -2191,31 +2203,29 @@ class TemporalVerifier:
                         record["status"] = TrackState.CONFIRMED
                         suspect_reason = ""
 
-                    # Spatial & temporal deduplication
+                    # Spatial & temporal deduplication (khử trùng lặp theo vụ việc/incident)
                     if record["status"] == TrackState.CONFIRMED:
-                        is_spatially_cooldown = any(
-                            ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
-                            and (current_timestamp - c["time"]) < self.cooldown_seconds
-                            for c in self.confirmed_locations
-                        )
-                        time_ok = (record.get("last_alert_time") is None) or (
-                            (current_timestamp - record["last_alert_time"]) >= self.cooldown_seconds
-                        )
-
-                        if not is_spatially_cooldown and time_ok:
-                            is_new_alert = True
-                            record["last_alert_time"] = current_timestamp
-                            self.confirmed_locations.append({
-                                "cx": cx,
-                                "cy": cy,
-                                "time": current_timestamp,
-                                "track_id": track_id,
-                            })
-                            # Dọn dẹp mốc cũ
-                            self.confirmed_locations = [
-                                c for c in self.confirmed_locations
-                                if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
-                            ]
+                        if not record.get("alerted", False):
+                            is_spatially_cooldown = any(
+                                ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
+                                and (current_timestamp - c["time"]) < self.cooldown_seconds
+                                for c in self.confirmed_locations
+                            )
+                            if not is_spatially_cooldown:
+                                is_new_alert = True
+                                record["alerted"] = True
+                                record["last_alert_time"] = current_timestamp
+                                self.confirmed_locations.append({
+                                    "cx": cx,
+                                    "cy": cy,
+                                    "time": current_timestamp,
+                                    "track_id": track_id,
+                                })
+                                # Dọn dẹp mốc cũ
+                                self.confirmed_locations = [
+                                    c for c in self.confirmed_locations
+                                    if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
+                                ]
                 else:
                     if record["status"] != TrackState.CONFIRMED:
                         record["status"] = TrackState.SUSPECTED
@@ -2237,6 +2247,7 @@ class TemporalVerifier:
                     record["viol_start_time"] = None
                     record["last_viol_timestamp"] = None
                     record["status"] = TrackState.NORMAL
+                    record["alerted"] = False
                 else:
                     # Trong ngưỡng dung sai (1-2 frame flicker): trừ conf tương ứng khi decay
                     if record["viol_confs"]:
@@ -2246,6 +2257,7 @@ class TemporalVerifier:
                         record["viol_start_time"] = None
                         record["last_viol_timestamp"] = None
                         record["status"] = TrackState.NORMAL
+                        record["alerted"] = False
                     else:
                         record["viol_start_time"] = record["viol_confs"][0][0]
 
@@ -2274,6 +2286,7 @@ class TemporalVerifier:
                 if missing_exceeded:
                     if missing_streak > (self.max_missing_frames // 2):
                         r["status"] = TrackState.NORMAL
+                        r["alerted"] = False
                         r["viol_confs"].clear()
                         r["count"] = 0
                         r["viol_start_time"] = None
