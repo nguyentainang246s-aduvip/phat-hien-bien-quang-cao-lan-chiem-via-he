@@ -86,6 +86,38 @@ def test_violation_database():
     assert stats2["violations_by_status"]["confirmed"] == 1
     assert stats2["violations_by_status"]["dismissed"] == 1
 
+    # 5. Kiểm tra khử trùng lặp thông minh (Deduplication theo Incident Lifecycle)
+    from datetime import datetime
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    id3 = db.insert_violation(
+        camera_id="camera_03",
+        track_id=10,
+        timestamp=now_str,
+        confidence=0.85,
+        overlap_pct=80.0,
+        full_image_path="evidence/records/cam_03/test.jpg",
+        bbox=(100, 100, 200, 200)
+    )
+    # Tọa độ lân cận trong dung sai margin_x, margin_y
+    near_bbox = (105, 98, 202, 197)
+    far_bbox = (500, 500, 600, 600)
+
+    # 5.1. Khi trạng thái là pending: phát hiện trùng lặp
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+    assert db.is_duplicate_violation("camera_03", far_bbox, time_window_minutes=60) is False
+
+    # 5.2. Khi trạng thái chuyển sang confirmed: vẫn tiếp tục chặn trùng lặp
+    db.update_violation_status(id3, "confirmed", reviewed_by="Đ/c Test")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+
+    # 5.3. Khi trạng thái là dismissed (có giấy phép): chặn trùng lặp trong 24 giờ
+    db.update_violation_status(id3, "dismissed", reviewed_by="Đ/c Test", dismiss_reason="Được cấp phép")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+
+    # 5.4. Khi trạng thái là resolved (đã xử lý/thu dọn): cho phép phát hiện vụ việc mới
+    db.update_violation_status(id3, "resolved", reviewed_by="Đ/c Test")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is False
+
     # Dọn dẹp file test db
     if os.path.exists(test_db_file):
         os.remove(test_db_file)

@@ -1,6 +1,6 @@
 # BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG TRÊN VIDEO THỰC TẾ (SYSTEM-LEVEL METRICS)
 
-> **Thời gian chạy kiểm thử:** 2026-11-03 15:42:39  
+> **Thời gian chạy kiểm thử:** 2026-11-03 15:57:42  
 > **Người thực hiện:** Nguyễn Đức Tài Năng (ĐATN 20224083)  
 > **Cơ chế đo đạc:** Chạy tự động từ `evaluation/evaluate_videos.py`, đối chiếu với `configs/video_ground_truth.json` và trích xuất `reports/system_eval_results.json`.
 
@@ -22,8 +22,8 @@
 ## 2. Kết Quả Chi Tiết Từng Video Thực Địa
 
 ### Video: `data/videos/video test.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **33.4 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 47.36 ms (p50: 43.30 ms, p95: 70.10 ms); Verifier Mean = 2.01 ms; Tổng khung hình infer = 53.08 ms (Frame khởi động: 2365.01 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **34.0 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 50.03 ms (p50: 42.22 ms, p95: 79.23 ms); Verifier Mean = 1.87 ms; Tổng khung hình infer = 54.82 ms (Frame khởi động: 2201.72 ms)
 * **Kết quả:** **4 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -38,8 +38,8 @@
 ---
 
 ### Video: `data/videos/videotesst2.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **51.9 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 45.46 ms (p50: 43.10 ms, p95: 59.77 ms); Verifier Mean = 1.15 ms; Tổng khung hình infer = 50.30 ms (Frame khởi động: 154.29 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **44.4 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 55.17 ms (p50: 47.05 ms, p95: 91.57 ms); Verifier Mean = 1.26 ms; Tổng khung hình infer = 59.79 ms (Frame khởi động: 201.06 ms)
 * **Kết quả:** **3 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **0 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -52,8 +52,8 @@
 ---
 
 ### Video: `data/videos/video test3.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **30.1 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 85.37 ms (p50: 56.79 ms, p95: 231.47 ms); Verifier Mean = 2.89 ms; Tổng khung hình infer = 92.00 ms (Frame khởi động: 146.74 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **37.6 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 66.27 ms (p50: 57.19 ms, p95: 117.72 ms); Verifier Mean = 2.71 ms; Tổng khung hình infer = 72.16 ms (Frame khởi động: 157.45 ms)
 * **Kết quả:** **7 Vi phạm (Confirmed)** | **2 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -101,7 +101,7 @@
 
 ### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):
 1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.
-2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.
+2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 41 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 24.0% (0.240), thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.
 3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).
 
 ---
@@ -120,9 +120,9 @@
 | **System Recall** | $\frac{TP}{TP + FN}$ | 78.57% (11/14) | **85.71%** (12/14) | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System F1-Score** | $2 \cdot \frac{P \cdot R}{P + R}$ | 81.48% | **85.71%** | Cân bằng điều hòa tối ưu |
 | **Cảnh báo sai trong mẫu** | FP / 30s | 2 cảnh báo sai | **2 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
-| **Thông lượng Pipeline** | Throughput | 30.1 – 51.9 FPS | **30.1 – 51.9 FPS** | Ổn định: 30.6 – 53.9 FPS |
-| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~10.0 – 17.3 Hz | **~10.0 – 17.3 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
-| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 47.4 ms | **47.4 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 59.4 ms; loại trừ frame khởi động) |
+| **Thông lượng Pipeline** | Throughput | 34.0 – 44.4 FPS | **34.0 – 44.4 FPS** | Ổn định: 38.6 – 49.8 FPS |
+| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~11.3 – 14.8 Hz | **~11.3 – 14.8 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
+| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 55.2 ms | **55.2 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 57.2 ms; loại trừ frame khởi động) |
 
 ---
 
@@ -159,7 +159,7 @@ Nhằm trả lời chất vấn của Hội đồng về tính ổn định và 
 
 * **Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency):** **100.0% (18/18 đối tượng)**
 * **Tính ổn định của chỉ số đánh giá (System Metrics Consistency):** Cả 3 lần chạy đều đạt đồng nhất **12 TP, 2 FP, 2 FN, 2 TN** (Recall: 85.71%, Precision: 85.71%).
-* **Độ ổn định thông lượng xử lý:** Trial 1: 30.1–51.9 FPS (Ổn định 30.6–53.9 FPS), Trial 2: 35.7–40.9 FPS (Ổn định 36.7–42.1 FPS), Trial 3: 36.1–47.4 FPS (Ổn định 37.5–49.6 FPS).
+* **Độ ổn định thông lượng xử lý:** Trial 1: 34.0–44.4 FPS (Ổn định 38.6–49.8 FPS), Trial 2: 31.8–37.4 FPS (Ổn định 32.7–38.5 FPS), Trial 3: 37.4–39.7 FPS (Ổn định 38.3–40.9 FPS).
 
 ---
 

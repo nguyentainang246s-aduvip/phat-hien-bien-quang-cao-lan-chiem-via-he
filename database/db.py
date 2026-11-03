@@ -153,7 +153,7 @@ class ViolationDatabase:
                   AND ABS(bbox_y2 - ?) <= ?
                   AND (
                       (status IN ('pending', 'confirmed') AND timestamp >= datetime('now', 'localtime', ?))
-                      OR (status = 'dismissed' AND timestamp >= datetime('now', 'localtime', '-24 hours'))
+                      OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', '-24 hours'))
                   )
             """, (
                 camera_id,

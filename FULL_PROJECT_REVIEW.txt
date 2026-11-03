@@ -140,9 +140,17 @@ TASK: 27 - Xây dựng Module camera/stream_reader.py tự động kết nối l
 import os
 import time
 import math
+import re
 import threading
 import cv2
 import numpy as np
+
+
+def mask_source_url(url) -> str:
+    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
+    if not isinstance(url, str):
+        return str(url)
+    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
 
 
 class StreamReader:
@@ -233,14 +241,14 @@ class StreamReader:
                 self.cap = None
 
             if not self.is_live_stream and isinstance(self.source, str) and not os.path.exists(self.source):
-                print(f"[LỖI] Tệp video không tồn tại trên đĩa: {self.source}")
+                print(f"[LỖI] Tệp video không tồn tại trên đĩa: {mask_source_url(self.source)}")
                 return False
 
-            print(f"[CAMERA STREAM] Đang kết nối nguồn: {self.source}...")
+            print(f"[CAMERA STREAM] Đang kết nối nguồn: {mask_source_url(self.source)}...")
             self.cap = cv2.VideoCapture(self.source)
 
             if not self.cap.isOpened():
-                print(f"[CẢNH BÁO] Không thể mở nguồn camera: {self.source}")
+                print(f"[CẢNH BÁO] Không thể mở nguồn camera: {mask_source_url(self.source)}")
                 return False
 
             # Lấy thông số luồng kèm kiểm tra FPS hợp lệ [5, 120] (chống lỗi time-base 90000 của RTSP FFmpeg)
@@ -7206,7 +7214,7 @@ class ViolationDatabase:
                   AND ABS(bbox_y2 - ?) <= ?
                   AND (
                       (status IN ('pending', 'confirmed') AND timestamp >= datetime('now', 'localtime', ?))
-                      OR (status = 'dismissed' AND timestamp >= datetime('now', 'localtime', '-24 hours'))
+                      OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', '-24 hours'))
                   )
             """, (
                 camera_id,
@@ -9689,7 +9697,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
 
             mf.write("### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):\n")
             mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
-            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
+            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 41 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 24.0% (0.240), thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
             mf.write("3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).\n\n")
 
             mf.write("---\n\n")
@@ -11175,6 +11183,14 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
 
+def mask_source_url(url) -> str:
+    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
+    if not isinstance(url, str):
+        return str(url)
+    import re
+    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
+
+
 BANNER = r"""
 ==============================================================================
    ____ ____ _______     __  ____  _     _                 _ _                 
@@ -11225,8 +11241,9 @@ def run_monitor_mode(args):
 
     is_stream = isinstance(source, str) and source.lower().startswith(("rtsp://", "http://", "https://"))
     is_webcam = (isinstance(source, int) or (isinstance(source, str) and source.isdigit()))
+    is_live_stream = is_stream or is_webcam
     if not is_stream and not is_webcam and not os.path.exists(str(source)):
-        print(f"[LỖI] Tệp tin nguồn không tồn tại: {source}")
+        print(f"[LỖI] Tệp tin nguồn không tồn tại: {mask_source_url(source)}")
         return False
 
     is_image = isinstance(source, str) and source.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.webp'))
@@ -11244,13 +11261,13 @@ def run_monitor_mode(args):
         elif os.path.exists(candidate_2):
             config_path = candidate_2
         elif is_live_stream:
-            print(f"[LỖI CẤU HÌNH] Nguồn camera trực tiếp '{source}' chưa được chỉ định cấu hình ROI.")
+            print(f"[LỖI CẤU HÌNH] Nguồn camera trực tiếp '{mask_source_url(source)}' chưa được chỉ định cấu hình ROI.")
             print("Vui lòng truyền tường minh tham số: --config configs/roi_<camera_id>.json")
             return False
         elif os.path.exists("configs/roi_camera1.json"):
             config_path = "configs/roi_camera1.json"
         else:
-            print(f"[LỖI CẤU HÌNH] Không tìm thấy tệp cấu hình ROI vỉa hè nào trong thư mục configs/.")
+            print(f"[LỖI CẤU HÌNH] Không tìm thấy tệp cấu hình ROI vỉa hè cho '{mask_source_url(source)}'. Vui lòng dùng tham số --config.")
             return False
 
     roi_manager = ROIManager(config_path)
@@ -11305,7 +11322,7 @@ def run_monitor_mode(args):
     cooldown_sec = args.cooldown if args.cooldown is not None else float(cfg_temporal.get("cooldown_seconds", 60.0))
     spatial_cooldown_rad = float(cfg_temporal.get("spatial_cooldown_radius", 50.0))
 
-    print(f"[*] Nguồn cấp dữ liệu : {source}")
+    print(f"[*] Nguồn cấp dữ liệu : {mask_source_url(source)}")
     print(f"[*] Cấu hình Vỉa hè   : {config_path} ({len(roi_manager.polygons)} vùng vỉa hè, {total_pts} đỉnh)")
     print(f"[*] Model AI Detector : {model_path} (Imgsz: {imgsz})")
     print(f"[*] Cấu hình Edge AI  : Engine: {engine_name} | Frame Skip: {frame_skip} | Playback: {sync_str}")
@@ -11729,14 +11746,18 @@ Ví dụ sử dụng:
 
     args = parser.parse_args()
 
+    success = True
     if args.mode == "monitor":
-        run_monitor_mode(args)
+        success = run_monitor_mode(args)
     elif args.mode == "dashboard":
         run_dashboard_mode(args)
     elif args.mode == "roi":
         run_roi_mode(args)
     elif args.mode == "benchmark":
         run_benchmark_mode(args)
+
+    if success is False:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -12561,7 +12582,7 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 
 # BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG TRÊN VIDEO THỰC TẾ (SYSTEM-LEVEL METRICS)
 
-> **Thời gian chạy kiểm thử:** 2026-11-03 15:42:39  
+> **Thời gian chạy kiểm thử:** 2026-11-03 15:57:42  
 > **Người thực hiện:** Nguyễn Đức Tài Năng (ĐATN 20224083)  
 > **Cơ chế đo đạc:** Chạy tự động từ `evaluation/evaluate_videos.py`, đối chiếu với `configs/video_ground_truth.json` và trích xuất `reports/system_eval_results.json`.
 
@@ -12583,8 +12604,8 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 ## 2. Kết Quả Chi Tiết Từng Video Thực Địa
 
 ### Video: `data/videos/video test.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **33.4 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 47.36 ms (p50: 43.30 ms, p95: 70.10 ms); Verifier Mean = 2.01 ms; Tổng khung hình infer = 53.08 ms (Frame khởi động: 2365.01 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **34.0 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 50.03 ms (p50: 42.22 ms, p95: 79.23 ms); Verifier Mean = 1.87 ms; Tổng khung hình infer = 54.82 ms (Frame khởi động: 2201.72 ms)
 * **Kết quả:** **4 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -12599,8 +12620,8 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 ---
 
 ### Video: `data/videos/videotesst2.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **51.9 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 45.46 ms (p50: 43.10 ms, p95: 59.77 ms); Verifier Mean = 1.15 ms; Tổng khung hình infer = 50.30 ms (Frame khởi động: 154.29 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **44.4 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 55.17 ms (p50: 47.05 ms, p95: 91.57 ms); Verifier Mean = 1.26 ms; Tổng khung hình infer = 59.79 ms (Frame khởi động: 201.06 ms)
 * **Kết quả:** **3 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **0 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -12613,8 +12634,8 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 ---
 
 ### Video: `data/videos/video test3.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **30.1 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 85.37 ms (p50: 56.79 ms, p95: 231.47 ms); Verifier Mean = 2.89 ms; Tổng khung hình infer = 92.00 ms (Frame khởi động: 146.74 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **37.6 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 66.27 ms (p50: 57.19 ms, p95: 117.72 ms); Verifier Mean = 2.71 ms; Tổng khung hình infer = 72.16 ms (Frame khởi động: 157.45 ms)
 * **Kết quả:** **7 Vi phạm (Confirmed)** | **2 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -12662,7 +12683,7 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 
 ### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):
 1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.
-2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.
+2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 41 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 24.0% (0.240), thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.
 3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).
 
 ---
@@ -12681,9 +12702,9 @@ FILE: reports\BAO_CAO_THUC_NGHIEM_VIDEO_THAT.md
 | **System Recall** | $\frac{TP}{TP + FN}$ | 78.57% (11/14) | **85.71%** (12/14) | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System F1-Score** | $2 \cdot \frac{P \cdot R}{P + R}$ | 81.48% | **85.71%** | Cân bằng điều hòa tối ưu |
 | **Cảnh báo sai trong mẫu** | FP / 30s | 2 cảnh báo sai | **2 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
-| **Thông lượng Pipeline** | Throughput | 30.1 – 51.9 FPS | **30.1 – 51.9 FPS** | Ổn định: 30.6 – 53.9 FPS |
-| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~10.0 – 17.3 Hz | **~10.0 – 17.3 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
-| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 47.4 ms | **47.4 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 59.4 ms; loại trừ frame khởi động) |
+| **Thông lượng Pipeline** | Throughput | 34.0 – 44.4 FPS | **34.0 – 44.4 FPS** | Ổn định: 38.6 – 49.8 FPS |
+| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~11.3 – 14.8 Hz | **~11.3 – 14.8 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
+| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 55.2 ms | **55.2 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 57.2 ms; loại trừ frame khởi động) |
 
 ---
 
@@ -12720,7 +12741,7 @@ Nhằm trả lời chất vấn của Hội đồng về tính ổn định và 
 
 * **Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency):** **100.0% (18/18 đối tượng)**
 * **Tính ổn định của chỉ số đánh giá (System Metrics Consistency):** Cả 3 lần chạy đều đạt đồng nhất **12 TP, 2 FP, 2 FN, 2 TN** (Recall: 85.71%, Precision: 85.71%).
-* **Độ ổn định thông lượng xử lý:** Trial 1: 30.1–51.9 FPS (Ổn định 30.6–53.9 FPS), Trial 2: 35.7–40.9 FPS (Ổn định 36.7–42.1 FPS), Trial 3: 36.1–47.4 FPS (Ổn định 37.5–49.6 FPS).
+* **Độ ổn định thông lượng xử lý:** Trial 1: 34.0–44.4 FPS (Ổn định 38.6–49.8 FPS), Trial 2: 31.8–37.4 FPS (Ổn định 32.7–38.5 FPS), Trial 3: 37.4–39.7 FPS (Ổn định 38.3–40.9 FPS).
 
 ---
 
@@ -13417,7 +13438,7 @@ FILE: reports\evaluation_run.log
 
 ===============================================================================
 NHAT KY THUC NGHIEM DANH GIA TOAN DIEN HE THONG (EVALUATION RUN LOG)
-Thoi gian thuc hien: 2026-11-03 15:41:33
+Thoi gian thuc hien: 2026-11-03 15:56:35
 He dieu hanh: Windows-11-10.0.26200-SP0 | Python: 3.12.10
 Phan cung CPU: Intel64 Family 6 Model 165 Stepping 2, GenuineIntel
 Ground Truth: configs/video_ground_truth.json
@@ -13516,12 +13537,12 @@ Ground Truth: configs/video_ground_truth.json
   [TRACE F238 - 9.92s] Track #03: conf=0.81, running_avg_conf=0.801, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 33.4 FPS (Tong thoi gian: 7.175s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 2365.01 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 47.36 ms | p50 = 43.3 ms | p95 = 70.1 ms
-   - Spatial Check + Verifier (Python):           Mean = 2.01 ms | p50 = 1.44 ms | p95 = 2.47 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 53.08 ms | p50 = 49.96 ms | p95 = 76.04 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.07 ms
+[THONG LUONG] Pipeline Throughput: 34.0 FPS (Tong thoi gian: 7.050s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 2201.72 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 50.03 ms | p50 = 42.22 ms | p95 = 79.23 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.87 ms | p50 = 1.5 ms | p95 = 2.26 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 54.82 ms | p50 = 47.85 ms | p95 = 84.99 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.62 ms
 [TRACKS] Tong so Track ID theo doi duoc: 6
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -13628,12 +13649,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.45, running_avg_conf=0.638, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 51.9 FPS (Tong thoi gian: 4.621s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 154.29 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 45.46 ms | p50 = 43.1 ms | p95 = 59.77 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.15 ms | p50 = 1.17 ms | p95 = 1.51 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 50.3 ms | p50 = 47.94 ms | p95 = 66.1 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.65 ms
+[THONG LUONG] Pipeline Throughput: 44.4 FPS (Tong thoi gian: 5.407s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 201.06 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 55.17 ms | p50 = 47.05 ms | p95 = 91.57 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.26 ms | p50 = 1.24 ms | p95 = 1.87 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 59.79 ms | p50 = 51.03 ms | p95 = 96.76 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.51 ms
 [TRACKS] Tong so Track ID theo doi duoc: 4
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -13906,12 +13927,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #08: conf=0.31, running_avg_conf=0.309, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 30.1 FPS (Tong thoi gian: 7.980s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 146.74 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 85.37 ms | p50 = 56.79 ms | p95 = 231.47 ms
-   - Spatial Check + Verifier (Python):           Mean = 2.89 ms | p50 = 2.59 ms | p95 = 3.59 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 92.0 ms | p50 = 63.01 ms | p95 = 237.67 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.77 ms
+[THONG LUONG] Pipeline Throughput: 37.6 FPS (Tong thoi gian: 6.380s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 157.45 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 66.27 ms | p50 = 57.19 ms | p95 = 117.72 ms
+   - Spatial Check + Verifier (Python):           Mean = 2.71 ms | p50 = 2.65 ms | p95 = 3.28 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 72.16 ms | p50 = 63.09 ms | p95 = 123.77 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.36 ms
 [TRACKS] Tong so Track ID theo doi duoc: 10
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14024,12 +14045,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.81, running_avg_conf=0.801, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 36.2 FPS (Tong thoi gian: 6.631s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 237.62 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 66.63 ms | p50 = 58.83 ms | p95 = 110.05 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.81 ms | p50 = 1.72 ms | p95 = 2.28 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 73.0 ms | p50 = 64.49 ms | p95 = 119.22 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.16 ms
+[THONG LUONG] Pipeline Throughput: 42.1 FPS (Tong thoi gian: 5.705s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 229.19 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 57.83 ms | p50 = 52.45 ms | p95 = 78.17 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.66 ms | p50 = 1.63 ms | p95 = 1.99 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 62.97 ms | p50 = 58.09 ms | p95 = 83.55 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.52 ms
 [TRACKS] Tong so Track ID theo doi duoc: 6
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14143,12 +14164,12 @@ DO LUONG DO ON DINH QUA 3 LAN CHAY LAP DOC LAP (STABILITY ANALYSIS)
   [TRACE F238 - 9.92s] Track #03: conf=0.81, running_avg_conf=0.801, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 40.9 FPS (Tong thoi gian: 5.870s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 162.3 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 58.19 ms | p50 = 51.2 ms | p95 = 94.12 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.9 ms | p50 = 1.8 ms | p95 = 2.55 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 64.46 ms | p50 = 57.45 ms | p95 = 100.42 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.27 ms
+[THONG LUONG] Pipeline Throughput: 31.8 FPS (Tong thoi gian: 7.552s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 203.9 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 79.03 ms | p50 = 63.58 ms | p95 = 150.64 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.91 ms | p50 = 1.77 ms | p95 = 2.54 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 85.22 ms | p50 = 69.19 ms | p95 = 157.22 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.2 ms
 [TRACKS] Tong so Track ID theo doi duoc: 6
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14255,12 +14276,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.45, running_avg_conf=0.638, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 35.7 FPS (Tong thoi gian: 6.729s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 173.97 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 70.33 ms | p50 = 65.37 ms | p95 = 106.71 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.37 ms | p50 = 1.39 ms | p95 = 1.83 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 75.86 ms | p50 = 71.19 ms | p95 = 112.69 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.0 ms
+[THONG LUONG] Pipeline Throughput: 35.4 FPS (Tong thoi gian: 6.778s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 231.65 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 70.47 ms | p50 = 59.11 ms | p95 = 125.02 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.38 ms | p50 = 1.38 ms | p95 = 1.92 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 75.87 ms | p50 = 65.16 ms | p95 = 129.93 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.94 ms
 [TRACKS] Tong so Track ID theo doi duoc: 4
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14533,12 +14554,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #08: conf=0.31, running_avg_conf=0.309, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 36.0 FPS (Tong thoi gian: 6.661s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 181.29 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 66.58 ms | p50 = 59.57 ms | p95 = 119.03 ms
-   - Spatial Check + Verifier (Python):           Mean = 3.3 ms | p50 = 3.2 ms | p95 = 4.15 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 73.8 ms | p50 = 68.39 ms | p95 = 126.31 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.07 ms
+[THONG LUONG] Pipeline Throughput: 37.4 FPS (Tong thoi gian: 6.422s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 170.01 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 65.4 ms | p50 = 58.08 ms | p95 = 117.69 ms
+   - Spatial Check + Verifier (Python):           Mean = 3.1 ms | p50 = 3.06 ms | p95 = 3.92 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 72.09 ms | p50 = 64.14 ms | p95 = 123.71 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.6 ms
 [TRACKS] Tong so Track ID theo doi duoc: 10
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14652,12 +14673,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.81, running_avg_conf=0.801, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 47.4 FPS (Tong thoi gian: 5.063s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 210.79 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 49.59 ms | p50 = 48.63 ms | p95 = 62.48 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.86 ms | p50 = 1.77 ms | p95 = 2.34 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 54.92 ms | p50 = 53.68 ms | p95 = 67.57 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.63 ms
+[THONG LUONG] Pipeline Throughput: 38.8 FPS (Tong thoi gian: 6.190s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 220.86 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 62.7 ms | p50 = 53.05 ms | p95 = 106.85 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.86 ms | p50 = 1.75 ms | p95 = 2.51 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 68.18 ms | p50 = 58.56 ms | p95 = 111.81 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.98 ms
 [TRACKS] Tong so Track ID theo doi duoc: 6
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -14764,12 +14785,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #03: conf=0.45, running_avg_conf=0.638, streak=80, overlap=100.0%, base_in_roi=True, is_viol=True, status=CONFIRMED
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 44.9 FPS (Tong thoi gian: 5.343s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 183.06 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 54.15 ms | p50 = 51.11 ms | p95 = 75.22 ms
-   - Spatial Check + Verifier (Python):           Mean = 1.46 ms | p50 = 1.47 ms | p95 = 2.18 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 59.11 ms | p50 = 55.81 ms | p95 = 80.25 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.6 ms
+[THONG LUONG] Pipeline Throughput: 39.7 FPS (Tong thoi gian: 6.044s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 156.45 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 63.48 ms | p50 = 51.44 ms | p95 = 125.27 ms
+   - Spatial Check + Verifier (Python):           Mean = 1.36 ms | p50 = 1.34 ms | p95 = 1.89 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 68.3 ms | p50 = 55.94 ms | p95 = 131.25 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.57 ms
 [TRACKS] Tong so Track ID theo doi duoc: 4
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -15042,12 +15063,12 @@ Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
   [TRACE F238 - 9.92s] Track #08: conf=0.31, running_avg_conf=0.309, streak=0, overlap=  0.0%, base_in_roi=False, is_viol=False, status=NORMAL
 
 [DONE] DA XU LY XONG 240/240 FRAMES (10.0s)
-[THONG LUONG] Pipeline Throughput: 36.1 FPS (Tong thoi gian: 6.655s)
-[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 232.08 ms):
-   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 65.93 ms | p50 = 56.07 ms | p95 = 111.68 ms
-   - Spatial Check + Verifier (Python):           Mean = 3.5 ms | p50 = 3.28 ms | p95 = 4.51 ms
-   - Tong do tre 1 frame suy luan (Inferred):    Mean = 73.37 ms | p50 = 64.06 ms | p95 = 119.69 ms
-   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 2.98 ms
+[THONG LUONG] Pipeline Throughput: 37.4 FPS (Tong thoi gian: 6.411s)
+[DO TRE - LATENCY] (Khong tinh frame khoi dong dau tien: 142.15 ms):
+   - AI Detection + ByteTrack (640x640 ONNX CPU): Mean = 64.46 ms | p50 = 55.52 ms | p95 = 113.68 ms
+   - Spatial Check + Verifier (Python):           Mean = 3.32 ms | p50 = 3.2 ms | p95 = 4.12 ms
+   - Tong do tre 1 frame suy luan (Inferred):    Mean = 71.6 ms | p50 = 62.87 ms | p95 = 120.97 ms
+   - Do tre 1 frame bo qua (Skipped Frame Read): Mean = 3.01 ms
 [TRACKS] Tong so Track ID theo doi duoc: 10
 ---------------------------------------------------------------------------
 Track ID   | Frames   | Avg Conf   | Avg Overlap  | Trang thai phan quyet
@@ -15366,7 +15387,7 @@ FILE: reports\system_eval_results.json
 
 {
   "metadata": {
-    "generated_at": "2026-11-03 15:42:39",
+    "generated_at": "2026-11-03 15:57:42",
     "generator_script": "evaluation/evaluate_videos.py",
     "ground_truth_file": "configs/video_ground_truth.json",
     "hardware_platform": "Windows-11-10.0.26200-SP0",
@@ -15423,13 +15444,13 @@ FILE: reports\system_eval_results.json
     "false_alarms_in_sample": 2,
     "standee_3_v1_avg_overlap": 100.0,
     "standee_3_v1_status": "CONFIRMED",
-    "pipeline_throughput_fps_min": 30.1,
-    "pipeline_throughput_fps_max": 51.9,
-    "pipeline_steady_state_fps_min": 30.6,
-    "pipeline_steady_state_fps_max": 53.9,
-    "estimated_inference_rate_hz": "~10.0 - 17.3 Hz",
-    "measured_tracker_mean_ms": 59.4,
-    "measured_inferred_frame_mean_ms": 65.13,
+    "pipeline_throughput_fps_min": 34.0,
+    "pipeline_throughput_fps_max": 44.4,
+    "pipeline_steady_state_fps_min": 38.6,
+    "pipeline_steady_state_fps_max": 49.8,
+    "estimated_inference_rate_hz": "~11.3 - 14.8 Hz",
+    "measured_tracker_mean_ms": 57.16,
+    "measured_inferred_frame_mean_ms": 62.26,
     "item_evaluations": [
       {
         "object_id": "V1_OBJ_1",
@@ -15836,27 +15857,27 @@ FILE: reports\system_eval_results.json
     "throughput_across_trials": [
       {
         "trial": 1,
-        "fps_min": 30.1,
-        "fps_max": 51.9,
-        "fps_mean": 38.5,
-        "steady_fps_min": 30.6,
-        "steady_fps_max": 53.9
+        "fps_min": 34.0,
+        "fps_max": 44.4,
+        "fps_mean": 38.7,
+        "steady_fps_min": 38.6,
+        "steady_fps_max": 49.8
       },
       {
         "trial": 2,
-        "fps_min": 35.7,
-        "fps_max": 40.9,
-        "fps_mean": 37.5,
-        "steady_fps_min": 36.7,
-        "steady_fps_max": 42.1
+        "fps_min": 31.8,
+        "fps_max": 37.4,
+        "fps_mean": 34.9,
+        "steady_fps_min": 32.7,
+        "steady_fps_max": 38.5
       },
       {
         "trial": 3,
-        "fps_min": 36.1,
-        "fps_max": 47.4,
-        "fps_mean": 42.8,
-        "steady_fps_min": 37.5,
-        "steady_fps_max": 49.6
+        "fps_min": 37.4,
+        "fps_max": 39.7,
+        "fps_mean": 38.6,
+        "steady_fps_min": 38.3,
+        "steady_fps_max": 40.9
       }
     ],
     "object_stability_details": [
@@ -16304,21 +16325,21 @@ FILE: reports\system_eval_results.json
       "roi_sha256": "8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 33.4,
+      "fps_throughput": 34.0,
       "latency_stats": {
-        "warmup_frame_ms": 2365.01,
-        "steady_state_fps": 50.4,
-        "overall_fps": 33.4,
-        "tracker_mean_ms": 47.36,
-        "tracker_p50_ms": 43.3,
-        "tracker_p95_ms": 70.1,
-        "verifier_mean_ms": 2.01,
-        "verifier_p50_ms": 1.44,
-        "verifier_p95_ms": 2.47,
-        "inferred_frame_mean_ms": 53.08,
-        "inferred_frame_p50_ms": 49.96,
-        "inferred_frame_p95_ms": 76.04,
-        "skipped_frame_mean_ms": 3.07
+        "warmup_frame_ms": 2201.72,
+        "steady_state_fps": 49.8,
+        "overall_fps": 34.0,
+        "tracker_mean_ms": 50.03,
+        "tracker_p50_ms": 42.22,
+        "tracker_p95_ms": 79.23,
+        "verifier_mean_ms": 1.87,
+        "verifier_p50_ms": 1.5,
+        "verifier_p95_ms": 2.26,
+        "inferred_frame_mean_ms": 54.82,
+        "inferred_frame_p50_ms": 47.85,
+        "inferred_frame_p95_ms": 84.99,
+        "skipped_frame_mean_ms": 2.62
       },
       "tracks_count": 6,
       "confirmed_count": 4,
@@ -16383,21 +16404,21 @@ FILE: reports\system_eval_results.json
       "roi_sha256": "79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 51.9,
+      "fps_throughput": 44.4,
       "latency_stats": {
-        "warmup_frame_ms": 154.29,
-        "steady_state_fps": 53.9,
-        "overall_fps": 51.9,
-        "tracker_mean_ms": 45.46,
-        "tracker_p50_ms": 43.1,
-        "tracker_p95_ms": 59.77,
-        "verifier_mean_ms": 1.15,
-        "verifier_p50_ms": 1.17,
-        "verifier_p95_ms": 1.51,
-        "inferred_frame_mean_ms": 50.3,
-        "inferred_frame_p50_ms": 47.94,
-        "inferred_frame_p95_ms": 66.1,
-        "skipped_frame_mean_ms": 2.65
+        "warmup_frame_ms": 201.06,
+        "steady_state_fps": 46.3,
+        "overall_fps": 44.4,
+        "tracker_mean_ms": 55.17,
+        "tracker_p50_ms": 47.05,
+        "tracker_p95_ms": 91.57,
+        "verifier_mean_ms": 1.26,
+        "verifier_p50_ms": 1.24,
+        "verifier_p95_ms": 1.87,
+        "inferred_frame_mean_ms": 59.79,
+        "inferred_frame_p50_ms": 51.03,
+        "inferred_frame_p95_ms": 96.76,
+        "skipped_frame_mean_ms": 2.51
       },
       "tracks_count": 4,
       "confirmed_count": 3,
@@ -16446,21 +16467,21 @@ FILE: reports\system_eval_results.json
       "roi_sha256": "529ee774742c5d8b5f6a7730dec484f85f0a72755f323e3f9e626b5ae00b9fd9",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 30.1,
+      "fps_throughput": 37.6,
       "latency_stats": {
-        "warmup_frame_ms": 146.74,
-        "steady_state_fps": 30.6,
-        "overall_fps": 30.1,
-        "tracker_mean_ms": 85.37,
-        "tracker_p50_ms": 56.79,
-        "tracker_p95_ms": 231.47,
-        "verifier_mean_ms": 2.89,
-        "verifier_p50_ms": 2.59,
-        "verifier_p95_ms": 3.59,
-        "inferred_frame_mean_ms": 92.0,
-        "inferred_frame_p50_ms": 63.01,
-        "inferred_frame_p95_ms": 237.67,
-        "skipped_frame_mean_ms": 2.77
+        "warmup_frame_ms": 157.45,
+        "steady_state_fps": 38.6,
+        "overall_fps": 37.6,
+        "tracker_mean_ms": 66.27,
+        "tracker_p50_ms": 57.19,
+        "tracker_p95_ms": 117.72,
+        "verifier_mean_ms": 2.71,
+        "verifier_p50_ms": 2.65,
+        "verifier_p95_ms": 3.28,
+        "inferred_frame_mean_ms": 72.16,
+        "inferred_frame_p50_ms": 63.09,
+        "inferred_frame_p95_ms": 123.77,
+        "skipped_frame_mean_ms": 2.36
       },
       "tracks_count": 10,
       "confirmed_count": 7,
@@ -25262,7 +25283,7 @@ def build_essentials():
     p("   - Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận confirm_seconds = 3.0s.")
     p("   - Đây là hiệu ứng cắt cụt dữ liệu biên thời gian (Right-Censoring) của clip ngắn 10.0 giây. Hệ thống giữ ở SUSPECTED thay vì kết luận vội vã.")
     p("2. Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):")
-    p("   - Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track chỉ đạt 0.307, thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.")
+    p("   - Xuất hiện 41 detections rải rác. Độ tin cậy trung bình trên toàn track chỉ đạt 24.0% (0.240), thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.")
     p("   - Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống kiên quyết giữ đối tượng ở diện SUSPECTED để bảo đảm nguyên tắc thận trọng pháp lý, tránh báo sai.")
     p("3. Standee #3 (Video 1 - chỉ xảy ra ở Version A):")
     p("   - Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (base_in_roi = False), xếp loại NORMAL (bỏ sót).")
@@ -25275,7 +25296,7 @@ def build_essentials():
     p("   - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian -> True Negative (TN).")
     p("2. Track #8 (Video 3 - Biển gắn tường tầng thấp phía bên phải, GT #8):")
     p("   - Biển gắn cố định trên phần tường thấp sát mặt đất, không cắm chân hay đặt trên mặt vỉa hè.")
-    p("   - Xuất hiện liên tục 77 frames, tỷ lệ đè vỉa hè ghi nhận Overlap TB = 0.0% và chân đế không tiếp xúc mặt hè phố.")
+    p("   - Xuất hiện liên tục 80 frames, tỷ lệ đè vỉa hè ghi nhận Overlap TB = 0.0% và chân đế không tiếp xúc mặt hè phố.")
     p("   - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian (Spatial Checker) -> True Negative (TN).")
     p()
 
@@ -25331,7 +25352,7 @@ def build_essentials():
     p("      khác nhau mỗi chân đế kim loại mỏng dễ bị che khuất. Nếu ép YOLO phân loại 2 class sẽ gây nhập nhằng nhãn (class confusion).")
     p("   2. Hệ thống áp dụng kiến trúc Phòng thủ nhiều lớp (Defense-in-Depth):")
     p("      - Lớp 1 (Spatial Rule Engine): Kiểm tra Overlap >= 30% và chân đế tiếp đất 3 điểm (base_in_roi), loại trừ ngay 100% biển treo")
-    p("        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 77 frames) -> xếp NORMAL.")
+    p("        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 80 frames) -> xếp NORMAL.")
     p("      - Lớp 2 (Temporal Verifier & Calibration): Với các trường hợp biên (Corner Case) góc nghiêng camera làm đáy Box chiếu sát mép vỉa hè,")
     p("        tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đóng vai trò chốt chặn an toàn giữ đối tượng ở diện SUSPECTED (không bao giờ phạt nhầm),")
     p("        kết hợp quy trình hiệu chuẩn lùi biên ROI cách chân tường 10-15px trên Web ROI Studio.")
@@ -25356,7 +25377,7 @@ def build_essentials():
     p()
     p("Câu hỏi 6: Hai trường hợp False Positive (Track #6, Track #7 ở Video 3) có thực sự là báo động sai không?")
     p("-> Trả lời: Quan sát thực tế trên góc quay phố Bà Triệu (Video 3), Track #6 và Track #7 là các biển quảng cáo thực tế của các cửa hàng phía xa")
-    p("   xuất hiện liên tục 76-80 frames, tỷ lệ overlap vỉa hè đạt 100%. Tuy nhiên, do nguyên tắc liêm chính khoa học khi lập Ground Truth chỉ tập trung gán nhãn")
+    p("   xuất hiện liên tục 80 frames, tỷ lệ overlap vỉa hè đạt 100%. Tuy nhiên, do nguyên tắc liêm chính khoa học khi lập Ground Truth chỉ tập trung gán nhãn")
     p("   16 đối tượng trọng tâm, 2 đối tượng này không nằm trong danh sách nhãn ban đầu nên bị thuật toán Hungarian tính vào False Positive.")
     p("   Đây là hiện tượng Ground Truth Incompleteness phổ biến trong thị giác máy tính thực địa, cho thấy khả năng phát hiện của mô hình còn nhạy hơn nhãn gán thủ công.")
     p()
@@ -33313,6 +33334,38 @@ def test_violation_database():
     assert stats2["violations_by_status"]["confirmed"] == 1
     assert stats2["violations_by_status"]["dismissed"] == 1
 
+    # 5. Kiểm tra khử trùng lặp thông minh (Deduplication theo Incident Lifecycle)
+    from datetime import datetime
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    id3 = db.insert_violation(
+        camera_id="camera_03",
+        track_id=10,
+        timestamp=now_str,
+        confidence=0.85,
+        overlap_pct=80.0,
+        full_image_path="evidence/records/cam_03/test.jpg",
+        bbox=(100, 100, 200, 200)
+    )
+    # Tọa độ lân cận trong dung sai margin_x, margin_y
+    near_bbox = (105, 98, 202, 197)
+    far_bbox = (500, 500, 600, 600)
+
+    # 5.1. Khi trạng thái là pending: phát hiện trùng lặp
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+    assert db.is_duplicate_violation("camera_03", far_bbox, time_window_minutes=60) is False
+
+    # 5.2. Khi trạng thái chuyển sang confirmed: vẫn tiếp tục chặn trùng lặp
+    db.update_violation_status(id3, "confirmed", reviewed_by="Đ/c Test")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+
+    # 5.3. Khi trạng thái là dismissed (có giấy phép): chặn trùng lặp trong 24 giờ
+    db.update_violation_status(id3, "dismissed", reviewed_by="Đ/c Test", dismiss_reason="Được cấp phép")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+
+    # 5.4. Khi trạng thái là resolved (đã xử lý/thu dọn): cho phép phát hiện vụ việc mới
+    db.update_violation_status(id3, "resolved", reviewed_by="Đ/c Test")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is False
+
     # Dọn dẹp file test db
     if os.path.exists(test_db_file):
         os.remove(test_db_file)
@@ -34718,6 +34771,7 @@ TASK: 18 - Xây dựng Module Quyết định Vi phạm Lai (Hybrid Violation Ch
 ==============================================================================
 """
 
+import time
 import cv2
 import numpy as np
 import shapely.geometry as sg

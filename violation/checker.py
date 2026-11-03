@@ -6,6 +6,7 @@ TASK: 18 - Xây dựng Module Quyết định Vi phạm Lai (Hybrid Violation Ch
 ==============================================================================
 """
 
+import time
 import cv2
 import numpy as np
 import shapely.geometry as sg

@@ -114,7 +114,7 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
    - Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận confirm_seconds = 3.0s.
    - Đây là hiệu ứng cắt cụt dữ liệu biên thời gian (Right-Censoring) của clip ngắn 10.0 giây. Hệ thống giữ ở SUSPECTED thay vì kết luận vội vã.
 2. Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):
-   - Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track chỉ đạt 0.307, thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.
+   - Xuất hiện 41 detections rải rác. Độ tin cậy trung bình trên toàn track chỉ đạt 24.0% (0.240), thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.
    - Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống kiên quyết giữ đối tượng ở diện SUSPECTED để bảo đảm nguyên tắc thận trọng pháp lý, tránh báo sai.
 3. Standee #3 (Video 1 - chỉ xảy ra ở Version A):
    - Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (base_in_roi = False), xếp loại NORMAL (bỏ sót).
@@ -126,7 +126,7 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
    - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian -> True Negative (TN).
 2. Track #8 (Video 3 - Biển gắn tường tầng thấp phía bên phải, GT #8):
    - Biển gắn cố định trên phần tường thấp sát mặt đất, không cắm chân hay đặt trên mặt vỉa hè.
-   - Xuất hiện liên tục 77 frames, tỷ lệ đè vỉa hè ghi nhận Overlap TB = 0.0% và chân đế không tiếp xúc mặt hè phố.
+   - Xuất hiện liên tục 80 frames, tỷ lệ đè vỉa hè ghi nhận Overlap TB = 0.0% và chân đế không tiếp xúc mặt hè phố.
    - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian (Spatial Checker) -> True Negative (TN).
 
 ## 5. ĐÁNH GIÁ ĐỘ ỔN ĐỊNH QUA 3 LẦN CHẠY LẶP & CƠ CHẾ GHÉP CẶP BIPARTITE
@@ -181,7 +181,7 @@ Câu hỏi 2: Tại sao em chỉ gán nhãn biển đứng trên Roboflow mà kh
       khác nhau mỗi chân đế kim loại mỏng dễ bị che khuất. Nếu ép YOLO phân loại 2 class sẽ gây nhập nhằng nhãn (class confusion).
    2. Hệ thống áp dụng kiến trúc Phòng thủ nhiều lớp (Defense-in-Depth):
       - Lớp 1 (Spatial Rule Engine): Kiểm tra Overlap >= 30% và chân đế tiếp đất 3 điểm (base_in_roi), loại trừ ngay 100% biển treo
-        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 77 frames) -> xếp NORMAL.
+        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 80 frames) -> xếp NORMAL.
       - Lớp 2 (Temporal Verifier & Calibration): Với các trường hợp biên (Corner Case) góc nghiêng camera làm đáy Box chiếu sát mép vỉa hè,
         tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đóng vai trò chốt chặn an toàn giữ đối tượng ở diện SUSPECTED (không bao giờ phạt nhầm),
         kết hợp quy trình hiệu chuẩn lùi biên ROI cách chân tường 10-15px trên Web ROI Studio.
@@ -206,7 +206,7 @@ Câu hỏi 5: Mô hình YOLOv8n được huấn luyện ở imgsz=1280 (mAP50 89
 
 Câu hỏi 6: Hai trường hợp False Positive (Track #6, Track #7 ở Video 3) có thực sự là báo động sai không?
 -> Trả lời: Quan sát thực tế trên góc quay phố Bà Triệu (Video 3), Track #6 và Track #7 là các biển quảng cáo thực tế của các cửa hàng phía xa
-   xuất hiện liên tục 76-80 frames, tỷ lệ overlap vỉa hè đạt 100%. Tuy nhiên, do nguyên tắc liêm chính khoa học khi lập Ground Truth chỉ tập trung gán nhãn
+   xuất hiện liên tục 80 frames, tỷ lệ overlap vỉa hè đạt 100%. Tuy nhiên, do nguyên tắc liêm chính khoa học khi lập Ground Truth chỉ tập trung gán nhãn
    16 đối tượng trọng tâm, 2 đối tượng này không nằm trong danh sách nhãn ban đầu nên bị thuật toán Hungarian tính vào False Positive.
    Đây là hiện tượng Ground Truth Incompleteness phổ biến trong thị giác máy tính thực địa, cho thấy khả năng phát hiện của mô hình còn nhạy hơn nhãn gán thủ công.
 

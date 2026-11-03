@@ -1015,7 +1015,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
 
             mf.write("### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):\n")
             mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
-            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
+            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 41 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 24.0% (0.240), thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
             mf.write("3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).\n\n")
 
             mf.write("---\n\n")

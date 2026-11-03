@@ -137,7 +137,7 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
    - Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận confirm_seconds = 3.0s.
    - Đây là hiệu ứng cắt cụt dữ liệu biên thời gian (Right-Censoring) của clip ngắn 10.0 giây. Hệ thống giữ ở SUSPECTED thay vì kết luận vội vã.
 2. Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):
-   - Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track chỉ đạt 0.307, thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.
+   - Xuất hiện 41 detections rải rác. Độ tin cậy trung bình trên toàn track chỉ đạt 24.0% (0.240), thấp hơn ngưỡng cổng bảo vệ min_avg_confidence = 0.40.
    - Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống kiên quyết giữ đối tượng ở diện SUSPECTED để bảo đảm nguyên tắc thận trọng pháp lý, tránh báo sai.
 3. Standee #3 (Video 1 - chỉ xảy ra ở Version A):
    - Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (base_in_roi = False), xếp loại NORMAL (bỏ sót).
@@ -149,7 +149,7 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
    - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian -> True Negative (TN).
 2. Track #8 (Video 3 - Biển gắn tường tầng thấp phía bên phải, GT #8):
    - Biển gắn cố định trên phần tường thấp sát mặt đất, không cắm chân hay đặt trên mặt vỉa hè.
-   - Xuất hiện liên tục 77 frames, tỷ lệ đè vỉa hè ghi nhận Overlap TB = 0.0% và chân đế không tiếp xúc mặt hè phố.
+   - Xuất hiện liên tục 80 frames, tỷ lệ đè vỉa hè ghi nhận Overlap TB = 0.0% và chân đế không tiếp xúc mặt hè phố.
    - Hệ thống xếp trạng thái NORMAL ngay tại tầng Không gian (Spatial Checker) -> True Negative (TN).
 
 ## 5. ĐÁNH GIÁ ĐỘ ỔN ĐỊNH QUA 3 LẦN CHẠY LẶP & CƠ CHẾ GHÉP CẶP BIPARTITE
@@ -204,7 +204,7 @@ Câu hỏi 2: Tại sao em chỉ gán nhãn biển đứng trên Roboflow mà kh
       khác nhau mỗi chân đế kim loại mỏng dễ bị che khuất. Nếu ép YOLO phân loại 2 class sẽ gây nhập nhằng nhãn (class confusion).
    2. Hệ thống áp dụng kiến trúc Phòng thủ nhiều lớp (Defense-in-Depth):
       - Lớp 1 (Spatial Rule Engine): Kiểm tra Overlap >= 30% và chân đế tiếp đất 3 điểm (base_in_roi), loại trừ ngay 100% biển treo
-        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 77 frames) -> xếp NORMAL.
+        trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 80 frames) -> xếp NORMAL.
       - Lớp 2 (Temporal Verifier & Calibration): Với các trường hợp biên (Corner Case) góc nghiêng camera làm đáy Box chiếu sát mép vỉa hè,
         tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đóng vai trò chốt chặn an toàn giữ đối tượng ở diện SUSPECTED (không bao giờ phạt nhầm),
         kết hợp quy trình hiệu chuẩn lùi biên ROI cách chân tường 10-15px trên Web ROI Studio.
@@ -229,7 +229,7 @@ Câu hỏi 5: Mô hình YOLOv8n được huấn luyện ở imgsz=1280 (mAP50 89
 
 Câu hỏi 6: Hai trường hợp False Positive (Track #6, Track #7 ở Video 3) có thực sự là báo động sai không?
 -> Trả lời: Quan sát thực tế trên góc quay phố Bà Triệu (Video 3), Track #6 và Track #7 là các biển quảng cáo thực tế của các cửa hàng phía xa
-   xuất hiện liên tục 76-80 frames, tỷ lệ overlap vỉa hè đạt 100%. Tuy nhiên, do nguyên tắc liêm chính khoa học khi lập Ground Truth chỉ tập trung gán nhãn
+   xuất hiện liên tục 80 frames, tỷ lệ overlap vỉa hè đạt 100%. Tuy nhiên, do nguyên tắc liêm chính khoa học khi lập Ground Truth chỉ tập trung gán nhãn
    16 đối tượng trọng tâm, 2 đối tượng này không nằm trong danh sách nhãn ban đầu nên bị thuật toán Hungarian tính vào False Positive.
    Đây là hiện tượng Ground Truth Incompleteness phổ biến trong thị giác máy tính thực địa, cho thấy khả năng phát hiện của mô hình còn nhạy hơn nhãn gán thủ công.
 
@@ -1119,6 +1119,14 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
 
+def mask_source_url(url) -> str:
+    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
+    if not isinstance(url, str):
+        return str(url)
+    import re
+    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
+
+
 BANNER = r"""
 ==============================================================================
    ____ ____ _______     __  ____  _     _                 _ _                 
@@ -1169,8 +1177,9 @@ def run_monitor_mode(args):
 
     is_stream = isinstance(source, str) and source.lower().startswith(("rtsp://", "http://", "https://"))
     is_webcam = (isinstance(source, int) or (isinstance(source, str) and source.isdigit()))
+    is_live_stream = is_stream or is_webcam
     if not is_stream and not is_webcam and not os.path.exists(str(source)):
-        print(f"[LỖI] Tệp tin nguồn không tồn tại: {source}")
+        print(f"[LỖI] Tệp tin nguồn không tồn tại: {mask_source_url(source)}")
         return False
 
     is_image = isinstance(source, str) and source.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.webp'))
@@ -1188,13 +1197,13 @@ def run_monitor_mode(args):
         elif os.path.exists(candidate_2):
             config_path = candidate_2
         elif is_live_stream:
-            print(f"[LỖI CẤU HÌNH] Nguồn camera trực tiếp '{source}' chưa được chỉ định cấu hình ROI.")
+            print(f"[LỖI CẤU HÌNH] Nguồn camera trực tiếp '{mask_source_url(source)}' chưa được chỉ định cấu hình ROI.")
             print("Vui lòng truyền tường minh tham số: --config configs/roi_<camera_id>.json")
             return False
         elif os.path.exists("configs/roi_camera1.json"):
             config_path = "configs/roi_camera1.json"
         else:
-            print(f"[LỖI CẤU HÌNH] Không tìm thấy tệp cấu hình ROI vỉa hè nào trong thư mục configs/.")
+            print(f"[LỖI CẤU HÌNH] Không tìm thấy tệp cấu hình ROI vỉa hè cho '{mask_source_url(source)}'. Vui lòng dùng tham số --config.")
             return False
 
     roi_manager = ROIManager(config_path)
@@ -1249,7 +1258,7 @@ def run_monitor_mode(args):
     cooldown_sec = args.cooldown if args.cooldown is not None else float(cfg_temporal.get("cooldown_seconds", 60.0))
     spatial_cooldown_rad = float(cfg_temporal.get("spatial_cooldown_radius", 50.0))
 
-    print(f"[*] Nguồn cấp dữ liệu : {source}")
+    print(f"[*] Nguồn cấp dữ liệu : {mask_source_url(source)}")
     print(f"[*] Cấu hình Vỉa hè   : {config_path} ({len(roi_manager.polygons)} vùng vỉa hè, {total_pts} đỉnh)")
     print(f"[*] Model AI Detector : {model_path} (Imgsz: {imgsz})")
     print(f"[*] Cấu hình Edge AI  : Engine: {engine_name} | Frame Skip: {frame_skip} | Playback: {sync_str}")
@@ -1673,14 +1682,18 @@ Ví dụ sử dụng:
 
     args = parser.parse_args()
 
+    success = True
     if args.mode == "monitor":
-        run_monitor_mode(args)
+        success = run_monitor_mode(args)
     elif args.mode == "dashboard":
         run_dashboard_mode(args)
     elif args.mode == "roi":
         run_roi_mode(args)
     elif args.mode == "benchmark":
         run_benchmark_mode(args)
+
+    if success is False:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -1799,6 +1812,7 @@ TASK: 18 - Xây dựng Module Quyết định Vi phạm Lai (Hybrid Violation Ch
 ==============================================================================
 """
 
+import time
 import cv2
 import numpy as np
 import shapely.geometry as sg
@@ -2981,7 +2995,7 @@ def run_full_evaluation(progress_callback=None, custom_logger=None):
 
             mf.write("### Phân Tích Hiện Tượng Của Các Trường Hợp False Negative (FN):\n")
             mf.write("1. **Track #33 (Video 2 - Cơm Lươn Huệ Liễu, không đạt điều kiện ghép cặp - unmatched):** Xuất hiện ở cự ly xa vào cuối video tại Frame 238 (9.92s). Tổng thời gian quan sát chưa đạt ngưỡng xác nhận `confirm_seconds = 3.0s`. Đây là hiệu ứng cắt cụt dữ liệu (Right-Censoring) của clip ngắn 10.0 giây, đối tượng được hệ thống an toàn giữ ở trạng thái `SUSPECTED` thay vì phạt vội vã.\n")
-            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 19 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 0.307, thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
+            mf.write("2. **Track #23 (Video 2 - Biển hiệu khung sắt tầm thấp ven đường, matched Track #20):** Xuất hiện 41 detections rải rác. Độ tin cậy trung bình trên toàn track đạt 24.0% (0.240), thấp hơn ngưỡng cổng `min_avg_confidence = 0.40`. Sau khi chuẩn hóa bộ lọc chuỗi thời gian, hệ thống giữ đối tượng ở trạng thái `SUSPECTED` để đảm bảo nguyên tắc thận trọng pháp lý, tránh báo động sai.\n")
             mf.write("3. **Standee #3 (Video 1 - chỉ xảy ra ở Version A):** Trong cấu hình ROI cũ (Version A), đa giác vỉa hè vẽ hẹp nên chân đế rơi ra ngoài (`base_in_roi = False`), xếp loại `NORMAL` (bỏ sót). Khi chuyển sang Version B chuẩn hóa, ROI bao trọn vỉa hè và đối tượng được xác nhận `CONFIRMED` chính xác (True Positive).\n\n")
 
             mf.write("---\n\n")
@@ -4115,9 +4129,17 @@ TASK: 27 - Xây dựng Module camera/stream_reader.py tự động kết nối l
 import os
 import time
 import math
+import re
 import threading
 import cv2
 import numpy as np
+
+
+def mask_source_url(url) -> str:
+    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
+    if not isinstance(url, str):
+        return str(url)
+    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
 
 
 class StreamReader:
@@ -4208,14 +4230,14 @@ class StreamReader:
                 self.cap = None
 
             if not self.is_live_stream and isinstance(self.source, str) and not os.path.exists(self.source):
-                print(f"[LỖI] Tệp video không tồn tại trên đĩa: {self.source}")
+                print(f"[LỖI] Tệp video không tồn tại trên đĩa: {mask_source_url(self.source)}")
                 return False
 
-            print(f"[CAMERA STREAM] Đang kết nối nguồn: {self.source}...")
+            print(f"[CAMERA STREAM] Đang kết nối nguồn: {mask_source_url(self.source)}...")
             self.cap = cv2.VideoCapture(self.source)
 
             if not self.cap.isOpened():
-                print(f"[CẢNH BÁO] Không thể mở nguồn camera: {self.source}")
+                print(f"[CẢNH BÁO] Không thể mở nguồn camera: {mask_source_url(self.source)}")
                 return False
 
             # Lấy thông số luồng kèm kiểm tra FPS hợp lệ [5, 120] (chống lỗi time-base 90000 của RTSP FFmpeg)
@@ -4906,7 +4928,7 @@ class ViolationDatabase:
                   AND ABS(bbox_y2 - ?) <= ?
                   AND (
                       (status IN ('pending', 'confirmed') AND timestamp >= datetime('now', 'localtime', ?))
-                      OR (status = 'dismissed' AND timestamp >= datetime('now', 'localtime', '-24 hours'))
+                      OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', '-24 hours'))
                   )
             """, (
                 camera_id,
@@ -11515,6 +11537,38 @@ def test_violation_database():
     stats2 = db.get_statistics()
     assert stats2["violations_by_status"]["confirmed"] == 1
     assert stats2["violations_by_status"]["dismissed"] == 1
+
+    # 5. Kiểm tra khử trùng lặp thông minh (Deduplication theo Incident Lifecycle)
+    from datetime import datetime
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    id3 = db.insert_violation(
+        camera_id="camera_03",
+        track_id=10,
+        timestamp=now_str,
+        confidence=0.85,
+        overlap_pct=80.0,
+        full_image_path="evidence/records/cam_03/test.jpg",
+        bbox=(100, 100, 200, 200)
+    )
+    # Tọa độ lân cận trong dung sai margin_x, margin_y
+    near_bbox = (105, 98, 202, 197)
+    far_bbox = (500, 500, 600, 600)
+
+    # 5.1. Khi trạng thái là pending: phát hiện trùng lặp
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+    assert db.is_duplicate_violation("camera_03", far_bbox, time_window_minutes=60) is False
+
+    # 5.2. Khi trạng thái chuyển sang confirmed: vẫn tiếp tục chặn trùng lặp
+    db.update_violation_status(id3, "confirmed", reviewed_by="Đ/c Test")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+
+    # 5.3. Khi trạng thái là dismissed (có giấy phép): chặn trùng lặp trong 24 giờ
+    db.update_violation_status(id3, "dismissed", reviewed_by="Đ/c Test", dismiss_reason="Được cấp phép")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is True
+
+    # 5.4. Khi trạng thái là resolved (đã xử lý/thu dọn): cho phép phát hiện vụ việc mới
+    db.update_violation_status(id3, "resolved", reviewed_by="Đ/c Test")
+    assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is False
 
     # Dọn dẹp file test db
     if os.path.exists(test_db_file):

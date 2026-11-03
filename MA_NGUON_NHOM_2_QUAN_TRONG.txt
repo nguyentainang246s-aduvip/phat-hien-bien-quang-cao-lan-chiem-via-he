@@ -32,9 +32,17 @@ TASK: 27 - Xây dựng Module camera/stream_reader.py tự động kết nối l
 import os
 import time
 import math
+import re
 import threading
 import cv2
 import numpy as np
+
+
+def mask_source_url(url) -> str:
+    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
+    if not isinstance(url, str):
+        return str(url)
+    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
 
 
 class StreamReader:
@@ -125,14 +133,14 @@ class StreamReader:
                 self.cap = None
 
             if not self.is_live_stream and isinstance(self.source, str) and not os.path.exists(self.source):
-                print(f"[LỖI] Tệp video không tồn tại trên đĩa: {self.source}")
+                print(f"[LỖI] Tệp video không tồn tại trên đĩa: {mask_source_url(self.source)}")
                 return False
 
-            print(f"[CAMERA STREAM] Đang kết nối nguồn: {self.source}...")
+            print(f"[CAMERA STREAM] Đang kết nối nguồn: {mask_source_url(self.source)}...")
             self.cap = cv2.VideoCapture(self.source)
 
             if not self.cap.isOpened():
-                print(f"[CẢNH BÁO] Không thể mở nguồn camera: {self.source}")
+                print(f"[CẢNH BÁO] Không thể mở nguồn camera: {mask_source_url(self.source)}")
                 return False
 
             # Lấy thông số luồng kèm kiểm tra FPS hợp lệ [5, 120] (chống lỗi time-base 90000 của RTSP FFmpeg)
@@ -823,7 +831,7 @@ class ViolationDatabase:
                   AND ABS(bbox_y2 - ?) <= ?
                   AND (
                       (status IN ('pending', 'confirmed') AND timestamp >= datetime('now', 'localtime', ?))
-                      OR (status = 'dismissed' AND timestamp >= datetime('now', 'localtime', '-24 hours'))
+                      OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', '-24 hours'))
                   )
             """, (
                 camera_id,

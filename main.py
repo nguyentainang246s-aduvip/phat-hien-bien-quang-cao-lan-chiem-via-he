@@ -37,6 +37,14 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
 
+def mask_source_url(url) -> str:
+    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
+    if not isinstance(url, str):
+        return str(url)
+    import re
+    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
+
+
 BANNER = r"""
 ==============================================================================
    ____ ____ _______     __  ____  _     _                 _ _                 
@@ -87,8 +95,9 @@ def run_monitor_mode(args):
 
     is_stream = isinstance(source, str) and source.lower().startswith(("rtsp://", "http://", "https://"))
     is_webcam = (isinstance(source, int) or (isinstance(source, str) and source.isdigit()))
+    is_live_stream = is_stream or is_webcam
     if not is_stream and not is_webcam and not os.path.exists(str(source)):
-        print(f"[LỖI] Tệp tin nguồn không tồn tại: {source}")
+        print(f"[LỖI] Tệp tin nguồn không tồn tại: {mask_source_url(source)}")
         return False
 
     is_image = isinstance(source, str) and source.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.webp'))
@@ -106,13 +115,13 @@ def run_monitor_mode(args):
         elif os.path.exists(candidate_2):
             config_path = candidate_2
         elif is_live_stream:
-            print(f"[LỖI CẤU HÌNH] Nguồn camera trực tiếp '{source}' chưa được chỉ định cấu hình ROI.")
+            print(f"[LỖI CẤU HÌNH] Nguồn camera trực tiếp '{mask_source_url(source)}' chưa được chỉ định cấu hình ROI.")
             print("Vui lòng truyền tường minh tham số: --config configs/roi_<camera_id>.json")
             return False
         elif os.path.exists("configs/roi_camera1.json"):
             config_path = "configs/roi_camera1.json"
         else:
-            print(f"[LỖI CẤU HÌNH] Không tìm thấy tệp cấu hình ROI vỉa hè nào trong thư mục configs/.")
+            print(f"[LỖI CẤU HÌNH] Không tìm thấy tệp cấu hình ROI vỉa hè cho '{mask_source_url(source)}'. Vui lòng dùng tham số --config.")
             return False
 
     roi_manager = ROIManager(config_path)
@@ -167,7 +176,7 @@ def run_monitor_mode(args):
     cooldown_sec = args.cooldown if args.cooldown is not None else float(cfg_temporal.get("cooldown_seconds", 60.0))
     spatial_cooldown_rad = float(cfg_temporal.get("spatial_cooldown_radius", 50.0))
 
-    print(f"[*] Nguồn cấp dữ liệu : {source}")
+    print(f"[*] Nguồn cấp dữ liệu : {mask_source_url(source)}")
     print(f"[*] Cấu hình Vỉa hè   : {config_path} ({len(roi_manager.polygons)} vùng vỉa hè, {total_pts} đỉnh)")
     print(f"[*] Model AI Detector : {model_path} (Imgsz: {imgsz})")
     print(f"[*] Cấu hình Edge AI  : Engine: {engine_name} | Frame Skip: {frame_skip} | Playback: {sync_str}")
@@ -591,14 +600,18 @@ Ví dụ sử dụng:
 
     args = parser.parse_args()
 
+    success = True
     if args.mode == "monitor":
-        run_monitor_mode(args)
+        success = run_monitor_mode(args)
     elif args.mode == "dashboard":
         run_dashboard_mode(args)
     elif args.mode == "roi":
         run_roi_mode(args)
     elif args.mode == "benchmark":
         run_benchmark_mode(args)
+
+    if success is False:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
