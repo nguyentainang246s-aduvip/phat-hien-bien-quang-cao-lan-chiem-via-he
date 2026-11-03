@@ -28,6 +28,9 @@ import argparse
 import cv2
 import numpy as np
 
+# Đánh dấu không phải module test của pytest (đây là công cụ CLI duyệt ảnh)
+__test__ = False
+
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 

@@ -1,0 +1,10 @@
+# Cấu hình tập dữ liệu đã chuẩn hóa (v13_clean) cho Đồ án tốt nghiệp
+# Chuẩn định dạng Ultralytics YOLOv8 / YOLOv11 / YOLO26
+
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 1
+names:
+  0: bien-quang-cao
