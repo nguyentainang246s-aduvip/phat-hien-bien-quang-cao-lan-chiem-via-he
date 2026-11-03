@@ -36,6 +36,10 @@ evidence/crops/
 models/best (*).pt
 models/best_*.pt
 models/best_*.onnx
+models/backup_*/
+
+# Thư mục ảnh xuất tạm / trung gian
+data/images/output_v13_clean/
 
 # Dataset Roboflow (tải lại bằng script datasets/download_dataset.py)
 sidewalk-signboard-detection*/

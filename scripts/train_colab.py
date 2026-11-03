@@ -63,6 +63,7 @@ results = model.train(
     erasing=0.4,
     seed=0,
     deterministic=True,
+    device=0,
     amp=True,
     project="runs/detect",
     name="train_v13_clean",
@@ -70,43 +71,51 @@ results = model.train(
     plots=True
 )
 
-print(f"\n[✓] Huấn luyện hoàn tất! Trọng số tốt nhất lưu tại: runs/detect/train_v13_clean/weights/best.pt")
+# Tự động lấy chính xác đường dẫn thư mục lưu của phiên train vừa chạy
+train_save_dir = Path(results.save_dir)
+best_pt_path = train_save_dir / "weights" / "best.pt"
+print(f"\n[✓] Huấn luyện hoàn tất! Trọng số tốt nhất lưu tại: {best_pt_path}")
 
 # BƯỚC 4: Đánh giá độc lập trên tập Test (267 ảnh chưa từng thấy)
 print("\n" + "=" * 70)
 print("[*] Đang đánh giá độc lập trên tập Test (267 ảnh, cách ly 100%)...")
 print("=" * 70)
 
-best_model = YOLO("runs/detect/train_v13_clean/weights/best.pt")
-metrics_test = best_model.val(
+best_model = YOLO(str(best_pt_path))
+test_results = best_model.val(
     data=data_yaml,
     split="test",
     imgsz=1280,
     plots=True,
-    project="runs/detect",
+    project=str(train_save_dir.parent),
     name="test_v13_clean"
 )
 
+test_save_dir = Path(test_results.save_dir)
+
 print("\n" + "=" * 70)
 print("SỐ LIỆU ĐÁNH GIÁ KIỂM THỬ TRUNG THỰC (TẬP TEST ĐỘC LẬP - ĐƯA VÀO LUẬN VĂN):")
-print(f"  • Precision (Độ chính xác)     : {metrics_test.results_dict.get('metrics/precision(B)', 0):.4f}")
-print(f"  • Recall (Độ bao phủ)          : {metrics_test.results_dict.get('metrics/recall(B)', 0):.4f}")
-print(f"  • mAP@50                       : {metrics_test.results_dict.get('metrics/mAP50(B)', 0):.4f}")
-print(f"  • mAP@50-95                    : {metrics_test.results_dict.get('metrics/mAP50-95(B)', 0):.4f}")
+print(f"  • Precision (Độ chính xác)     : {test_results.results_dict.get('metrics/precision(B)', 0):.4f}")
+print(f"  • Recall (Độ bao phủ)          : {test_results.results_dict.get('metrics/recall(B)', 0):.4f}")
+print(f"  • mAP@50                       : {test_results.results_dict.get('metrics/mAP50(B)', 0):.4f}")
+print(f"  • mAP@50-95                    : {test_results.results_dict.get('metrics/mAP50-95(B)', 0):.4f}")
 print("=" * 70)
 
 # BƯỚC 5: Xuất mô hình sang định dạng ONNX
 print("\n[*] Đang xuất mô hình sang ONNX phục vụ chạy CPU...")
 best_model.export(format="onnx", imgsz=1280, dynamic=True, simplify=True)
+best_onnx_path = train_save_dir / "weights" / "best.onnx"
 
 # BƯỚC 6: Đóng gói artifacts và tải về máy
 print("\n[*] Đang đóng gói toàn bộ artifacts (biểu đồ, log, weights)...")
-!zip -q -r /content/results_v13_clean.zip runs/detect/train_v13_clean runs/detect/test_v13_clean
+zip_output = "/content/results_v13_clean.zip"
+!zip -q -r {zip_output} {train_save_dir} {test_save_dir}
 
 print("\n[✓] Đang gửi lệnh tải file về máy tính qua trình duyệt:")
-print("    1. best.pt (Trọng số PyTorch)")
-print("    2. best.onnx (Trọng số ONNX chạy CPU)")
-print("    3. results_v13_clean.zip (Toàn bộ biểu đồ mAP, confusion matrix, kết quả)")
-files.download("runs/detect/train_v13_clean/weights/best.pt")
-files.download("runs/detect/train_v13_clean/weights/best.onnx")
-files.download("/content/results_v13_clean.zip")
+print(f"    1. best.pt (Trọng số PyTorch): {best_pt_path}")
+print(f"    2. best.onnx (Trọng số ONNX chạy CPU): {best_onnx_path}")
+print(f"    3. results_v13_clean.zip (Toàn bộ biểu đồ mAP, confusion matrix, kết quả)")
+files.download(str(best_pt_path))
+if best_onnx_path.exists():
+    files.download(str(best_onnx_path))
+files.download(zip_output)

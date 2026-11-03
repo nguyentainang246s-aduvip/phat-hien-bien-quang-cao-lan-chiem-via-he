@@ -15,8 +15,8 @@ camera:
   buffer_flush: true           # Kích hoạt background thread flush buffer (Zero Latency)
 
 detector:
-  model_path: "models/best.pt" # Trọng số YOLOv8n Version 13 Final đã huấn luyện (6.61 MB, mAP50 89.6%)
-  onnx_path: "models/best.onnx" # Bản xuất tối ưu ONNX Runtime Version 13 Final (12.4 MB, Dynamic Shape)
+  model_path: "models/best.pt" # Trọng số YOLOv8n Version 13 Clean đã huấn luyện (6.64 MB, mAP50 90.44% trên Test)
+  onnx_path: "models/best.onnx" # Bản xuất tối ưu ONNX Runtime Version 13 Clean (12.87 MB, Dynamic Shape)
   imgsz: 640                   # Kích thước ảnh chuẩn khi suy luận (640x640 tối ưu cho CPU)
   conf_threshold: 0.25         # Ngưỡng tin cậy tối thiểu cho bounding box
   iou_threshold: 0.50          # Ngưỡng Non-Maximum Suppression (NMS)
