@@ -152,3 +152,4 @@ Hệ thống đồ án tốt nghiệp giải quyết trọn vẹn các khoảng 
 5. **[P5]** C. He and P. Saha, *"Investigating YOLO Models Towards Outdoor Obstacle Detection For Visually Impaired People,"* **arXiv preprint arXiv:2312.05734**, Dec. 2023. DOI: [10.48550/arXiv.2312.05734](https://doi.org/10.48550/arXiv.2312.05734).
 6. **[P6]** J. Redmon, S. Divvala, R. Girshick, and A. Farhadi, *"You Only Look Once: Unified, Real-Time Object Detection,"* in **IEEE Conference on Computer Vision and Pattern Recognition (CVPR)**, 2016, pp. 779–788. DOI: [10.1109/CVPR.2016.91](https://doi.org/10.1109/CVPR.2016.91).
 7. **[P7]** G. Jocher, A. Chaurasia, and J. Qiu, *"Ultralytics YOLOv8,"* 2023. [Phần mềm mã nguồn mở]. Sẵn có tại: [github.com/ultralytics/ultralytics](https://github.com/ultralytics/ultralytics).
+

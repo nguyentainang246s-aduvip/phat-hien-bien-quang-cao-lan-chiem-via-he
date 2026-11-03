@@ -1,0 +1,126 @@
+=== PAGE 1 ===
+HỆ THỐNG BẢNG KẾT QUẢ THỰC NGHIỆM ĐỀ XUẤT 
+Đề tài: Phát hiện biển quảng cáo/biển hiệu lấn chiếm vỉa hè qua camera an ninh CCTV cố định 
+Các ô “—” dùng để điền số liệu sau khi hoàn tất thực nghiệm. 
+I. Đánh giá mô hình phát hiện đối tượng (Perception) 
+Bảng 1. Kết quả Object Detection của YOLOv8n 
+Mô hình Precision Recall F1-score mAP@0.5 mAP@0.5:0.95 
+YOLOv8n pretrained — — — — — 
+YOLOv8n fine-tuned — — — — — 
+YOLOv8n best checkpoint — — — — — 
+Mục tiêu: đánh giá chất lượng mô hình nhận diện biển quảng cáo/biển hiệu trước khi tích hợp vào pipeline xác định vi phạm. 
+Bảng 2. Kết quả theo kích thước biển quảng cáo/biển hiệu 
+Kích thước đối tượng Số mẫu Precision Recall F1-score mAP@0.5 
+Small — — — — — 
+Medium — — — — — 
+Large — — — — — 
+Tổng — — — — — 
+Có thể quy định Small/Medium/Large theo diện tích bounding box hoặc theo chuẩn COCO và nêu rõ tiêu chí trong báo cáo. 
+Bảng 3. Kết quả theo điều kiện môi trường quan sát 
+Điều kiện Số ảnh Precision Recall F1-score mAP@0.5 
+Ban ngày — — — — — 
+Ban đêm — — — — — 
+Nắng mạnh — — — — — 
+Bóng râm — — — — — 
+Đông người/xe — — — — — 
+Có che khuất — — — — — 
+Nên chọn các nhóm điều kiện có đủ số lượng mẫu để kết quả có ý nghĩa thống kê. 
+
+=== PAGE 2 ===
+II. Đánh giá Spatial Reasoning và Decision Logic 
+Bảng 4. Đánh giá thuật toán xác định vi phạm 
+Phương pháp Precision vi phạm Recall vi phạm F1-score Accuracy 
+Detection đơn thuần — — — — 
+Detection + ROI — — — — 
+Detection + ROI + overlap threshold — — — — 
+Full pipeline — — — — 
+Bảng này đánh giá trực tiếp nhiệm vụ cuối cùng: xác định đúng trường hợp biển quảng cáo/biển hiệu lấn chiếm vùng vỉa hè. 
+Bảng 5. Khảo sát ngưỡng diện tích giao nhau với ROI 
+Ngưỡng overlap Precision Recall F1-score False Positive False Negative 
+10% — — — — — 
+20% — — — — — 
+30% — — — — — 
+40% — — — — — 
+50% — — — — — 
+Gợi ý định nghĩa: Overlap = Area(BBox ∩ ROI) / Area(BBox). Có thể bổ sung thêm ngưỡng nếu đường cong F1 chưa đạt cực đại trong khoảng trên. 
+Bảng 6. Ảnh hưởng của số frame xác nhận vi phạm 
+Số frame xác nhận Precision Recall F1-score False Alarm Detection Delay (s) 
+1 frame — — — — — 
+3 frames — — — — — 
+5 frames — — — — — 
+10 frames — — — — — 
+20 frames — — — — — 
+Kết quả dùng để phân tích trade-off giữa giảm cảnh báo giả và tăng độ trễ xác nhận. 
+Bảng 7. Ablation Study cho toàn bộ pipeline 
+Cấu hình Detection ROI Tracking Temporal confirmation Precision vi phạm Recall F1-score 
+A ✓    — — — 
+
+=== PAGE 3 ===
+Cấu hình Detection ROI Tracking Temporal confirmation Precision vi phạm Recall F1-score 
+B ✓ ✓   — — — 
+C ✓ ✓ ✓  — — — 
+D ✓ ✓ ✓ ✓ — — — 
+Bảng này cho thấy đóng góp của từng module vào hiệu quả xác định vi phạm cuối cùng. 
+Bảng 8. Kết quả theo mức độ lấn chiếm vỉa hè 
+Mức lấn chiếm Khoảng overlap Số trường hợp Phát hiện đúng Recall 
+Rất nhỏ 0–10% — — — 
+Nhỏ 10–25% — — — 
+Trung bình 25–50% — — — 
+Lớn >50% — — — 
+Có thể điều chỉnh các khoảng overlap sau khi khảo sát phân bố dữ liệu thực tế. 
+III. Đánh giá hệ thống End-to-End và khả năng tổng quát hóa 
+Bảng 9. Kết quả End-to-End trên từng video/camera 
+Video/Camera Số vi phạm thực tế Phát hiện đúng FP FN Precision Recall 
+Camera 1 — — — — — — 
+Camera 2 — — — — — — 
+Camera 3 — — — — — — 
+Camera 4 — — — — — — 
+Tổng — — — — — — 
+Nên tính theo sự kiện vi phạm thay vì theo frame để phản ánh đúng chất lượng cảnh báo của hệ thống. 
+ 
+
+=== PAGE 4 ===
+Bảng 10. Khả năng tổng quát hóa giữa các camera/góc nhìn 
+Camera Đặc điểm góc nhìn Precision Recall F1-score 
+Camera 1 Chính diện — — — 
+Camera 2 Chéo trái — — — 
+Camera 3 Chéo phải — — — 
+Camera 4 Góc cao — — — 
+Camera 5 Góc rộng — — — 
+Mỗi camera cần thiết lập ROI riêng nhưng nên sử dụng cùng một mô hình detection để kiểm tra mức độ tổng quát hóa. 
+Bảng 11. So sánh hệ thống có và không có ByteTrack 
+Phương pháp Duplicate alerts False alarms Missed violations F1-score 
+Không tracking — — — — 
+ByteTrack — — — — 
+Có thể bổ sung chỉ số “số cảnh báo trung bình/sự kiện” để thể hiện vai trò của tracking trong khử cảnh báo lặp. 
+IV. Benchmark triển khai và tối ưu hệ thống 
+Bảng 12. Benchmark PC và thiết bị Edge 
+Platform Model/Runtime Precision FPS Latency (ms) RAM Power 
+PC GPU PyTorch FP32 — — — — — 
+PC GPU ONNX FP16 — — — — — 
+Edge device ONNX FP32 — — — — — 
+Edge device ONNX FP16 — — — — — 
+Edge device INT8 (nếu hỗ trợ) — — — — — 
+Nếu không đo được công suất trực tiếp, có thể bỏ cột Power hoặc ghi rõ phương pháp đo/ước lượng. 
+ 
+
+=== PAGE 5 ===
+Bảng 13. Benchmark theo số lượng camera xử lý đồng thời 
+Số camera FPS/camera Tổng FPS GPU usage (%) CPU usage (%) RAM Realtime? 
+1 — — — — — — 
+2 — — — — — — 
+4 — — — — — — 
+8 — — — — — — 
+Nếu phần cứng không đủ chạy 8 camera, có thể dừng ở mức lớn nhất hệ thống chạy ổn định và giải thích giới hạn tài nguyên. 
+Bảng 14. Phân tích lỗi (Failure Analysis) 
+Loại lỗi Số trường hợp Tỷ lệ (%) Nguyên nhân chính Hướng khắc phục 
+Miss detection — — Biển nhỏ/xa, che khuất Bổ sung dữ liệu; tăng độ phân giải; tối ưu detector 
+False detection — — Vật thể có hình dạng giống biển Hard-negative mining; bổ sung dữ liệu âm 
+ROI error — — ROI thiết lập chưa chính xác Hiệu chỉnh ROI; công cụ cấu hình tốt hơn 
+Tracking ID switch — — Che khuất; giao cắt đối tượng Tuning ByteTrack; bổ sung re-identification nếu cần 
+False violation — — Ngưỡng overlap chưa phù hợp Tối ưu threshold; thêm xác nhận temporal 
+Missed violation — — Detection không ổn định Temporal aggregation; bổ sung dữ liệu khó 
+Bảng Failure Analysis nên được tổng hợp từ tập test độc lập và minh họa thêm bằng một số ảnh/video điển hình trong báo cáo. 
+Gợi ý sử dụng trong Chương 4: ưu tiên các Bảng 1, 2, 4, 5, 6, 7, 9 và 12 làm nhóm kết quả chính; các bảng còn lại dùng để làm phong phú phần phân tích, khả năng 
+tổng quát hóa và đánh giá triển khai thực tế. 
+
