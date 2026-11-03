@@ -118,6 +118,23 @@ def test_violation_database():
     db.update_violation_status(id3, "resolved", reviewed_by="Đ/c Test")
     assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is False
 
+    # 5.5. Kiểm tra hồ sơ pending tạo cách đây 2 giờ (-2 hours) vẫn chặn trùng lặp tuyệt đối (loại bỏ cửa sổ 60p)
+    from datetime import timedelta
+    two_hours_ago = (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+    id4 = db.insert_violation(
+        camera_id="camera_04",
+        track_id=15,
+        timestamp=two_hours_ago,
+        confidence=0.90,
+        overlap_pct=85.0,
+        full_image_path="evidence/records/cam_04/old.jpg",
+        bbox=(300, 300, 400, 400)
+    )
+    old_pending_near = (305, 298, 402, 397)
+    # Vụ việc pending từ 2 giờ trước vẫn đang tồn tại -> is_duplicate_violation PHẢI trả về True
+    assert db.is_duplicate_violation("camera_04", old_pending_near) is True
+    assert db.is_duplicate_violation("camera_04", far_bbox) is False
+
     # Dọn dẹp file test db
     if os.path.exists(test_db_file):
         os.remove(test_db_file)

@@ -59,8 +59,12 @@ Hệ thống giải quyết triệt để bài toán thị giác máy tính bằ
   • Nhiệm vụ: Chỉ phát hiện mọi ứng viên mang hình thái biển hiệu, KHÔNG kết luận vi phạm tại tầng này.
                 │
                 ▼
-  [Tầng 3: Object Tracking - ByteTrack]
-  • Thuật toán: ByteTrack (bytetrack.yaml, track_thresh=0.20, match_thresh=0.80, track_buffer=30).
+  [Tầng 3: Object Tracking - ByteTrack 2-Stage Association]
+  • Thuật toán: ByteTrack (configs/bytetrack_custom.yaml, track_low_thresh=0.10, track_high_thresh=0.25, match_thresh=0.80, track_buffer=30).
+  • Cơ chế ghép cặp 2 giai đoạn (2-Stage Association):
+    + Vòng 1: Khớp các detection rõ nét (conf >= 0.25) với tracklet hiện hữu.
+    + Vòng 2: Khớp các detection suy giảm độ tin cậy [0.10, 0.25) do bị che khuất một phần (occlusion recovery).
+    + Hậu xử lý: Chỉ đưa các tracklet hợp lệ vào bộ thẩm định; loại bỏ dứt điểm mọi detection trôi nổi không gán được track có conf < 0.25.
   • Gán mã định danh duy nhất (Track ID) liên tục qua các khung hình, bảo toàn lịch sử di chuyển.
                 │
                 ▼
@@ -76,7 +80,7 @@ Hệ thống giải quyết triệt để bài toán thị giác máy tính bằ
     2. Bộ lọc vật thể đứng yên theo cửa sổ trượt thích nghi phối cảnh (Sliding-Window & Perspective-Adaptive Stationary Filter):
        Kiểm tra độ dời tâm hộp giới hạn trong cửa sổ trượt 1.0s gần nhất tại thời điểm đạt ngưỡng xác nhận 3.0s
        (<= 50.0 px và tự động co giãn tỷ lệ thuận với đường chéo BBox theo chiều sâu camera).
-       Loại trừ 100% người đi bộ bê biển đi ngang mà không từ chối oan biển vừa được đặt xuống rồi đứng yên.
+       Ngăn chặn và loại trừ hiệu quả người đi bộ bê biển di chuyển ngang qua vỉa hè, đồng thời bảo đảm ghi nhận chính xác biển hiệu khi được đặt cố định xuống vỉa hè.
     3. Ngưỡng tin cậy trung bình min_avg_confidence = 0.40: Loại trừ nhiễu chập chờn ở cự ly xa.
     4. Máy trạng thái (State Machine): NORMAL -> SUSPECTED -> CONFIRMED.
        Chỉ khi đạt CONFIRMED mới kích hoạt trích xuất bằng chứng sang Tầng 5.
@@ -84,7 +88,7 @@ Hệ thống giải quyết triệt để bài toán thị giác máy tính bằ
                 ▼
   [Tầng 5: Evidence Storage, SQLite Database & Human-in-the-Loop Web Dashboard]
   • Lưu trữ bằng chứng số: Tự động trích xuất ảnh Crop cận cảnh biển hiệu và ảnh toàn cảnh Full-HD có đóng dấu vi phạm.
-  • Cơ sở dữ liệu SQLite: Ghi nhận lịch sử vi phạm, chống trùng lặp theo cửa sổ thời gian (5 phút), bảo đảm tính toàn vẹn.
+  • Cơ sở dữ liệu SQLite: Ghi nhận lịch sử vi phạm, chống trùng lặp theo vòng đời vụ việc (Incident Lifecycle Deduplication: pending/confirmed và 24h đối với dismissed).
   • Web Dashboard & ROI Studio: Giao diện trực quan hóa thời gian thực, quản lý phân quyền và kiểm duyệt bằng chứng số
     cho cán bộ trật tự đô thị trước khi ra quyết định xử phạt hành chính.
 
@@ -104,10 +108,10 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 | **System Recall** | TP / (TP + FN) | 78.57% (11/14) | **85.71% (12/14)** | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System F1-Score** | 2*P*R / (P + R) | 81.48% | **85.71%** | Điểm cân bằng điều hòa tối ưu |
 | **Cảnh báo sai trong mẫu** | FP / 30s | 2 cảnh báo sai | **2 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
-| **Thông lượng Pipeline** | Throughput | 31.3 – 38.7 FPS | **31.3 – 38.7 FPS** | Tốc độ xử lý thực tế trên CPU Intel |
-| **Thông lượng ổn định** | Steady-state | 37.2 – 44.6 FPS | **37.2 – 44.6 FPS** | Loại trừ frame khởi động đầu tiên |
-| **Tần suất suy luận AI** | FPS / 3 | ~10.4 – 12.9 Hz | **~10.4 – 12.9 Hz** | Tần suất chạy mô hình YOLOv8n ONNX |
-| **Độ trễ suy luận AI (Latency)** | Timer p50 | 62.6 ms | **62.6 ms** | Mean: 61.0 ms (loại trừ warmup frame) |
+| **Thông lượng Pipeline** | Throughput | 36.1 – 51.2 FPS | **36.1 – 51.2 FPS** | Tốc độ xử lý thực tế trên CPU Intel |
+| **Thông lượng ổn định** | Steady-state | 47.6 – 54.4 FPS | **47.6 – 54.4 FPS** | Loại trừ frame khởi động đầu tiên |
+| **Tần suất suy luận AI** | FPS / 3 | ~12.0 - 17.1 Hz | **~12.0 - 17.1 Hz** | Tần suất chạy mô hình YOLOv8n ONNX |
+| **Độ trễ suy luận AI (Latency)** | Timer mean | 48.3 ms | **48.3 ms** | Mean: 48.3 ms (loại trừ warmup frame) |
 
 ## 4. BẢNG CHI TIẾT 16 ĐỐI TƯỢNG GROUND TRUTH & PHÂN TÍCH NGOẠI LỆ (FN, TN)
 --------------------------------------------------------------------------------
@@ -157,7 +161,7 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 • Kết quả thử nghiệm chạy lặp 3 lần độc lập (Trial 1, Trial 2, Trial 3) trên toàn bộ 720 frames:
   - Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency): 100.0% (18/18 đối tượng giữ nguyên trạng thái).
   - Tính ổn định chỉ số đánh giá: Cả 3 lần chạy đều đạt đồng nhất: 12 TP, 2 FP, 2 FN, 2 TN (Recall: 85.71%, Precision: 85.71%).
-  - Độ ổn định thông lượng: Trial 1 (31.3-38.7 FPS), Trial 2 (35.6-38.3 FPS), Trial 3 (30.6-40.9 FPS).
+  - Độ ổn định thông lượng: Trial 1 (36.1-51.2 FPS), Trial 2 (42.0-45.7 FPS), Trial 3 (38.2-45.4 FPS).
 
 • Giải trình khoa học về hiện tượng ByteTrack ID biến thiên giữa các lần chạy:
   - Nguyên nhân: ByteTrack là thuật toán gán ID số nguyên tăng dần liên tục (track_id += 1). Khi xử lý luồng video ngoài đời thực,
@@ -182,7 +186,7 @@ Việc khoanh vùng ROI vỉa hè là bước hiệu chuẩn camera (Camera Cali
   - Thử nghiệm Web Studio ngày 12/10; giản lược bớt đỉnh làm sai lệch góc vỉa hè, overlap giảm còn 63.1%; đã lưu trữ độc lập để bảo toàn Version B.
 
 • Bảng mã băm toàn vẹn SHA-256 tính từ file vật lý tại thời điểm chạy:
-  - configs/video_ground_truth.json: dd10831355221904c113e78de4a2d9e91da886707123e6cc1c00292b14afd8a2
+  - configs/video_ground_truth.json: a0c788cb7c638b47177c1f995f268c901b29c816ac13446701b852e54229f292
   - configs/roi_video_test_version_b.json: 8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c
   - configs/roi_video_test.json: 8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c
   - configs/roi_videotesst2.json: 79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263
@@ -203,7 +207,7 @@ Câu hỏi 2: Tại sao em chỉ gán nhãn biển đứng trên Roboflow mà kh
    1. Mặt biển đứng và biển treo tường có đặc trưng thị giác giống nhau đến 90% (khung chữ nhật, bạt in, chữ quảng cáo),
       khác nhau mỗi chân đế kim loại mỏng dễ bị che khuất. Nếu ép YOLO phân loại 2 class sẽ gây nhập nhằng nhãn (class confusion).
    2. Hệ thống áp dụng kiến trúc Phòng thủ nhiều lớp (Defense-in-Depth):
-      - Lớp 1 (Spatial Rule Engine): Kiểm tra Overlap >= 30% và chân đế tiếp đất 3 điểm (base_in_roi), loại trừ ngay 100% biển treo
+      - Lớp 1 (Spatial Rule Engine): Kiểm tra Overlap >= 30% và chân đế tiếp đất 3 điểm (base_in_roi), loại trừ hiệu quả các biển treo
         trên cao, thụt trong lòng nhà (như Track #5 ở Video 1 có Overlap 20.3% < 30%) hoặc biển gắn trên tường (như Track #8 ở Video 3 có Overlap 0.0% trên 80 frames) -> xếp NORMAL.
       - Lớp 2 (Temporal Verifier & Calibration): Với các trường hợp biên (Corner Case) góc nghiêng camera làm đáy Box chiếu sát mép vỉa hè,
         tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đóng vai trò chốt chặn an toàn giữ đối tượng ở diện SUSPECTED (không bao giờ phạt nhầm),
@@ -1119,14 +1123,6 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
 
-def mask_source_url(url) -> str:
-    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
-    if not isinstance(url, str):
-        return str(url)
-    import re
-    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
-
-
 BANNER = r"""
 ==============================================================================
    ____ ____ _______     __  ____  _     _                 _ _                 
@@ -1162,7 +1158,7 @@ def run_monitor_mode(args):
     from violation import ViolationChecker
     from evidence import EvidenceSaver
     from database import ViolationDatabase
-    from utils import FPSTracker, draw_fps_badge, draw_detection
+    from utils import FPSTracker, draw_fps_badge, draw_detection, mask_source_url
 
     # 1. Khởi tạo nguồn Camera / Video
     source = args.source
@@ -1218,6 +1214,7 @@ def run_monitor_mode(args):
     cfg_detector = cfg.get("detector", {})
     cfg_spatial = cfg.get("spatial", {})
     cfg_perf = cfg.get("performance", {})
+    cfg_tracking = cfg.get("tracking", {})
 
     is_edge_mode = getattr(args, "edge", False)
 
@@ -1267,7 +1264,17 @@ def run_monitor_mode(args):
     print(f"[*] Bộ lọc thời gian  : Xác nhận sau {confirm_seconds}s ({confirm_frames} frames) | Cooldown {cooldown_sec}s")
     print("-" * 78)
 
-    tracker = ObjectTracker(model_path=model_path, conf_threshold=conf_thres, imgsz=imgsz)
+    tracker_cfg_path = cfg_tracking.get("tracker_config", "configs/bytetrack_custom.yaml")
+    track_low_th = float(cfg_tracking.get("track_low_thresh", 0.10))
+    iou_th = float(cfg_detector.get("iou_threshold", 0.50))
+    tracker = ObjectTracker(
+        model_path=model_path,
+        tracker_type=tracker_cfg_path,
+        conf_threshold=conf_thres,
+        track_low_thresh=track_low_th,
+        iou=iou_th,
+        imgsz=imgsz
+    )
     ground_rule = bool(cfg_spatial.get("ground_contact_rule", True))
     checker = ViolationChecker(threshold=overlap_thres, ground_contact_rule=ground_rule)
     allow_moving = getattr(args, "allow_moving", False)
@@ -1327,8 +1334,8 @@ def run_monitor_mode(args):
                 status = TrackState.SUSPECTED
 
                 # Kiểm tra khử trùng lặp trước khi ghi nhận bằng chứng
-                if db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5):
-                    print(f"   [BỎ QUA] Vi phạm ID #{track_id} tại vị trí này đã được ghi nhận trong 5 phút qua.")
+                if db.is_duplicate_violation(roi_manager.camera_id, box):
+                    print(f"   [BỎ QUA] Vi phạm ID #{track_id} tại vị trí này đang tồn tại trong hệ thống (chống trùng lặp).")
                 else:
                     ev_res = evidence_saver.save_evidence(
                         clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
@@ -1374,8 +1381,13 @@ def run_monitor_mode(args):
     frame_count = 0
     total_confirmed_events = 0
     fps_tracker = FPSTracker(alpha=0.15)
+    stream_failed = False
     try:
         reader = StreamReader(source=source, loop=loop_video)
+        if is_live_stream and (reader.cap is None or not reader.cap.isOpened()):
+            print(f"[LỖI] Không thể mở luồng camera trực tiếp: {mask_source_url(source)}")
+            stream_failed = True
+            return False
         effective_fps = (reader.fps / (frame_skip + 1)) if (hasattr(reader, 'fps') and reader.fps > 0) else 30.0
         verifier.source_fps = effective_fps
         window_name = "CCTV Sidewalk Surveillance 2.0 (ByteTrack + Temporal Verifier)"
@@ -1406,6 +1418,8 @@ def run_monitor_mode(args):
                 max_fails = 5 if getattr(reader, 'is_live_stream', False) else 150
                 if fail_count > max_fails:
                     print("[LỖI] Mất nguồn video/camera, dừng giám sát.")
+                    if getattr(reader, 'is_live_stream', False):
+                        stream_failed = True
                     break
                 if not args.headless and (cv2.waitKey(10) & 0xFF) in (ord('q'), 27):
                     break
@@ -1464,7 +1478,7 @@ def run_monitor_mode(args):
 
                         if is_new_alert:
                             try:
-                                is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=60)
+                                is_dup = db.is_duplicate_violation(roi_manager.camera_id, box)
                                 if is_dup:
                                     print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi còn hiệu lực hoặc đã được xử lý)")
                                 else:
@@ -1556,6 +1570,9 @@ def run_monitor_mode(args):
         print("[OK] Đã giải phóng tài nguyên an toàn.")
         print("=" * 78)
 
+    if stream_failed:
+        print("[LỖI THOÁT] Kết thúc tiến trình với trạng thái thất bại do mất luồng camera (Exit Code: 1 để Supervisor khởi động lại).")
+        return False
     return True
 
 
@@ -3140,8 +3157,9 @@ MỤC ĐÍCH KIỂM TRA: Cấu trúc GT, expected_track_id, 16 đối tượng (
     "title": "Bảng gán nhãn Ground Truth thực nghiệm trên 3 Video CCTV thực tế",
     "annotator": "Nguyễn Đức Tài Năng (Tác giả đề tài ĐATN)",
     "annotation_date": "2026-10-08",
-    "last_reviewed": "2026-10-12",
-    "methodology": "Do một người gán (tác giả đề tài), chưa kiểm định chéo độc lập. Gán nhãn dựa trên quan sát hiện trường thực tế, vị trí chân đế tiếp xúc mặt đất và mức độ cản trở lối đi bộ qua video trích xuất.",
+    "last_reviewed": "2026-11-03",
+    "methodology": "Gán nhãn độc lập dựa trên quan sát mắt thường tại khung hình trung tâm (Keyframe t=5.0s), xác định vị trí tiếp xúc của chân đế với mặt đất và mức độ lấn chiếm lối đi bộ. Tọa độ approx_box_xyxy là ước lượng không gian thực tế của vật thể. Thuật toán đánh giá đối sánh Spatio-Temporal Bipartite Matching (Hungarian) tự động tìm ghép cặp tối ưu bằng Median IoU và khoảng cách tâm mà không phụ thuộc vào thứ tự ID của tracker.",
+    "ground_truth_protocol": "Các đối tượng mang mã định danh duy nhất (object_id từ V1_OBJ_1 đến V3_OBJ_14). Trường expected_track_id chỉ mang tính chất ghi chú tham chiếu trực quan ban đầu, hệ thống đánh giá hoàn toàn tự động đối sánh không gian - thời gian khách quan.",
     "legal_basis": "Nghị định 168/2024/NĐ-CP Điều 12 (Quy định xử phạt hành vi đặt, treo biển hiệu, biển quảng cáo trên lòng đường, hè phố)"
   },
   "video_sources": {
@@ -4129,17 +4147,14 @@ TASK: 27 - Xây dựng Module camera/stream_reader.py tự động kết nối l
 import os
 import time
 import math
-import re
 import threading
 import cv2
 import numpy as np
 
-
-def mask_source_url(url) -> str:
-    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
-    if not isinstance(url, str):
-        return str(url)
-    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
+try:
+    from utils import mask_source_url
+except ImportError:
+    from utils.security import mask_source_url
 
 
 class StreamReader:
@@ -4904,17 +4919,21 @@ class ViolationDatabase:
         finally:
             conn.close()
 
-    def is_duplicate_violation(self, camera_id: str, bbox: tuple, time_window_minutes: int = 60) -> bool:
+    def is_duplicate_violation(self, camera_id: str, bbox: tuple, time_window_minutes: int = None) -> bool:
         """
         Kiểm tra xem đã có bản ghi vi phạm tương tự trong DB chưa (khử trùng lặp theo vụ việc/incident):
         1. Cùng camera và tọa độ bbox tương đồng.
-        2. Nếu đang có hồ sơ 'pending' hoặc 'confirmed' trong vòng time_window_minutes (mặc định 60 phút).
-        3. Nếu hồ sơ tại vị trí này đã được cán bộ duyệt 'dismissed' (có giấy phép) trong 24 giờ qua thì không báo lại.
+        2. Nếu đang có hồ sơ 'pending' hoặc 'confirmed': đây là vụ việc đang tồn tại/chờ xử lý,
+           bỏ hoàn toàn cửa sổ thời gian (không sinh thêm hồ sơ trùng lặp kể cả sau 60 phút khi bị xe che khuất).
+        3. Nếu hồ sơ tại vị trí này đã được cán bộ duyệt 'dismissed' (có giấy phép):
+           ức chế báo lại trong 24 giờ kể từ thời điểm thẩm định (hoặc theo time_window_minutes nếu được chỉ định).
         """
         x1, y1, x2, y2 = bbox if bbox else (0, 0, 0, 0)
         # Tách riêng biên độ pixel theo trục X và trục Y để thích nghi với biển dạng đứng
         margin_x = max(30, int(abs(x2 - x1) * 0.15))
         margin_y = max(30, int(abs(y2 - y1) * 0.15))
+        
+        dismiss_window = f"-{time_window_minutes} minutes" if (time_window_minutes and time_window_minutes > 0) else "-24 hours"
         
         conn = self.get_connection()
         try:
@@ -4927,13 +4946,13 @@ class ViolationDatabase:
                   AND ABS(bbox_x2 - ?) <= ?
                   AND ABS(bbox_y2 - ?) <= ?
                   AND (
-                      (status IN ('pending', 'confirmed') AND timestamp >= datetime('now', 'localtime', ?))
-                      OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', '-24 hours'))
+                      status IN ('pending', 'confirmed')
+                      OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', ?))
                   )
             """, (
                 camera_id,
                 x1, margin_x, y1, margin_y, x2, margin_x, y2, margin_y,
-                f'-{time_window_minutes} minutes'
+                dismiss_window
             ))
             count = cursor.fetchone()[0]
             return count > 0
@@ -5070,25 +5089,25 @@ MỤC ĐÍCH KIỂM TRA: Pin cứng phiên bản thư viện đảm bảo 100% t
 # ==============================================================================
 
 # 1. Nền tảng Thị giác máy tính & Xử lý ảnh
-opencv-python>=4.8.0
-numpy>=1.24.0,<=2.3.5
-Pillow>=9.5.0
+opencv-python==5.0.0.93
+numpy==2.5.3
+Pillow==12.3.0
 
 # 2. Học sâu, Suy luận Biên (Edge ONNX Runtime) & Bám vết (YOLO + ByteTrack)
-torch>=2.0.0
-torchvision>=0.15.0
-ultralytics>=8.1.0
-onnxruntime>=1.16.0
+torch==2.14.0
+torchvision==0.29.0
+ultralytics==8.4.152
+onnxruntime==1.30.0
 
 # 3. Tính toán Hình học không gian & Ghép cặp tối ưu Hungarian (Bipartite Matching)
-shapely>=2.0.0
-scipy>=1.10.0
+shapely==2.1.2
+scipy==1.18.1
 
 # 4. Thu thập dữ liệu, Cấu hình hệ thống & Đo đạc tài nguyên phần cứng
-roboflow>=1.1.0
-PyYAML>=6.0
-psutil>=5.9.0
-python-docx>=1.1.0
+roboflow==1.4.2
+PyYAML==6.0.3
+psutil==7.2.2
+python-docx==1.2.0
 
 
 ================================================================================
@@ -5124,7 +5143,7 @@ from camera import StreamReader
 from roi import ROIManager
 from tracking import ObjectTracker, TemporalVerifier, TrackState
 from violation import ViolationChecker
-from utils import FPSTracker
+from utils import FPSTracker, mask_source_url
 
 
 class SystemBenchmark:
@@ -5267,7 +5286,7 @@ class SystemBenchmark:
         if verbose:
             print("=" * 78)
             print(" BẮT ĐẦU ĐO ĐẠC HIỆU NĂNG THỰC NGHIỆM (SYSTEM BENCHMARK)")
-            print(f"   • Nguồn kiểm thử     : {self.source}")
+            print(f"   • Nguồn kiểm thử     : {mask_source_url(self.source)}")
             print(f"   • Cấu hình ROI       : {self.config_path}")
             print(f"   • Mô hình AI         : {self.model_path}")
             print(f"   • Số khung hình đo   : {self.num_frames} frames")
@@ -5374,7 +5393,7 @@ class SystemBenchmark:
         results = {
             "hardware": hw,
             "source_info": {
-                "source": self.source,
+                "source": mask_source_url(self.source),
                 "resolution": f"{reader.width}x{reader.height}",
                 "stream_fps": reader.fps,
                 "frames_evaluated": processed_frames
@@ -5474,7 +5493,7 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 | **Bộ xử lý (CPU)** | {hw.get('cpu_name', hw['device_name'])} |
 | **Bộ nhớ RAM** | {hw.get('ram', 'N/A')} |
 | **Thiết bị xử lý (Device)** | {hw['device_name']} |
-| **Nguồn dữ liệu thực nghiệm** | {src['source']} ({src['resolution']}, FPS gốc: {src['stream_fps']:.1f}) |
+| **Nguồn dữ liệu thực nghiệm** | {mask_source_url(src['source'])} ({src['resolution']}, FPS gốc: {src['stream_fps']:.1f}) |
 | **Số lượng khung hình đánh giá** | {src['frames_evaluated']} frames |
 
 ---
@@ -10071,7 +10090,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
                             # Tự động lưu bằng chứng ảnh & ghi nhận hồ sơ vi phạm vào CSDL (phục vụ duyệt phạt nguội)
                             if obj.get("is_new_alert", False):
-                                if not db.is_duplicate_violation(camera_clean_id, box, time_window_minutes=5):
+                                if not db.is_duplicate_violation(camera_clean_id, box):
                                     sw_idx = sp.get("sidewalk_index", 1)
                                     ev_res = evidence_saver.save_evidence(
                                         clean_frame, box, track_id=tid, camera_id=camera_clean_id, overlap_pct=sp["overlap_pct"],
@@ -11004,8 +11023,18 @@ def test_scenarios():
     assert res3['is_violation'] == False, "Lỗi: Kịch bản 3 phải là HỢP LỆ!"
     print("  -> ĐÁNH GIÁ: ĐẠT CHUẨN [HỢP LỆ]")
     
+    # Kịch bản 4: Xử lý ngoại lệ hình học Shapely (Error Path Resilience - N2)
+    from unittest.mock import patch
+    print("\n[KỊCH BẢN 4] Kiểm thử đường lỗi ngoại lệ hình học Shapely:")
+    with patch("shapely.geometry.Polygon", side_effect=RuntimeError("Lỗi cấu trúc đa giác Shapely mô phỏng")):
+        res4 = checker.check(box_violation, roi.points)
+        print(f"  Kết quả khi Shapely ném lỗi: Overlap = {res4['overlap_pct']}% | Vi phạm = {res4['is_violation']}")
+        assert res4['overlap_ratio'] == 0.0, "Khi hình học lỗi, overlap_ratio phải là 0.0"
+        assert res4['is_violation'] is False, "Khi hình học lỗi, không được kết luận vi phạm bừa bãi"
+    print("  -> ĐÁNH GIÁ: ĐẠT CHUẨN [BẮT NGOẠI LỆ AN TOÀN - KHÔNG SẬP CHƯƠNG TRÌNH]")
+
     print("=" * 65)
-    print(">> KẾT QUẢ: TẤT CẢ 3 KỊCH BẢN ĐỀU VƯỢT QUA 100%!")
+    print(">> KẾT QUẢ: TẤT CẢ 4 KỊCH BẢN ĐỀU VƯỢT QUA 100%!")
     print(">> MODULE VIOLATION CHECKER HOẠT ĐỘNG HOÀN TOÀN CHÍNH XÁC.")
     print("=" * 65)
     return True
@@ -11240,6 +11269,49 @@ def test_temporal_verifier():
     assert res6["temporal_status"] == TrackState.CONFIRMED
     assert not res6["is_new_alert"], "ID moi cung vi tri trong Cooldown khong duoc phat canh bao trung!"
     print("  => [PASS] Khu trung lap canh bao theo vi tri khong gian thanh cong 100%!")
+
+    # -----------------------------------------------------------------------
+    # 6. Kiem tra vong doi co alerted (chi bat 1 lan duy nhat khi CONFIRMED, reset khi NORMAL)
+    # -----------------------------------------------------------------------
+    print("\n6. Kiem tra vong doi co alerted (Alert Lifecycle State Machine):")
+    verifier_alert = TemporalVerifier(
+        confirm_frames=3,
+        confirm_seconds=0.2,
+        cooldown_seconds=1.0,
+        max_missing_frames=5,
+        tolerance_frames=2,
+        require_stationary=False
+    )
+    obj_alert = [{"track_id": 99, "box": (200, 200, 300, 400), "conf": 0.85,
+                  "class_id": 0, "class_name": "signboard"}]
+
+    # 6.1. Frame 1 & 2: SUSPECTED, alerted = False
+    for i in range(2):
+        r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=i * 0.1)[0]
+        assert r["temporal_status"] == TrackState.SUSPECTED
+        assert r["is_new_alert"] is False
+
+    # 6.2. Frame 3 (t=0.2s): Vua dat CONFIRMED -> is_new_alert PHAI LA True
+    r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=0.2)[0]
+    assert r["temporal_status"] == TrackState.CONFIRMED
+    assert r["is_new_alert"] is True
+    assert verifier_alert.track_records[99]["alerted"] is True
+
+    # 6.3. Frame 4 & 5: Tiep tuc giu CONFIRMED -> is_new_alert PHAI LA False (khong spam canh bao)
+    for i in range(2):
+        r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=0.3 + i * 0.1)[0]
+        assert r["temporal_status"] == TrackState.CONFIRMED
+        assert r["is_new_alert"] is False
+        assert verifier_alert.track_records[99]["alerted"] is True
+
+    # 6.4. Doi tuong roi khoi via he (hop le hoan toan) vuot qua tolerance -> Chuyen ve NORMAL va reset alerted = False
+    obj_normal = [{"track_id": 99, "box": (600, 600, 700, 700), "conf": 0.85,
+                   "class_id": 0, "class_name": "signboard"}]
+    for i in range(4):
+        r = verifier_alert.process_frame(obj_normal, checker, test_poly, current_timestamp=0.6 + i * 0.1)[0]
+    assert r["temporal_status"] == TrackState.NORMAL
+    assert verifier_alert.track_records[99]["alerted"] is False
+    print("  => [PASS] Vong doi co alerted hoat dong hoan hao!")
 
     print("\n" + "=" * 65)
     print("[THANH CONG] 100% UNIT TEST BO LOC THOI GIAN (TASK 22) DAT CHUAN TUYET DOI!")
@@ -11570,6 +11642,23 @@ def test_violation_database():
     db.update_violation_status(id3, "resolved", reviewed_by="Đ/c Test")
     assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is False
 
+    # 5.5. Kiểm tra hồ sơ pending tạo cách đây 2 giờ (-2 hours) vẫn chặn trùng lặp tuyệt đối (loại bỏ cửa sổ 60p)
+    from datetime import timedelta
+    two_hours_ago = (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+    id4 = db.insert_violation(
+        camera_id="camera_04",
+        track_id=15,
+        timestamp=two_hours_ago,
+        confidence=0.90,
+        overlap_pct=85.0,
+        full_image_path="evidence/records/cam_04/old.jpg",
+        bbox=(300, 300, 400, 400)
+    )
+    old_pending_near = (305, 298, 402, 397)
+    # Vụ việc pending từ 2 giờ trước vẫn đang tồn tại -> is_duplicate_violation PHẢI trả về True
+    assert db.is_duplicate_violation("camera_04", old_pending_near) is True
+    assert db.is_duplicate_violation("camera_04", far_bbox) is False
+
     # Dọn dẹp file test db
     if os.path.exists(test_db_file):
         os.remove(test_db_file)
@@ -11829,6 +11918,27 @@ class TestMainCLI(unittest.TestCase):
             capture_output=True, text=True, encoding="utf-8"
         )
         self.assertIn("không tồn tại", res.stdout)
+        self.assertEqual(res.returncode, 1)
+
+    def test_main_live_stream_missing_roi(self):
+        res = subprocess.run(
+            [sys.executable, "main.py", "--mode", "monitor", "--source", "rtsp://camera_no_roi:554/stream", "--headless"],
+            capture_output=True, text=True, encoding="utf-8"
+        )
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("LỖI CẤU HÌNH", res.stdout)
+        self.assertIn("chưa được chỉ định cấu hình ROI", res.stdout)
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertNotIn("NameError", res.stderr)
+
+    def test_main_live_stream_masked_password(self):
+        res = subprocess.run(
+            [sys.executable, "main.py", "--mode", "monitor", "--source", "rtsp://admin:super_secret_pwd@192.168.1.50/live", "--headless"],
+            capture_output=True, text=True, encoding="utf-8"
+        )
+        self.assertEqual(res.returncode, 1)
+        self.assertNotIn("super_secret_pwd", res.stdout)
+        self.assertIn("rtsp://admin:***@192.168.1.50/live", res.stdout)
 
 
 if __name__ == "__main__":

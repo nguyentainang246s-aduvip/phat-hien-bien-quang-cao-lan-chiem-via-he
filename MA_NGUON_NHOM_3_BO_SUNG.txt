@@ -4515,7 +4515,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
                             # Tự động lưu bằng chứng ảnh & ghi nhận hồ sơ vi phạm vào CSDL (phục vụ duyệt phạt nguội)
                             if obj.get("is_new_alert", False):
-                                if not db.is_duplicate_violation(camera_clean_id, box, time_window_minutes=5):
+                                if not db.is_duplicate_violation(camera_clean_id, box):
                                     sw_idx = sp.get("sidewalk_index", 1)
                                     ev_res = evidence_saver.save_evidence(
                                         clean_frame, box, track_id=tid, camera_id=camera_clean_id, overlap_pct=sp["overlap_pct"],
@@ -5448,8 +5448,18 @@ def test_scenarios():
     assert res3['is_violation'] == False, "Lỗi: Kịch bản 3 phải là HỢP LỆ!"
     print("  -> ĐÁNH GIÁ: ĐẠT CHUẨN [HỢP LỆ]")
     
+    # Kịch bản 4: Xử lý ngoại lệ hình học Shapely (Error Path Resilience - N2)
+    from unittest.mock import patch
+    print("\n[KỊCH BẢN 4] Kiểm thử đường lỗi ngoại lệ hình học Shapely:")
+    with patch("shapely.geometry.Polygon", side_effect=RuntimeError("Lỗi cấu trúc đa giác Shapely mô phỏng")):
+        res4 = checker.check(box_violation, roi.points)
+        print(f"  Kết quả khi Shapely ném lỗi: Overlap = {res4['overlap_pct']}% | Vi phạm = {res4['is_violation']}")
+        assert res4['overlap_ratio'] == 0.0, "Khi hình học lỗi, overlap_ratio phải là 0.0"
+        assert res4['is_violation'] is False, "Khi hình học lỗi, không được kết luận vi phạm bừa bãi"
+    print("  -> ĐÁNH GIÁ: ĐẠT CHUẨN [BẮT NGOẠI LỆ AN TOÀN - KHÔNG SẬP CHƯƠNG TRÌNH]")
+
     print("=" * 65)
-    print(">> KẾT QUẢ: TẤT CẢ 3 KỊCH BẢN ĐỀU VƯỢT QUA 100%!")
+    print(">> KẾT QUẢ: TẤT CẢ 4 KỊCH BẢN ĐỀU VƯỢT QUA 100%!")
     print(">> MODULE VIOLATION CHECKER HOẠT ĐỘNG HOÀN TOÀN CHÍNH XÁC.")
     print("=" * 65)
     return True
@@ -5684,6 +5694,49 @@ def test_temporal_verifier():
     assert res6["temporal_status"] == TrackState.CONFIRMED
     assert not res6["is_new_alert"], "ID moi cung vi tri trong Cooldown khong duoc phat canh bao trung!"
     print("  => [PASS] Khu trung lap canh bao theo vi tri khong gian thanh cong 100%!")
+
+    # -----------------------------------------------------------------------
+    # 6. Kiem tra vong doi co alerted (chi bat 1 lan duy nhat khi CONFIRMED, reset khi NORMAL)
+    # -----------------------------------------------------------------------
+    print("\n6. Kiem tra vong doi co alerted (Alert Lifecycle State Machine):")
+    verifier_alert = TemporalVerifier(
+        confirm_frames=3,
+        confirm_seconds=0.2,
+        cooldown_seconds=1.0,
+        max_missing_frames=5,
+        tolerance_frames=2,
+        require_stationary=False
+    )
+    obj_alert = [{"track_id": 99, "box": (200, 200, 300, 400), "conf": 0.85,
+                  "class_id": 0, "class_name": "signboard"}]
+
+    # 6.1. Frame 1 & 2: SUSPECTED, alerted = False
+    for i in range(2):
+        r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=i * 0.1)[0]
+        assert r["temporal_status"] == TrackState.SUSPECTED
+        assert r["is_new_alert"] is False
+
+    # 6.2. Frame 3 (t=0.2s): Vua dat CONFIRMED -> is_new_alert PHAI LA True
+    r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=0.2)[0]
+    assert r["temporal_status"] == TrackState.CONFIRMED
+    assert r["is_new_alert"] is True
+    assert verifier_alert.track_records[99]["alerted"] is True
+
+    # 6.3. Frame 4 & 5: Tiep tuc giu CONFIRMED -> is_new_alert PHAI LA False (khong spam canh bao)
+    for i in range(2):
+        r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=0.3 + i * 0.1)[0]
+        assert r["temporal_status"] == TrackState.CONFIRMED
+        assert r["is_new_alert"] is False
+        assert verifier_alert.track_records[99]["alerted"] is True
+
+    # 6.4. Doi tuong roi khoi via he (hop le hoan toan) vuot qua tolerance -> Chuyen ve NORMAL va reset alerted = False
+    obj_normal = [{"track_id": 99, "box": (600, 600, 700, 700), "conf": 0.85,
+                   "class_id": 0, "class_name": "signboard"}]
+    for i in range(4):
+        r = verifier_alert.process_frame(obj_normal, checker, test_poly, current_timestamp=0.6 + i * 0.1)[0]
+    assert r["temporal_status"] == TrackState.NORMAL
+    assert verifier_alert.track_records[99]["alerted"] is False
+    print("  => [PASS] Vong doi co alerted hoat dong hoan hao!")
 
     print("\n" + "=" * 65)
     print("[THANH CONG] 100% UNIT TEST BO LOC THOI GIAN (TASK 22) DAT CHUAN TUYET DOI!")
@@ -6014,6 +6067,23 @@ def test_violation_database():
     db.update_violation_status(id3, "resolved", reviewed_by="Đ/c Test")
     assert db.is_duplicate_violation("camera_03", near_bbox, time_window_minutes=60) is False
 
+    # 5.5. Kiểm tra hồ sơ pending tạo cách đây 2 giờ (-2 hours) vẫn chặn trùng lặp tuyệt đối (loại bỏ cửa sổ 60p)
+    from datetime import timedelta
+    two_hours_ago = (datetime.now() - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+    id4 = db.insert_violation(
+        camera_id="camera_04",
+        track_id=15,
+        timestamp=two_hours_ago,
+        confidence=0.90,
+        overlap_pct=85.0,
+        full_image_path="evidence/records/cam_04/old.jpg",
+        bbox=(300, 300, 400, 400)
+    )
+    old_pending_near = (305, 298, 402, 397)
+    # Vụ việc pending từ 2 giờ trước vẫn đang tồn tại -> is_duplicate_violation PHẢI trả về True
+    assert db.is_duplicate_violation("camera_04", old_pending_near) is True
+    assert db.is_duplicate_violation("camera_04", far_bbox) is False
+
     # Dọn dẹp file test db
     if os.path.exists(test_db_file):
         os.remove(test_db_file)
@@ -6273,6 +6343,27 @@ class TestMainCLI(unittest.TestCase):
             capture_output=True, text=True, encoding="utf-8"
         )
         self.assertIn("không tồn tại", res.stdout)
+        self.assertEqual(res.returncode, 1)
+
+    def test_main_live_stream_missing_roi(self):
+        res = subprocess.run(
+            [sys.executable, "main.py", "--mode", "monitor", "--source", "rtsp://camera_no_roi:554/stream", "--headless"],
+            capture_output=True, text=True, encoding="utf-8"
+        )
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("LỖI CẤU HÌNH", res.stdout)
+        self.assertIn("chưa được chỉ định cấu hình ROI", res.stdout)
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertNotIn("NameError", res.stderr)
+
+    def test_main_live_stream_masked_password(self):
+        res = subprocess.run(
+            [sys.executable, "main.py", "--mode", "monitor", "--source", "rtsp://admin:super_secret_pwd@192.168.1.50/live", "--headless"],
+            capture_output=True, text=True, encoding="utf-8"
+        )
+        self.assertEqual(res.returncode, 1)
+        self.assertNotIn("super_secret_pwd", res.stdout)
+        self.assertIn("rtsp://admin:***@192.168.1.50/live", res.stdout)
 
 
 if __name__ == "__main__":

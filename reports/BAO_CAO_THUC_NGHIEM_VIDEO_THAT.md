@@ -1,6 +1,6 @@
 # BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TOÀN HỆ THỐNG TRÊN VIDEO THỰC TẾ (SYSTEM-LEVEL METRICS)
 
-> **Thời gian chạy kiểm thử:** 2026-11-03 15:57:42  
+> **Thời gian chạy kiểm thử:** 2026-11-03 16:18:32  
 > **Người thực hiện:** Nguyễn Đức Tài Năng (ĐATN 20224083)  
 > **Cơ chế đo đạc:** Chạy tự động từ `evaluation/evaluate_videos.py`, đối chiếu với `configs/video_ground_truth.json` và trích xuất `reports/system_eval_results.json`.
 
@@ -22,8 +22,8 @@
 ## 2. Kết Quả Chi Tiết Từng Video Thực Địa
 
 ### Video: `data/videos/video test.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **34.0 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 50.03 ms (p50: 42.22 ms, p95: 79.23 ms); Verifier Mean = 1.87 ms; Tổng khung hình infer = 54.82 ms (Frame khởi động: 2201.72 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **36.1 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 45.43 ms (p50: 41.36 ms, p95: 69.09 ms); Verifier Mean = 1.85 ms; Tổng khung hình infer = 50.17 ms (Frame khởi động: 2199.42 ms)
 * **Kết quả:** **4 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -38,8 +38,8 @@
 ---
 
 ### Video: `data/videos/videotesst2.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **44.4 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 55.17 ms (p50: 47.05 ms, p95: 91.57 ms); Verifier Mean = 1.26 ms; Tổng khung hình infer = 59.79 ms (Frame khởi động: 201.06 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **51.2 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 47.32 ms (p50: 43.16 ms, p95: 73.17 ms); Verifier Mean = 1.23 ms; Tổng khung hình infer = 51.57 ms (Frame khởi động: 183.21 ms)
 * **Kết quả:** **3 Vi phạm (Confirmed)** | **1 Nghi vấn (Suspected)** | **0 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -52,8 +52,8 @@
 ---
 
 ### Video: `data/videos/video test3.mp4`
-* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **37.6 FPS**
-* **Phân tích độ trễ:** AI+Tracker Mean = 66.27 ms (p50: 57.19 ms, p95: 117.72 ms); Verifier Mean = 2.71 ms; Tổng khung hình infer = 72.16 ms (Frame khởi động: 157.45 ms)
+* **Độ dài:** 240 frames (10.0 giây) &bull; **Tốc độ thông lượng:** **45.7 FPS**
+* **Phân tích độ trễ:** AI+Tracker Mean = 52.17 ms (p50: 45.76 ms, p95: 76.16 ms); Verifier Mean = 2.70 ms; Tổng khung hình infer = 57.92 ms (Frame khởi động: 185.12 ms)
 * **Kết quả:** **7 Vi phạm (Confirmed)** | **2 Nghi vấn (Suspected)** | **1 Hợp lệ (Normal)**
 
 | Track ID | Số frames | Độ tin cậy TB | % Lấn chiếm TB | Kết luận Hệ thống | File ảnh Crop |
@@ -120,9 +120,9 @@
 | **System Recall** | $\frac{TP}{TP + FN}$ | 78.57% (11/14) | **85.71%** (12/14) | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System F1-Score** | $2 \cdot \frac{P \cdot R}{P + R}$ | 81.48% | **85.71%** | Cân bằng điều hòa tối ưu |
 | **Cảnh báo sai trong mẫu** | FP / 30s | 2 cảnh báo sai | **2 cảnh báo sai / 30s** | Không ngoại suy ra giờ trên mẫu 30s |
-| **Thông lượng Pipeline** | Throughput | 34.0 – 44.4 FPS | **34.0 – 44.4 FPS** | Ổn định: 38.6 – 49.8 FPS |
-| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~11.3 – 14.8 Hz | **~11.3 – 14.8 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
-| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 55.2 ms | **55.2 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 57.2 ms; loại trừ frame khởi động) |
+| **Thông lượng Pipeline** | Throughput | 36.1 – 51.2 FPS | **36.1 – 51.2 FPS** | Ổn định: 47.6 – 54.4 FPS |
+| **Tần suất suy luận ước tính** | Thông lượng / 3 | ~12.0 – 17.1 Hz | **~12.0 – 17.1 Hz** | Tần suất chạy mô hình AI trên CPU AVX2 |
+| **Độ trễ suy luận AI (Latency)** | Timer đo trực tiếp (p50) | 47.3 ms | **47.3 ms** | Trung vị thời gian infer YOLOv8n ONNX (Mean: 48.3 ms; loại trừ frame khởi động) |
 
 ---
 
@@ -159,7 +159,7 @@ Nhằm trả lời chất vấn của Hội đồng về tính ổn định và 
 
 * **Tỷ lệ nhất quán phán quyết pháp lý (Classification Consistency):** **100.0% (18/18 đối tượng)**
 * **Tính ổn định của chỉ số đánh giá (System Metrics Consistency):** Cả 3 lần chạy đều đạt đồng nhất **12 TP, 2 FP, 2 FN, 2 TN** (Recall: 85.71%, Precision: 85.71%).
-* **Độ ổn định thông lượng xử lý:** Trial 1: 34.0–44.4 FPS (Ổn định 38.6–49.8 FPS), Trial 2: 31.8–37.4 FPS (Ổn định 32.7–38.5 FPS), Trial 3: 37.4–39.7 FPS (Ổn định 38.3–40.9 FPS).
+* **Độ ổn định thông lượng xử lý:** Trial 1: 36.1–51.2 FPS (Ổn định 47.6–54.4 FPS), Trial 2: 42.0–45.7 FPS (Ổn định 43.5–47.4 FPS), Trial 3: 38.2–45.4 FPS (Ổn định 39.4–46.8 FPS).
 
 ---
 
@@ -186,4 +186,4 @@ Toàn bộ ảnh chụp cận cảnh biển hiệu vi phạm được lưu trữ
 ### Các file cấu hình chuẩn hóa khác:
 * **ROI Video 2:** `configs/roi_videotesst2.json` (5 đỉnh) - SHA-256: `79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263`
 * **ROI Video 3:** `configs/roi_video_test3.json` (7 đỉnh) - SHA-256: `529ee774742c5d8b5f6a7730dec484f85f0a72755f323e3f9e626b5ae00b9fd9`
-* **Ground Truth:** `configs/video_ground_truth.json` (16 đối tượng kiểm thử) - SHA-256: `dd10831355221904c113e78de4a2d9e91da886707123e6cc1c00292b14afd8a2`
+* **Ground Truth:** `configs/video_ground_truth.json` (16 đối tượng kiểm thử) - SHA-256: `a0c788cb7c638b47177c1f995f268c901b29c816ac13446701b852e54229f292`

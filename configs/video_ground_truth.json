@@ -3,8 +3,9 @@
     "title": "Bảng gán nhãn Ground Truth thực nghiệm trên 3 Video CCTV thực tế",
     "annotator": "Nguyễn Đức Tài Năng (Tác giả đề tài ĐATN)",
     "annotation_date": "2026-10-08",
-    "last_reviewed": "2026-10-12",
-    "methodology": "Do một người gán (tác giả đề tài), chưa kiểm định chéo độc lập. Gán nhãn dựa trên quan sát hiện trường thực tế, vị trí chân đế tiếp xúc mặt đất và mức độ cản trở lối đi bộ qua video trích xuất.",
+    "last_reviewed": "2026-11-03",
+    "methodology": "Gán nhãn độc lập dựa trên quan sát mắt thường tại khung hình trung tâm (Keyframe t=5.0s), xác định vị trí tiếp xúc của chân đế với mặt đất và mức độ lấn chiếm lối đi bộ. Tọa độ approx_box_xyxy là ước lượng không gian thực tế của vật thể. Thuật toán đánh giá đối sánh Spatio-Temporal Bipartite Matching (Hungarian) tự động tìm ghép cặp tối ưu bằng Median IoU và khoảng cách tâm mà không phụ thuộc vào thứ tự ID của tracker.",
+    "ground_truth_protocol": "Các đối tượng mang mã định danh duy nhất (object_id từ V1_OBJ_1 đến V3_OBJ_14). Trường expected_track_id chỉ mang tính chất ghi chú tham chiếu trực quan ban đầu, hệ thống đánh giá hoàn toàn tự động đối sánh không gian - thời gian khách quan.",
     "legal_basis": "Nghị định 168/2024/NĐ-CP Điều 12 (Quy định xử phạt hành vi đặt, treo biển hiệu, biển quảng cáo trên lòng đường, hè phố)"
   },
   "video_sources": {

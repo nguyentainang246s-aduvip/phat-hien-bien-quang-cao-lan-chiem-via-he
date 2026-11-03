@@ -219,6 +219,49 @@ def test_temporal_verifier():
     assert not res6["is_new_alert"], "ID moi cung vi tri trong Cooldown khong duoc phat canh bao trung!"
     print("  => [PASS] Khu trung lap canh bao theo vi tri khong gian thanh cong 100%!")
 
+    # -----------------------------------------------------------------------
+    # 6. Kiem tra vong doi co alerted (chi bat 1 lan duy nhat khi CONFIRMED, reset khi NORMAL)
+    # -----------------------------------------------------------------------
+    print("\n6. Kiem tra vong doi co alerted (Alert Lifecycle State Machine):")
+    verifier_alert = TemporalVerifier(
+        confirm_frames=3,
+        confirm_seconds=0.2,
+        cooldown_seconds=1.0,
+        max_missing_frames=5,
+        tolerance_frames=2,
+        require_stationary=False
+    )
+    obj_alert = [{"track_id": 99, "box": (200, 200, 300, 400), "conf": 0.85,
+                  "class_id": 0, "class_name": "signboard"}]
+
+    # 6.1. Frame 1 & 2: SUSPECTED, alerted = False
+    for i in range(2):
+        r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=i * 0.1)[0]
+        assert r["temporal_status"] == TrackState.SUSPECTED
+        assert r["is_new_alert"] is False
+
+    # 6.2. Frame 3 (t=0.2s): Vua dat CONFIRMED -> is_new_alert PHAI LA True
+    r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=0.2)[0]
+    assert r["temporal_status"] == TrackState.CONFIRMED
+    assert r["is_new_alert"] is True
+    assert verifier_alert.track_records[99]["alerted"] is True
+
+    # 6.3. Frame 4 & 5: Tiep tuc giu CONFIRMED -> is_new_alert PHAI LA False (khong spam canh bao)
+    for i in range(2):
+        r = verifier_alert.process_frame(obj_alert, checker, test_poly, current_timestamp=0.3 + i * 0.1)[0]
+        assert r["temporal_status"] == TrackState.CONFIRMED
+        assert r["is_new_alert"] is False
+        assert verifier_alert.track_records[99]["alerted"] is True
+
+    # 6.4. Doi tuong roi khoi via he (hop le hoan toan) vuot qua tolerance -> Chuyen ve NORMAL va reset alerted = False
+    obj_normal = [{"track_id": 99, "box": (600, 600, 700, 700), "conf": 0.85,
+                   "class_id": 0, "class_name": "signboard"}]
+    for i in range(4):
+        r = verifier_alert.process_frame(obj_normal, checker, test_poly, current_timestamp=0.6 + i * 0.1)[0]
+    assert r["temporal_status"] == TrackState.NORMAL
+    assert verifier_alert.track_records[99]["alerted"] is False
+    print("  => [PASS] Vong doi co alerted hoat dong hoan hao!")
+
     print("\n" + "=" * 65)
     print("[THANH CONG] 100% UNIT TEST BO LOC THOI GIAN (TASK 22) DAT CHUAN TUYET DOI!")
     print("=" * 65)

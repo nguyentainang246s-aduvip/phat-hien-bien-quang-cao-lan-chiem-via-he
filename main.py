@@ -37,14 +37,6 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
 
-def mask_source_url(url) -> str:
-    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
-    if not isinstance(url, str):
-        return str(url)
-    import re
-    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
-
-
 BANNER = r"""
 ==============================================================================
    ____ ____ _______     __  ____  _     _                 _ _                 
@@ -80,7 +72,7 @@ def run_monitor_mode(args):
     from violation import ViolationChecker
     from evidence import EvidenceSaver
     from database import ViolationDatabase
-    from utils import FPSTracker, draw_fps_badge, draw_detection
+    from utils import FPSTracker, draw_fps_badge, draw_detection, mask_source_url
 
     # 1. Khởi tạo nguồn Camera / Video
     source = args.source
@@ -136,6 +128,7 @@ def run_monitor_mode(args):
     cfg_detector = cfg.get("detector", {})
     cfg_spatial = cfg.get("spatial", {})
     cfg_perf = cfg.get("performance", {})
+    cfg_tracking = cfg.get("tracking", {})
 
     is_edge_mode = getattr(args, "edge", False)
 
@@ -185,7 +178,17 @@ def run_monitor_mode(args):
     print(f"[*] Bộ lọc thời gian  : Xác nhận sau {confirm_seconds}s ({confirm_frames} frames) | Cooldown {cooldown_sec}s")
     print("-" * 78)
 
-    tracker = ObjectTracker(model_path=model_path, conf_threshold=conf_thres, imgsz=imgsz)
+    tracker_cfg_path = cfg_tracking.get("tracker_config", "configs/bytetrack_custom.yaml")
+    track_low_th = float(cfg_tracking.get("track_low_thresh", 0.10))
+    iou_th = float(cfg_detector.get("iou_threshold", 0.50))
+    tracker = ObjectTracker(
+        model_path=model_path,
+        tracker_type=tracker_cfg_path,
+        conf_threshold=conf_thres,
+        track_low_thresh=track_low_th,
+        iou=iou_th,
+        imgsz=imgsz
+    )
     ground_rule = bool(cfg_spatial.get("ground_contact_rule", True))
     checker = ViolationChecker(threshold=overlap_thres, ground_contact_rule=ground_rule)
     allow_moving = getattr(args, "allow_moving", False)
@@ -245,8 +248,8 @@ def run_monitor_mode(args):
                 status = TrackState.SUSPECTED
 
                 # Kiểm tra khử trùng lặp trước khi ghi nhận bằng chứng
-                if db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=5):
-                    print(f"   [BỎ QUA] Vi phạm ID #{track_id} tại vị trí này đã được ghi nhận trong 5 phút qua.")
+                if db.is_duplicate_violation(roi_manager.camera_id, box):
+                    print(f"   [BỎ QUA] Vi phạm ID #{track_id} tại vị trí này đang tồn tại trong hệ thống (chống trùng lặp).")
                 else:
                     ev_res = evidence_saver.save_evidence(
                         clean_frame, box, track_id=track_id, camera_id=roi_manager.camera_id, overlap_pct=sp['overlap_pct'],
@@ -292,8 +295,13 @@ def run_monitor_mode(args):
     frame_count = 0
     total_confirmed_events = 0
     fps_tracker = FPSTracker(alpha=0.15)
+    stream_failed = False
     try:
         reader = StreamReader(source=source, loop=loop_video)
+        if is_live_stream and (reader.cap is None or not reader.cap.isOpened()):
+            print(f"[LỖI] Không thể mở luồng camera trực tiếp: {mask_source_url(source)}")
+            stream_failed = True
+            return False
         effective_fps = (reader.fps / (frame_skip + 1)) if (hasattr(reader, 'fps') and reader.fps > 0) else 30.0
         verifier.source_fps = effective_fps
         window_name = "CCTV Sidewalk Surveillance 2.0 (ByteTrack + Temporal Verifier)"
@@ -324,6 +332,8 @@ def run_monitor_mode(args):
                 max_fails = 5 if getattr(reader, 'is_live_stream', False) else 150
                 if fail_count > max_fails:
                     print("[LỖI] Mất nguồn video/camera, dừng giám sát.")
+                    if getattr(reader, 'is_live_stream', False):
+                        stream_failed = True
                     break
                 if not args.headless and (cv2.waitKey(10) & 0xFF) in (ord('q'), 27):
                     break
@@ -382,7 +392,7 @@ def run_monitor_mode(args):
 
                         if is_new_alert:
                             try:
-                                is_dup = db.is_duplicate_violation(roi_manager.camera_id, box, time_window_minutes=60)
+                                is_dup = db.is_duplicate_violation(roi_manager.camera_id, box)
                                 if is_dup:
                                     print(f"[DEDUP] Bỏ qua vi phạm trùng lặp ID #{track_id} (đã có bản ghi còn hiệu lực hoặc đã được xử lý)")
                                 else:
@@ -474,6 +484,9 @@ def run_monitor_mode(args):
         print("[OK] Đã giải phóng tài nguyên an toàn.")
         print("=" * 78)
 
+    if stream_failed:
+        print("[LỖI THOÁT] Kết thúc tiến trình với trạng thái thất bại do mất luồng camera (Exit Code: 1 để Supervisor khởi động lại).")
+        return False
     return True
 
 

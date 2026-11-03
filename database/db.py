@@ -129,17 +129,21 @@ class ViolationDatabase:
         finally:
             conn.close()
 
-    def is_duplicate_violation(self, camera_id: str, bbox: tuple, time_window_minutes: int = 60) -> bool:
+    def is_duplicate_violation(self, camera_id: str, bbox: tuple, time_window_minutes: int = None) -> bool:
         """
         Kiểm tra xem đã có bản ghi vi phạm tương tự trong DB chưa (khử trùng lặp theo vụ việc/incident):
         1. Cùng camera và tọa độ bbox tương đồng.
-        2. Nếu đang có hồ sơ 'pending' hoặc 'confirmed' trong vòng time_window_minutes (mặc định 60 phút).
-        3. Nếu hồ sơ tại vị trí này đã được cán bộ duyệt 'dismissed' (có giấy phép) trong 24 giờ qua thì không báo lại.
+        2. Nếu đang có hồ sơ 'pending' hoặc 'confirmed': đây là vụ việc đang tồn tại/chờ xử lý,
+           bỏ hoàn toàn cửa sổ thời gian (không sinh thêm hồ sơ trùng lặp kể cả sau 60 phút khi bị xe che khuất).
+        3. Nếu hồ sơ tại vị trí này đã được cán bộ duyệt 'dismissed' (có giấy phép):
+           ức chế báo lại trong 24 giờ kể từ thời điểm thẩm định (hoặc theo time_window_minutes nếu được chỉ định).
         """
         x1, y1, x2, y2 = bbox if bbox else (0, 0, 0, 0)
         # Tách riêng biên độ pixel theo trục X và trục Y để thích nghi với biển dạng đứng
         margin_x = max(30, int(abs(x2 - x1) * 0.15))
         margin_y = max(30, int(abs(y2 - y1) * 0.15))
+        
+        dismiss_window = f"-{time_window_minutes} minutes" if (time_window_minutes and time_window_minutes > 0) else "-24 hours"
         
         conn = self.get_connection()
         try:
@@ -152,13 +156,13 @@ class ViolationDatabase:
                   AND ABS(bbox_x2 - ?) <= ?
                   AND ABS(bbox_y2 - ?) <= ?
                   AND (
-                      (status IN ('pending', 'confirmed') AND timestamp >= datetime('now', 'localtime', ?))
-                      OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', '-24 hours'))
+                      status IN ('pending', 'confirmed')
+                      OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', ?))
                   )
             """, (
                 camera_id,
                 x1, margin_x, y1, margin_y, x2, margin_x, y2, margin_y,
-                f'-{time_window_minutes} minutes'
+                dismiss_window
             ))
             count = cursor.fetchone()[0]
             return count > 0

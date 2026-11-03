@@ -26,7 +26,7 @@ from camera import StreamReader
 from roi import ROIManager
 from tracking import ObjectTracker, TemporalVerifier, TrackState
 from violation import ViolationChecker
-from utils import FPSTracker
+from utils import FPSTracker, mask_source_url
 
 
 class SystemBenchmark:
@@ -169,7 +169,7 @@ class SystemBenchmark:
         if verbose:
             print("=" * 78)
             print(" BẮT ĐẦU ĐO ĐẠC HIỆU NĂNG THỰC NGHIỆM (SYSTEM BENCHMARK)")
-            print(f"   • Nguồn kiểm thử     : {self.source}")
+            print(f"   • Nguồn kiểm thử     : {mask_source_url(self.source)}")
             print(f"   • Cấu hình ROI       : {self.config_path}")
             print(f"   • Mô hình AI         : {self.model_path}")
             print(f"   • Số khung hình đo   : {self.num_frames} frames")
@@ -276,7 +276,7 @@ class SystemBenchmark:
         results = {
             "hardware": hw,
             "source_info": {
-                "source": self.source,
+                "source": mask_source_url(self.source),
                 "resolution": f"{reader.width}x{reader.height}",
                 "stream_fps": reader.fps,
                 "frames_evaluated": processed_frames
@@ -376,7 +376,7 @@ Hệ thống được kiểm thử và đánh giá hiệu năng thực tế trê
 | **Bộ xử lý (CPU)** | {hw.get('cpu_name', hw['device_name'])} |
 | **Bộ nhớ RAM** | {hw.get('ram', 'N/A')} |
 | **Thiết bị xử lý (Device)** | {hw['device_name']} |
-| **Nguồn dữ liệu thực nghiệm** | {src['source']} ({src['resolution']}, FPS gốc: {src['stream_fps']:.1f}) |
+| **Nguồn dữ liệu thực nghiệm** | {mask_source_url(src['source'])} ({src['resolution']}, FPS gốc: {src['stream_fps']:.1f}) |
 | **Số lượng khung hình đánh giá** | {src['frames_evaluated']} frames |
 
 ---

@@ -9,17 +9,14 @@ TASK: 27 - Xây dựng Module camera/stream_reader.py tự động kết nối l
 import os
 import time
 import math
-import re
 import threading
 import cv2
 import numpy as np
 
-
-def mask_source_url(url) -> str:
-    """Che mật khẩu trong URL RTSP/HTTP để chống lộ thông tin đăng nhập trong log."""
-    if not isinstance(url, str):
-        return str(url)
-    return re.sub(r'://([^:]+):([^@]+)@', r'://\1:***@', url)
+try:
+    from utils import mask_source_url
+except ImportError:
+    from utils.security import mask_source_url
 
 
 class StreamReader:

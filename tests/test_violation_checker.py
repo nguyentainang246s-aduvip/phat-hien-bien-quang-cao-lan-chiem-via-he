@@ -46,8 +46,18 @@ def test_scenarios():
     assert res3['is_violation'] == False, "Lỗi: Kịch bản 3 phải là HỢP LỆ!"
     print("  -> ĐÁNH GIÁ: ĐẠT CHUẨN [HỢP LỆ]")
     
+    # Kịch bản 4: Xử lý ngoại lệ hình học Shapely (Error Path Resilience - N2)
+    from unittest.mock import patch
+    print("\n[KỊCH BẢN 4] Kiểm thử đường lỗi ngoại lệ hình học Shapely:")
+    with patch("shapely.geometry.Polygon", side_effect=RuntimeError("Lỗi cấu trúc đa giác Shapely mô phỏng")):
+        res4 = checker.check(box_violation, roi.points)
+        print(f"  Kết quả khi Shapely ném lỗi: Overlap = {res4['overlap_pct']}% | Vi phạm = {res4['is_violation']}")
+        assert res4['overlap_ratio'] == 0.0, "Khi hình học lỗi, overlap_ratio phải là 0.0"
+        assert res4['is_violation'] is False, "Khi hình học lỗi, không được kết luận vi phạm bừa bãi"
+    print("  -> ĐÁNH GIÁ: ĐẠT CHUẨN [BẮT NGOẠI LỆ AN TOÀN - KHÔNG SẬP CHƯƠNG TRÌNH]")
+
     print("=" * 65)
-    print(">> KẾT QUẢ: TẤT CẢ 3 KỊCH BẢN ĐỀU VƯỢT QUA 100%!")
+    print(">> KẾT QUẢ: TẤT CẢ 4 KỊCH BẢN ĐỀU VƯỢT QUA 100%!")
     print(">> MODULE VIOLATION CHECKER HOẠT ĐỘNG HOÀN TOÀN CHÍNH XÁC.")
     print("=" * 65)
     return True

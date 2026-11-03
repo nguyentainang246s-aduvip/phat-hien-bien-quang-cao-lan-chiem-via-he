@@ -51,6 +51,27 @@ class TestMainCLI(unittest.TestCase):
             capture_output=True, text=True, encoding="utf-8"
         )
         self.assertIn("không tồn tại", res.stdout)
+        self.assertEqual(res.returncode, 1)
+
+    def test_main_live_stream_missing_roi(self):
+        res = subprocess.run(
+            [sys.executable, "main.py", "--mode", "monitor", "--source", "rtsp://camera_no_roi:554/stream", "--headless"],
+            capture_output=True, text=True, encoding="utf-8"
+        )
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("LỖI CẤU HÌNH", res.stdout)
+        self.assertIn("chưa được chỉ định cấu hình ROI", res.stdout)
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertNotIn("NameError", res.stderr)
+
+    def test_main_live_stream_masked_password(self):
+        res = subprocess.run(
+            [sys.executable, "main.py", "--mode", "monitor", "--source", "rtsp://admin:super_secret_pwd@192.168.1.50/live", "--headless"],
+            capture_output=True, text=True, encoding="utf-8"
+        )
+        self.assertEqual(res.returncode, 1)
+        self.assertNotIn("super_secret_pwd", res.stdout)
+        self.assertIn("rtsp://admin:***@192.168.1.50/live", res.stdout)
 
 
 if __name__ == "__main__":
