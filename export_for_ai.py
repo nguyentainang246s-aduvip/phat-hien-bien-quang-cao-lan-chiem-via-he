@@ -34,6 +34,7 @@ EXCLUDE_DIRS = {
     "scratch",
     ".pytest_cache",
     "labels",  # Bỏ qua 900+ file nhãn tọa độ YOLO để giữ file tinh gọn, chỉ giữ code & data.yaml
+    ".agents", # Bỏ qua thư mục skill agent mở rộng để giữ bản xuất tinh gọn
 }
 
 OUTPUT_FILE = "FULL_PROJECT_REVIEW.txt"

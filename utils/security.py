@@ -36,3 +36,4 @@ def mask_source_url(url) -> str:
 
     # Fallback bằng regex tham lam (greedy match tới ký tự '@' cuối cùng trước host/path)
     return re.sub(r'(://[^:/@]+):.*@', r'\1:***@', url)
+
