@@ -18,27 +18,35 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = "bytetrack.yaml", imgsz: int = 640, allowed_classes: list = None):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = None, imgsz: int = 640, allowed_classes: list = None, iou: float = 0.50, device: str = None):
         """
         Khởi tạo ObjectTracker.
         
         Args:
             model_path: Đường dẫn file trọng số YOLO (vd: 'models/best.pt', 'models/best.onnx')
             conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.25 = 25% theo chuẩn đánh giá hệ thống)
-            tracker_type: File cấu hình tracker ('bytetrack.yaml' hoặc 'botsort.yaml')
+            tracker_type: File cấu hình tracker ('configs/bytetrack_custom.yaml', 'bytetrack.yaml' hoặc 'botsort.yaml')
             imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
             allowed_classes: Danh sách class_id hoặc tên class được phép bám vết (None = tất cả)
+            iou: Ngưỡng NMS IoU (mặc định 0.50)
+            device: Thiết bị chạy suy luận ('cpu' hoặc 'cuda:0')
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
-        self.tracker_type = tracker_type
+        if tracker_type is None:
+            custom_cfg = "configs/bytetrack_custom.yaml"
+            self.tracker_type = custom_cfg if os.path.exists(custom_cfg) else "bytetrack.yaml"
+        else:
+            self.tracker_type = tracker_type
         self.imgsz = imgsz
         self.allowed_classes = allowed_classes
+        self.iou = iou
+        self.device = device
         
         if not os.path.exists(model_path) and not model_path.endswith("yolov8n.pt"):
             raise FileNotFoundError(f"Không tìm thấy file trọng số mô hình: {model_path}")
             
-        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {tracker_type} (Conf: {conf_threshold}, Imgsz: {imgsz})")
+        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {self.tracker_type} (Conf: {conf_threshold}, Imgsz: {imgsz}, NMS IoU: {iou})")
         self.model = YOLO(model_path)
         self.class_names = self.model.names
 
@@ -72,8 +80,11 @@ class ObjectTracker:
             "tracker": self.tracker_type,
             "conf": target_conf,
             "imgsz": target_imgsz,
+            "iou": self.iou,
             "verbose": False
         }
+        if self.device:
+            track_kwargs["device"] = self.device
         if self.allowed_classes is not None and all(isinstance(c, int) for c in self.allowed_classes):
             track_kwargs["classes"] = self.allowed_classes
 

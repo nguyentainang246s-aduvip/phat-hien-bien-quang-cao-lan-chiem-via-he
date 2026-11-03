@@ -600,12 +600,14 @@ def evaluate_single_video(
         min_avg_confidence=min_avg_conf,
         require_stationary=temp_cfg.get("require_stationary", True),
         max_displacement_pixels=max_disp,
+        min_stationary_seconds=temp_cfg.get("min_stationary_seconds", 2.0),
         spatial_cooldown_radius=spatial_cooldown_rad,
     )
 
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
+    raw_fps = cap.get(cv2.CAP_PROP_FPS)
+    fps = float(raw_fps) if (raw_fps and 5.0 <= raw_fps <= 120.0 and not np.isnan(raw_fps)) else 24.0
     verifier.source_fps = fps / (frame_skip + 1) if frame_skip > 0 else fps
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -1765,27 +1767,35 @@ class ObjectTracker:
     Nhiệm vụ: Gán và duy trì một mã định danh duy nhất (track_id: 1, 2, 3...)
     cho từng biển hiệu xuyên suốt các khung hình video theo thời gian.
     """
-    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = "bytetrack.yaml", imgsz: int = 640, allowed_classes: list = None):
+    def __init__(self, model_path: str = "models/best.pt", conf_threshold: float = 0.25, tracker_type: str = None, imgsz: int = 640, allowed_classes: list = None, iou: float = 0.50, device: str = None):
         """
         Khởi tạo ObjectTracker.
         
         Args:
             model_path: Đường dẫn file trọng số YOLO (vd: 'models/best.pt', 'models/best.onnx')
             conf_threshold: Ngưỡng độ tin cậy tối thiểu (mặc định 0.25 = 25% theo chuẩn đánh giá hệ thống)
-            tracker_type: File cấu hình tracker ('bytetrack.yaml' hoặc 'botsort.yaml')
+            tracker_type: File cấu hình tracker ('configs/bytetrack_custom.yaml', 'bytetrack.yaml' hoặc 'botsort.yaml')
             imgsz: Kích thước cạnh ảnh chuẩn khi suy luận (mặc định 640)
             allowed_classes: Danh sách class_id hoặc tên class được phép bám vết (None = tất cả)
+            iou: Ngưỡng NMS IoU (mặc định 0.50)
+            device: Thiết bị chạy suy luận ('cpu' hoặc 'cuda:0')
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
-        self.tracker_type = tracker_type
+        if tracker_type is None:
+            custom_cfg = "configs/bytetrack_custom.yaml"
+            self.tracker_type = custom_cfg if os.path.exists(custom_cfg) else "bytetrack.yaml"
+        else:
+            self.tracker_type = tracker_type
         self.imgsz = imgsz
         self.allowed_classes = allowed_classes
+        self.iou = iou
+        self.device = device
         
         if not os.path.exists(model_path) and not model_path.endswith("yolov8n.pt"):
             raise FileNotFoundError(f"Không tìm thấy file trọng số mô hình: {model_path}")
             
-        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {tracker_type} (Conf: {conf_threshold}, Imgsz: {imgsz})")
+        print(f"[OBJECT TRACKER] Nạp mô hình: {model_path} | Thuật toán: {self.tracker_type} (Conf: {conf_threshold}, Imgsz: {imgsz}, NMS IoU: {iou})")
         self.model = YOLO(model_path)
         self.class_names = self.model.names
 
@@ -1819,8 +1829,11 @@ class ObjectTracker:
             "tracker": self.tracker_type,
             "conf": target_conf,
             "imgsz": target_imgsz,
+            "iou": self.iou,
             "verbose": False
         }
+        if self.device:
+            track_kwargs["device"] = self.device
         if self.allowed_classes is not None and all(isinstance(c, int) for c in self.allowed_classes):
             track_kwargs["classes"] = self.allowed_classes
 
@@ -1937,6 +1950,7 @@ class TemporalVerifier:
         stationary_window_seconds: float = 1.0,
         spatial_cooldown_radius: float = 50.0,
         adaptive_perspective_scale: bool = True,
+        min_stationary_seconds: float = None,
     ):
         """
         Args:
@@ -1952,6 +1966,7 @@ class TemporalVerifier:
             stationary_window_seconds: Độ rộng cửa sổ trượt kiểm tra đứng yên (mặc định 1.0s).
             spatial_cooldown_radius:   Bán kính không gian (pixels) khử trùng lặp khi nhảy ID.
             adaptive_perspective_scale: Tự động co ngưỡng dịch chuyển theo kích thước BBox ở xa.
+            min_stationary_seconds:    Thời gian đứng yên liên tục tối thiểu (giây) để CONFIRMED.
         """
         self.confirm_frames = confirm_frames
         self.confirm_seconds = confirm_seconds
@@ -1967,6 +1982,7 @@ class TemporalVerifier:
         self.max_displacement_pixels = max_displacement_pixels
         self.stationary_window_seconds = stationary_window_seconds
         self.adaptive_perspective_scale = adaptive_perspective_scale
+        self.min_stationary_seconds = min_stationary_seconds if min_stationary_seconds is not None else min(2.0, self.confirm_seconds)
 
         # Spatial deduplication khi track_id bị đổi
         self.spatial_cooldown_radius = spatial_cooldown_radius
@@ -2003,7 +2019,10 @@ class TemporalVerifier:
         cutoff = now - self.stationary_window_seconds
         recent = [item for item in window if item[0] >= cutoff]
         if len(recent) < 2:
-            return True
+            # Nếu trong cửa sổ gần nhất có < 2 frame, so với frame gần nhất trước đó trong lịch sử
+            recent = list(window)[-2:] if len(window) >= 2 else []
+            if len(recent) < 2:
+                return True
 
         xs = [p[1] for p in recent]
         ys = [p[2] for p in recent]
@@ -2105,6 +2124,7 @@ class TemporalVerifier:
                     "last_seen": self.current_frame_index,
                     "last_alert_time": None,
                     "non_viol_streak": 0,
+                    "stationary_since": None,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
                     "pos_window": deque(maxlen=200),   # deque lưu (timestamp, cx, cy, box_diag)
                 }
@@ -2120,6 +2140,14 @@ class TemporalVerifier:
             suspect_reason = ""
 
             if is_spatial_viol:
+                # Cập nhật trạng thái đứng yên liên tục
+                is_stationary = self._is_stationary(record, current_timestamp)
+                if is_stationary:
+                    if record.get("stationary_since") is None:
+                        record["stationary_since"] = current_timestamp
+                else:
+                    record["stationary_since"] = None
+
                 # Kiểm tra gián đoạn chuỗi vi phạm (gap lớn hơn dung sai liên tục)
                 frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
                 max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval)
@@ -2131,6 +2159,7 @@ class TemporalVerifier:
                         record["viol_start_time"] = current_timestamp
                         record["count"] = 0
                         record["status"] = TrackState.SUSPECTED
+                        record["stationary_since"] = None
 
                 if record["viol_start_time"] is None:
                     record["viol_start_time"] = current_timestamp
@@ -2146,13 +2175,14 @@ class TemporalVerifier:
 
                 # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
                 if self._confirm_threshold_reached(record, current_timestamp):
-                    # Kiểm tra đứng yên (sliding window) - áp dụng cho cả track mới và track đã CONFIRMED
-                    is_stationary = self._is_stationary(record, current_timestamp)
+                    # Kiểm tra đứng yên liên tục đủ thời lượng (loại trừ người đi bộ bê biển)
+                    stationary_dur = (current_timestamp - record["stationary_since"]) if record.get("stationary_since") is not None else 0.0
+                    is_stationary_long_enough = is_stationary and (stationary_dur >= self.min_stationary_seconds if self.require_stationary else True)
 
-                    if not is_stationary:
+                    if not is_stationary_long_enough:
                         # Đang di chuyển -> người bê biển đi ngang hoặc di dời biển, chuyển về SUSPECTED
                         record["status"] = TrackState.SUSPECTED
-                        suspect_reason = "DI CHUYEN"
+                        suspect_reason = f"DI CHUYEN ({stationary_dur:.1f}s<{self.min_stationary_seconds:.1f}s)"
                     elif avg_conf < self.min_avg_confidence:
                         # Confidence TB quá thấp -> giữ SUSPECTED
                         record["status"] = TrackState.SUSPECTED

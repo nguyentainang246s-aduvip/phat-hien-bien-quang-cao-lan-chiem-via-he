@@ -407,12 +407,14 @@ def evaluate_single_video(
         min_avg_confidence=min_avg_conf,
         require_stationary=temp_cfg.get("require_stationary", True),
         max_displacement_pixels=max_disp,
+        min_stationary_seconds=temp_cfg.get("min_stationary_seconds", 2.0),
         spatial_cooldown_radius=spatial_cooldown_rad,
     )
 
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
+    raw_fps = cap.get(cv2.CAP_PROP_FPS)
+    fps = float(raw_fps) if (raw_fps and 5.0 <= raw_fps <= 120.0 and not np.isnan(raw_fps)) else 24.0
     verifier.source_fps = fps / (frame_skip + 1) if frame_skip > 0 else fps
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))

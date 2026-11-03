@@ -1,0 +1,12 @@
+# ==============================================================================
+# CẤU HÌNH BYTETRACK CHUẨN ULTRALYTICS CHO HỆ THỐNG GIÁM SÁT BIỂN HIỆU (DATN20224083)
+# Tối ưu hóa cho camera CCTV giao thông cố định (15 - 30 FPS)
+# ==============================================================================
+
+tracker_type: bytetrack       # Thuật toán theo vết: bytetrack
+track_high_thresh: 0.25       # Ngưỡng tin cậy vòng 1 (đối tượng rõ nét, match trước)
+track_low_thresh: 0.10        # Ngưỡng tin cậy vòng 2 (phục hồi vết khi bị che khuất tạm thời)
+new_track_thresh: 0.25        # Ngưỡng khởi tạo track ID mới (tránh sinh track rác từ nhiễu)
+track_buffer: 30              # Số frames duy trì trạng thái Kalman Filter khi mất dấu (~1.0s - 3.0s)
+match_thresh: 0.80            # Ngưỡng tương đồng IoU liên tiếp giữa các khung hình
+fuse_score: True              # Kết hợp điểm tin cậy detection với chi phí chuyển động Kalman

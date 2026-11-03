@@ -184,6 +184,7 @@ class SystemBenchmark:
             confirm_frames=20,
             confirm_seconds=3.0,
             cooldown_seconds=60.0,
+            min_stationary_seconds=2.0,
             source_fps=reader.fps
         )
 

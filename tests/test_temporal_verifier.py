@@ -160,6 +160,42 @@ def test_temporal_verifier():
     print("  => [PASS] Loai bo thanh cong doi tuong di dong mang bien luot qua via he!")
 
     # -----------------------------------------------------------------------
+    # 5b. Kiem tra nguoi be bien di vao roi dung lai tam thoi (Stationary Duration Gate)
+    # -----------------------------------------------------------------------
+    print("\n5b. Kiem tra nguoi be bien di chuyen roi dung lai chua du thoi gian quy dinh:")
+    verifier.reset()
+    base_ts_walk = 2000.0
+    v_walk = TemporalVerifier(
+        confirm_frames=5,
+        confirm_seconds=1.0,
+        min_stationary_seconds=1.0,
+        cooldown_seconds=10.0,
+    )
+    # Di chuyen trong 1.0s (8 frames, moi frame nhich 15px)
+    for f in range(8):
+        box_walk = (100 + f * 15, 200, 200 + f * 15, 350)
+        res_walk = v_walk.process_frame([{"track_id": 99, "box": box_walk, "conf": 0.85}], checker, test_poly,
+                                        current_timestamp=base_ts_walk + f * 0.125)[0]
+    assert res_walk["temporal_status"] == TrackState.SUSPECTED, "Khi dang di chuyen phai la SUSPECTED!"
+
+    # Dung lai tai vi tri cuoi trong 0.5s (4 frames, < min_stationary_seconds=1.0s)
+    # Tong thoi gian vi pham = 1.5s >= confirm_seconds (1.0s), nhung dung yen moi duoc 0.5s
+    last_box = (100 + 7 * 15, 200, 200 + 7 * 15, 350)
+    for f in range(8, 12):
+        res_walk = v_walk.process_frame([{"track_id": 99, "box": last_box, "conf": 0.85}], checker, test_poly,
+                                        current_timestamp=base_ts_walk + f * 0.125)[0]
+    assert res_walk["temporal_status"] == TrackState.SUSPECTED, \
+        "Dung lai chua du 1.0s khong duoc nang len CONFIRMED (ngan chan nguoi be bien dung lai nghi)!"
+
+    # Tiep tuc dung yen cho den khi cua so 1.0s loai bo het frame cu va tich luy du min_stationary_seconds
+    for f in range(12, 26):
+        res_walk = v_walk.process_frame([{"track_id": 99, "box": last_box, "conf": 0.85}], checker, test_poly,
+                                        current_timestamp=base_ts_walk + f * 0.125)[0]
+    assert res_walk["temporal_status"] == TrackState.CONFIRMED, \
+        "Dung yen lien tuc du thoi gian moi duoc xac nhan vi pham CONFIRMED!"
+    print("  => [PASS] Chot chan thoi gian dung yen lien tuc hoat dong hoan hao!")
+
+    # -----------------------------------------------------------------------
     # 6. Kiem tra Spatial Deduplication khi ByteTrack doi ID
     # -----------------------------------------------------------------------
     print("\n6. Kiem tra khu trung lap khong gian khi ByteTrack doi ID (Spatial Deduplication):")

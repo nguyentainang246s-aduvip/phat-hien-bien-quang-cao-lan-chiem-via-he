@@ -29,10 +29,13 @@ performance:
   target_fps: 24.0             # Tốc độ khung hình mục tiêu cho thiết bị biên (gợi ý: 15 - 24 FPS)
 
 tracking:
-  tracker_type: "bytetrack.yaml"
-  track_thresh: 0.20
-  match_thresh: 0.80
-  track_buffer: 30
+  tracker_config: "configs/bytetrack_custom.yaml" # File cấu hình ByteTrack chuẩn Ultralytics
+  track_high_thresh: 0.25      # Ngưỡng tin cậy vòng 1 (đối tượng rõ nét)
+  track_low_thresh: 0.10       # Ngưỡng tin cậy vòng 2 (phục hồi vết khi bị che khuất)
+  new_track_thresh: 0.25       # Ngưỡng khởi tạo track mới
+  track_buffer: 30             # Số frames duy trì trạng thái Kalman khi mất dấu
+  match_thresh: 0.80           # Ngưỡng ghép cặp IoU liên tiếp
+  fuse_score: true             # Kết hợp điểm tin cậy và chuyển động
 
 spatial:
   overlap_threshold: 0.30      # Ngưỡng diện tích lấn chiếm tối thiểu (30% diện tích box)
@@ -42,6 +45,7 @@ spatial:
 temporal:
   confirm_frames: 20           # Số frames liên tiếp để xác nhận vi phạm (~1s ở 20-24FPS)
   confirm_seconds: 3.0         # Thời gian vi phạm tối thiểu quy ra giây (3.0s - 10.0s trên camera thật)
+  min_stationary_seconds: 2.0  # Thời gian đứng yên liên tục tối thiểu (giây) để loại trừ người bê biển
   cooldown_seconds: 60.0       # Thời gian chờ (giây) chống gửi cảnh báo trùng lặp
   max_missing_frames: 30       # Xóa track khỏi RAM nếu mất dấu quá 30 frames (~1s)
   tolerance_frames: 2          # Dung sai 1-2 frames rung lắc/flicker trước khi reset

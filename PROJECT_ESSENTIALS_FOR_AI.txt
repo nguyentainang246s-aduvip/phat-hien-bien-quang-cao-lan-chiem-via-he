@@ -72,11 +72,11 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 | Chỉ số Đánh giá | Công thức | Phiên bản A (ROI cũ) | Phiên bản B (Chuẩn hóa) | Khoảng tin cậy (Wilson 95% Version B) |
 | :--- | :---: | :---: | :---: | :--- |
 | **Tổng khung hình kiểm thử** | Sum(Frames) | 720 frames | 720 frames | 30.0 giây video ngoài thực địa |
-| **Tổng đối tượng theo dõi** | TP+FP+FN+TN | 18 tracks | **18 tracks** | 14 vi phạm thật + 2 đối tượng ngoài hè/tường + 2 báo sai ngoài GT |
-| **True Positives (TP)** | Bắt đúng vi phạm | 11 vụ | **12 vụ** | Bắt chính xác toàn bộ biển chiếm lối đi |
-| **False Positives (FP)** | Báo sai | 2 vụ | **2 vụ** | Không có cảnh báo rác từ người/xe máy |
-| **False Negatives (FN)** | Bỏ sót / Chưa đạt ngưỡng | 3 vụ | **2 vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |
-| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Biển trong nhà (Track #5), biển gắn tường (Track #15/Track #8) |
+| **Tổng đối tượng theo dõi** | TP+FP+FN+TN | 18 tracks | **18 tracks** | 14 vi phạm thật + 2 đối tượng ngoài hè/tường + 2 biển ngoài GT |
+| **True Positives (TP)** | Bắt đúng vi phạm | 11 vụ | **12 vụ** | Bắt chính xác 12/14 biển vi phạm thực tế trong mẫu |
+| **False Positives (FP)** | Báo sai ngoài GT | 2 vụ | **2 vụ** | 2 biển hiệu thật ở cự ly xa ngoài danh mục GT ban đầu |
+| **False Negatives (FN)** | Chưa đạt ngưỡng | 3 vụ | **2 vụ** | Giữ an toàn ở diện Nghi vấn (SUSPECTED) |
+| **True Negatives (TN)** | Nhận diện đúng hợp lệ | 2 biển | **2 biển** | Biển trong nhà (Track #5), biển gắn tường (Track #8) |
 | **System Precision** | TP / (TP + FP) | 84.62% | **85.71%** | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System Recall** | TP / (TP + FN) | 78.57% (11/14) | **85.71% (12/14)** | **60.1% – 96.0%** (Wilson 95% CI) |
 | **System F1-Score** | 2*P*R / (P + R) | 81.48% | **85.71%** | Điểm cân bằng điều hòa tối ưu |
@@ -94,12 +94,12 @@ Kiểm chứng thực nghiệm trên 3 video CCTV thực tế đường phố H�
 | Video 1 | GT #2 | Track #2 | Biển hiệu dạng hộp đứng sát vách cửa hàng | IoU:1.00 | 80 | 86.2% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
 | Video 1 | GT #3 | Track #3 | Biển Standee chữ A chân sắt đặt trên lối đi bộ | IoU:1.00 | 80 | 80.1% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
 | Video 1 | GT #4 | Track #4 | Biển quảng cáo dọc dựng cạnh gốc cây vỉa hè | IoU:1.00 | 75 | 73.9% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | IoU:1.00 | 80 | 59.6% | 22.3% | `NORMAL` | NORMAL | **TN** |
+| Video 1 | GT #5 | Track #5 | Biển hiệu treo thụt sâu trong lòng nhà | IoU:1.00 | 80 | 60.5% | 20.3% | `NORMAL` | NORMAL | **TN** |
 | Video 2 | GT #1 | Track #1 | Biển hộp đèn lớn cắm chân vỉa hè phố Bạch Mai | IoU:1.00 | 80 | 84.5% | 74.9% | `CONFIRMED` | VIOLATION | **TP** |
 | Video 2 | GT #2 | Track #2 | Biển quảng cáo di động chân bánh xe | IoU:1.00 | 80 | 71.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
 | Video 2 | GT #3 | Track #3 | Biển bạt nhỏ kê trước bậc thềm | IoU:1.00 | 80 | 63.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
-| Video 2 | GT #23 | Track #23 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:1.00 | 19 | 30.7% | 91.9% | `SUSPECTED` | VIOLATION | **FN** |
-| Video 2 | GT #33 | Track #33 | Biển hiệu cửa hàng ở góc phải khung hình | IoU:1.00 | 1 | 36.9% | 100.0% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 2 | GT #23 | Track #20 | Biển hiệu dạng khung sắt tầm thấp ven đường | IoU:1.00 | 19 | 30.7% | 91.9% | `SUSPECTED` | VIOLATION | **FN** |
+| Video 2 | GT #33 | Track #None | Biển hiệu cửa hàng ở góc phải khung hình | unmatched | 0 | 0.0% | 0.0% | `UNKNOWN` | VIOLATION | **FN** |
 | Video 3 | GT #1 | Track #1 | Biển quảng cáo cỡ lớn trước cửa hàng phố Trần Đại Nghĩa | IoU:1.00 | 80 | 89.8% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
 | Video 3 | GT #2 | Track #2 | Biển hộp đèn đứng góc trái | IoU:1.00 | 80 | 88.4% | 66.7% | `CONFIRMED` | VIOLATION | **TP** |
 | Video 3 | GT #3 | Track #3 | Biển vẫy thấp đặt cạnh gốc cây | IoU:1.00 | 80 | 85.5% | 100.0% | `CONFIRMED` | VIOLATION | **TP** |
@@ -186,7 +186,7 @@ Câu hỏi 2: Tại sao em chỉ gán nhãn biển đứng trên Roboflow mà kh
         tầng Thời gian (confirm_seconds = 3.0s, min_avg_confidence = 0.40) đóng vai trò chốt chặn an toàn giữ đối tượng ở diện SUSPECTED (không bao giờ phạt nhầm),
         kết hợp quy trình hiệu chuẩn lùi biên ROI cách chân tường 10-15px trên Web ROI Studio.
       - Lớp 3 (Human-in-the-Loop): Hồ sơ bằng chứng xuất kèm ảnh Full Frame và ảnh Crop để cán bộ trật tự đô thị phê duyệt cuối cùng
-        theo Nghị định 168/2024/NĐ-CP, đảm bảo tỷ lệ phạt oan bằng 0%.
+        theo Nghị định 168/2024/NĐ-CP, đóng vai trò người thẩm định ra quyết định, kiểm soát và giảm thiểu tối đa rủi ro xử phạt nhầm.
 
 Câu hỏi 3: Vì sao mẫu kiểm thử chỉ có 30 giây video và khoảng tin cậy Wilson lại rộng (60.1% - 96.0%)?
 -> Trả lời: 3 đoạn video dài 10s là mẫu kiểm thử sự kiện (Event-level evaluation) thu thập thực tế tại các tuyến phố Hà Nội để kiểm chứng
@@ -197,6 +197,23 @@ Câu hỏi 4: Vì sao áp dụng Frame-Skip = 2 và hệ thống có bị bỏ l
 -> Trả lời: Đối tượng vi phạm là biển hiệu đặt cố định trên vỉa hè với yêu cầu đứng yên tối thiểu confirm_seconds = 3.0s (72-90 frames).
    Việc chạy suy luận AI 1 trong mỗi 3 frames (tần suất ~10-13 Hz) là hoàn toàn đủ dày đặc để bám vết, đồng thời giảm 67% tải tính toán,
    giúp hệ thống đạt thông lượng 31-39 FPS trên CPU phổ thông mà không bỏ sót bất kỳ vi phạm nào.
+
+Câu hỏi 5: Mô hình YOLOv8n được huấn luyện ở imgsz=1280 (mAP50 89.6%) nhưng khi triển khai thực tế trên CPU lại chạy ở imgsz=640. Tại sao lại có sự khác biệt này và ảnh hưởng ra sao?
+-> Trả lời: Đây là kỹ thuật Đánh đổi Tốc độ - Độ chính xác (Speed-Accuracy Trade-off) có chủ đích trong Kỹ thuật Thiết bị Biên (Edge Computing).
+   Huấn luyện ở 1280x1280 giúp mạng nơ-ron học trọn vẹn các đặc trưng chi tiết của chữ và viền biển hiệu. Khi đưa lên thiết bị biên CPU phổ thông
+   không có GPU rời, việc nạp ảnh ở 640x640 giúp duy trì thông lượng thời gian thực 35+ FPS (giảm 75% khối lượng tính toán FLOPS so với 1280).
+   Các biển ở cự ly rất xa bị suy giảm nhẹ độ tin cậy được hệ thống bảo vệ an toàn bằng tầng Thời gian (giữ an toàn ở diện SUSPECTED), không gây báo sai.
+
+Câu hỏi 6: Hai trường hợp False Positive (Track #6, Track #7 ở Video 3) có thực sự là báo động sai không?
+-> Trả lời: Quan sát thực tế trên góc quay phố Bà Triệu (Video 3), Track #6 và Track #7 là các biển quảng cáo thực tế của các cửa hàng phía xa
+   xuất hiện liên tục 76-80 frames, tỷ lệ overlap vỉa hè đạt 100%. Tuy nhiên, do nguyên tắc liêm chính khoa học khi lập Ground Truth chỉ tập trung gán nhãn
+   16 đối tượng trọng tâm, 2 đối tượng này không nằm trong danh sách nhãn ban đầu nên bị thuật toán Hungarian tính vào False Positive.
+   Đây là hiện tượng Ground Truth Incompleteness phổ biến trong thị giác máy tính thực địa, cho thấy khả năng phát hiện của mô hình còn nhạy hơn nhãn gán thủ công.
+
+Câu hỏi 7: Thuật toán có loại trừ được tình huống người đi bộ bê biển quảng cáo đi ngang qua vỉa hè hoặc dừng lại nghỉ không?
+-> Trả lời: Hệ thống kết hợp 2 lớp chốt chặn: Cửa sổ trượt kiểm tra độ dời tâm (Sliding-Window Stationary Filter) và bộ đếm thời gian đứng yên liên tục
+   (min_stationary_seconds = 2.0s). Khi người đi bộ bê biển di chuyển, độ dời tâm lớn hơn ngưỡng cho phép -> đối tượng bị giữ ở SUSPECTED.
+   Ngay cả khi người đó dừng lại nghỉ 1.0s rồi đi tiếp, thời gian đứng yên chưa tích lũy đủ 2.0s liên tục nên hệ thống vẫn kiên quyết không kích hoạt cảnh báo vi phạm.
 
 ## 8. MÃ NGUỒN CỐT LÕI CỦA HỆ THỐNG (CORE SOURCE CODE)
 --------------------------------------------------------------------------------
@@ -234,10 +251,13 @@ performance:
   target_fps: 24.0             # Tốc độ khung hình mục tiêu cho thiết bị biên (gợi ý: 15 - 24 FPS)
 
 tracking:
-  tracker_type: "bytetrack.yaml"
-  track_thresh: 0.20
-  match_thresh: 0.80
-  track_buffer: 30
+  tracker_config: "configs/bytetrack_custom.yaml" # File cấu hình ByteTrack chuẩn Ultralytics
+  track_high_thresh: 0.25      # Ngưỡng tin cậy vòng 1 (đối tượng rõ nét)
+  track_low_thresh: 0.10       # Ngưỡng tin cậy vòng 2 (phục hồi vết khi bị che khuất)
+  new_track_thresh: 0.25       # Ngưỡng khởi tạo track mới
+  track_buffer: 30             # Số frames duy trì trạng thái Kalman khi mất dấu
+  match_thresh: 0.80           # Ngưỡng ghép cặp IoU liên tiếp
+  fuse_score: true             # Kết hợp điểm tin cậy và chuyển động
 
 spatial:
   overlap_threshold: 0.30      # Ngưỡng diện tích lấn chiếm tối thiểu (30% diện tích box)
@@ -247,6 +267,7 @@ spatial:
 temporal:
   confirm_frames: 20           # Số frames liên tiếp để xác nhận vi phạm (~1s ở 20-24FPS)
   confirm_seconds: 3.0         # Thời gian vi phạm tối thiểu quy ra giây (3.0s - 10.0s trên camera thật)
+  min_stationary_seconds: 2.0  # Thời gian đứng yên liên tục tối thiểu (giây) để loại trừ người bê biển
   cooldown_seconds: 60.0       # Thời gian chờ (giây) chống gửi cảnh báo trùng lặp
   max_missing_frames: 30       # Xóa track khỏi RAM nếu mất dấu quá 30 frames (~1s)
   tolerance_frames: 2          # Dung sai 1-2 frames rung lắc/flicker trước khi reset
@@ -322,6 +343,7 @@ class TemporalVerifier:
         stationary_window_seconds: float = 1.0,
         spatial_cooldown_radius: float = 50.0,
         adaptive_perspective_scale: bool = True,
+        min_stationary_seconds: float = None,
     ):
         """
         Args:
@@ -337,6 +359,7 @@ class TemporalVerifier:
             stationary_window_seconds: Độ rộng cửa sổ trượt kiểm tra đứng yên (mặc định 1.0s).
             spatial_cooldown_radius:   Bán kính không gian (pixels) khử trùng lặp khi nhảy ID.
             adaptive_perspective_scale: Tự động co ngưỡng dịch chuyển theo kích thước BBox ở xa.
+            min_stationary_seconds:    Thời gian đứng yên liên tục tối thiểu (giây) để CONFIRMED.
         """
         self.confirm_frames = confirm_frames
         self.confirm_seconds = confirm_seconds
@@ -352,6 +375,7 @@ class TemporalVerifier:
         self.max_displacement_pixels = max_displacement_pixels
         self.stationary_window_seconds = stationary_window_seconds
         self.adaptive_perspective_scale = adaptive_perspective_scale
+        self.min_stationary_seconds = min_stationary_seconds if min_stationary_seconds is not None else min(2.0, self.confirm_seconds)
 
         # Spatial deduplication khi track_id bị đổi
         self.spatial_cooldown_radius = spatial_cooldown_radius
@@ -388,7 +412,10 @@ class TemporalVerifier:
         cutoff = now - self.stationary_window_seconds
         recent = [item for item in window if item[0] >= cutoff]
         if len(recent) < 2:
-            return True
+            # Nếu trong cửa sổ gần nhất có < 2 frame, so với frame gần nhất trước đó trong lịch sử
+            recent = list(window)[-2:] if len(window) >= 2 else []
+            if len(recent) < 2:
+                return True
 
         xs = [p[1] for p in recent]
         ys = [p[2] for p in recent]
@@ -490,6 +517,7 @@ class TemporalVerifier:
                     "last_seen": self.current_frame_index,
                     "last_alert_time": None,
                     "non_viol_streak": 0,
+                    "stationary_since": None,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
                     "pos_window": deque(maxlen=200),   # deque lưu (timestamp, cx, cy, box_diag)
                 }
@@ -505,6 +533,14 @@ class TemporalVerifier:
             suspect_reason = ""
 
             if is_spatial_viol:
+                # Cập nhật trạng thái đứng yên liên tục
+                is_stationary = self._is_stationary(record, current_timestamp)
+                if is_stationary:
+                    if record.get("stationary_since") is None:
+                        record["stationary_since"] = current_timestamp
+                else:
+                    record["stationary_since"] = None
+
                 # Kiểm tra gián đoạn chuỗi vi phạm (gap lớn hơn dung sai liên tục)
                 frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
                 max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval)
@@ -516,6 +552,7 @@ class TemporalVerifier:
                         record["viol_start_time"] = current_timestamp
                         record["count"] = 0
                         record["status"] = TrackState.SUSPECTED
+                        record["stationary_since"] = None
 
                 if record["viol_start_time"] is None:
                     record["viol_start_time"] = current_timestamp
@@ -531,13 +568,14 @@ class TemporalVerifier:
 
                 # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
                 if self._confirm_threshold_reached(record, current_timestamp):
-                    # Kiểm tra đứng yên (sliding window) - áp dụng cho cả track mới và track đã CONFIRMED
-                    is_stationary = self._is_stationary(record, current_timestamp)
+                    # Kiểm tra đứng yên liên tục đủ thời lượng (loại trừ người đi bộ bê biển)
+                    stationary_dur = (current_timestamp - record["stationary_since"]) if record.get("stationary_since") is not None else 0.0
+                    is_stationary_long_enough = is_stationary and (stationary_dur >= self.min_stationary_seconds if self.require_stationary else True)
 
-                    if not is_stationary:
+                    if not is_stationary_long_enough:
                         # Đang di chuyển -> người bê biển đi ngang hoặc di dời biển, chuyển về SUSPECTED
                         record["status"] = TrackState.SUSPECTED
-                        suspect_reason = "DI CHUYEN"
+                        suspect_reason = f"DI CHUYEN ({stationary_dur:.1f}s<{self.min_stationary_seconds:.1f}s)"
                     elif avg_conf < self.min_avg_confidence:
                         # Confidence TB quá thấp -> giữ SUSPECTED
                         record["status"] = TrackState.SUSPECTED

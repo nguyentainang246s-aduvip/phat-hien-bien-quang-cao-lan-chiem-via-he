@@ -4404,7 +4404,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
         cap = cv2.VideoCapture(video_path)
-        fps_source = cap.get(cv2.CAP_PROP_FPS) or 24.0
+        raw_fps = cap.get(cv2.CAP_PROP_FPS)
+        fps_source = float(raw_fps) if (raw_fps and 5.0 <= raw_fps <= 120.0 and not np.isnan(raw_fps)) else 24.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
         frame_delay = 1.0 / max(10.0, fps_source)
 
@@ -4419,12 +4420,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         roi_manager = ROIManager(config_path if os.path.exists(config_path) else "configs/roi_camera1.json")
         camera_clean_id = roi_manager.camera_id or os.path.splitext(video_name)[0]
         checker = ViolationChecker(threshold=0.30)
-        min_avg_c = max(0.25, min(0.40, conf * 1.6))
+        # Đồng bộ logic FPS hiệu dụng với main.py và evaluate_videos.py (fps_source / (frame_skip + 1))
+        effective_fps = fps_source / (frame_skip + 1) if (frame_skip > 0 and fps_source > 0) else (fps_source or 24.0)
         verifier = TemporalVerifier(
             confirm_frames=20,
             confirm_seconds=3.0,
-            source_fps=fps_source,
-            min_avg_confidence=min_avg_c
+            source_fps=effective_fps,
+            min_avg_confidence=0.40,
+            require_stationary=True,
+            max_displacement_pixels=50.0
         )
         fps_tracker = FPSTracker(alpha=0.15)
         tracker = get_shared_tracker(conf_threshold=conf, imgsz=imgsz)
@@ -4751,7 +4755,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 mime, _ = mimetypes.guess_type(file_path)
                 self.send_header("Content-Type", mime or "image/jpeg")
-                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Cache-Control", "private, no-cache, no-store, must-revalidate")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
                 self.end_headers()
                 with open(file_path, "rb") as f:
                     self.wfile.write(f.read())

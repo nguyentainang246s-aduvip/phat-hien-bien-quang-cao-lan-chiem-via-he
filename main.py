@@ -177,6 +177,8 @@ def run_monitor_mode(args):
     max_disp = args.max_displacement if getattr(args, "max_displacement", None) is not None else float(cfg_temporal.get("max_displacement_pixels", 50.0))
     min_avg_conf = args.min_avg_conf if getattr(args, "min_avg_conf", None) is not None else float(cfg_temporal.get("min_avg_confidence", 0.40))
 
+    min_stat_sec = float(cfg_temporal.get("min_stationary_seconds", 2.0))
+
     verifier = TemporalVerifier(
         confirm_frames=confirm_frames,
         confirm_seconds=confirm_seconds,
@@ -186,6 +188,7 @@ def run_monitor_mode(args):
         min_avg_confidence=min_avg_conf,
         require_stationary=require_stationary,
         max_displacement_pixels=max_disp,
+        min_stationary_seconds=min_stat_sec,
         spatial_cooldown_radius=spatial_cooldown_rad,
     )
     cfg_evidence = cfg.get("evidence", {})

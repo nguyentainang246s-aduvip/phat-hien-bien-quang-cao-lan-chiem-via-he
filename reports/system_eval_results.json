@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_at": "2026-11-02 23:27:57",
+    "generated_at": "2026-11-03 09:06:59",
     "generator_script": "evaluation/evaluate_videos.py",
     "ground_truth_file": "configs/video_ground_truth.json",
     "hardware_platform": "Windows-11-10.0.26200-SP0",
@@ -57,13 +57,13 @@
     "false_alarms_in_sample": 2,
     "standee_3_v1_avg_overlap": 100.0,
     "standee_3_v1_status": "CONFIRMED",
-    "pipeline_throughput_fps_min": 37.5,
-    "pipeline_throughput_fps_max": 55.4,
-    "pipeline_steady_state_fps_min": 45.4,
-    "pipeline_steady_state_fps_max": 60.2,
-    "estimated_inference_rate_hz": "~12.5 - 18.5 Hz",
-    "measured_tracker_mean_ms": 45.33,
-    "measured_inferred_frame_mean_ms": 50.5,
+    "pipeline_throughput_fps_min": 35.4,
+    "pipeline_throughput_fps_max": 43.9,
+    "pipeline_steady_state_fps_min": 44.4,
+    "pipeline_steady_state_fps_max": 53.3,
+    "estimated_inference_rate_hz": "~11.8 - 14.6 Hz",
+    "measured_tracker_mean_ms": 53.52,
+    "measured_inferred_frame_mean_ms": 58.45,
     "item_evaluations": [
       {
         "object_id": "V1_OBJ_1",
@@ -156,8 +156,8 @@
         "eval_result": "TN",
         "justification": "Biển hiệu treo sâu bên trong khuôn viên nhà dân, không cắm chân hay đặt trên mặt vỉa hè dành cho người đi bộ.",
         "total_detections": 80,
-        "avg_conf": 0.596,
-        "avg_overlap": 22.3,
+        "avg_conf": 0.605,
+        "avg_overlap": 20.3,
         "best_crop_path": "reports/video_eval_crops/video_test/track_5_conf68.jpg"
       },
       {
@@ -220,7 +220,7 @@
       {
         "object_id": "V2_OBJ_7",
         "video_id": "videotesst2",
-        "matched_track_id": 23,
+        "matched_track_id": 20,
         "expected_track_id": 23,
         "match_method": "spatio_temporal_bipartite",
         "match_confidence": 1.082,
@@ -234,26 +234,26 @@
         "total_detections": 19,
         "avg_conf": 0.307,
         "avg_overlap": 91.9,
-        "best_crop_path": "reports/video_eval_crops/videotesst2/track_23_conf37.jpg"
+        "best_crop_path": "reports/video_eval_crops/videotesst2/track_20_conf37.jpg"
       },
       {
         "object_id": "V2_OBJ_8",
         "video_id": "videotesst2",
-        "matched_track_id": 33,
+        "matched_track_id": null,
         "expected_track_id": 33,
-        "match_method": "spatio_temporal_bipartite",
-        "match_confidence": 1.0,
-        "spatial_iou": 1.0,
+        "match_method": "unmatched",
+        "match_confidence": 0.0,
+        "spatial_iou": 0.0,
         "temporal_iou": 0.0,
         "description": "Biển hiệu cửa hàng ở góc phải khung hình",
         "gt_label": "VIOLATION",
-        "system_status": "SUSPECTED",
+        "system_status": "UNKNOWN",
         "eval_result": "FN",
         "justification": "Biển hiệu đặt trên vỉa hè xuất hiện ở phần cuối đoạn video, chiếm dụng lối đi bộ.",
-        "total_detections": 1,
-        "avg_conf": 0.369,
-        "avg_overlap": 100.0,
-        "best_crop_path": "reports/video_eval_crops/videotesst2/track_33_conf36.jpg"
+        "total_detections": 0,
+        "avg_conf": 0.0,
+        "avg_overlap": 0.0,
+        "best_crop_path": ""
       },
       {
         "object_id": "V3_OBJ_1",
@@ -470,27 +470,27 @@
     "throughput_across_trials": [
       {
         "trial": 1,
-        "fps_min": 37.5,
-        "fps_max": 55.4,
-        "fps_mean": 45.5,
-        "steady_fps_min": 45.4,
-        "steady_fps_max": 60.2
+        "fps_min": 35.4,
+        "fps_max": 43.9,
+        "fps_mean": 40.6,
+        "steady_fps_min": 44.4,
+        "steady_fps_max": 53.3
       },
       {
         "trial": 2,
-        "fps_min": 47.1,
-        "fps_max": 56.5,
-        "fps_mean": 52.4,
-        "steady_fps_min": 49.7,
-        "steady_fps_max": 59.2
+        "fps_min": 43.2,
+        "fps_max": 48.8,
+        "fps_mean": 46.0,
+        "steady_fps_min": 44.6,
+        "steady_fps_max": 50.4
       },
       {
         "trial": 3,
-        "fps_min": 39.4,
-        "fps_max": 50.1,
-        "fps_mean": 45.5,
-        "steady_fps_min": 40.4,
-        "steady_fps_max": 52.3
+        "fps_min": 38.8,
+        "fps_max": 46.8,
+        "fps_mean": 44.0,
+        "steady_fps_min": 40.0,
+        "steady_fps_max": 48.2
       }
     ],
     "object_stability_details": [
@@ -693,9 +693,9 @@
         "gt_label": "VIOLATION",
         "expected_track_id": 23,
         "trial_matched_track_ids": [
-          23,
-          23,
-          23
+          20,
+          20,
+          20
         ],
         "trial_system_statuses": [
           "SUSPECTED",
@@ -717,14 +717,14 @@
         "gt_label": "VIOLATION",
         "expected_track_id": 33,
         "trial_matched_track_ids": [
-          33,
-          33,
-          33
+          null,
+          null,
+          null
         ],
         "trial_system_statuses": [
-          "SUSPECTED",
-          "SUSPECTED",
-          "SUSPECTED"
+          "UNKNOWN",
+          "UNKNOWN",
+          "UNKNOWN"
         ],
         "trial_eval_results": [
           "FN",
@@ -938,26 +938,26 @@
       "roi_sha256": "8c5840b81cd34eaa231a1ed9b7dfc2ad16b4668d8a4acb2c87b4d180bfb99c2c",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 37.5,
+      "fps_throughput": 35.4,
       "latency_stats": {
-        "warmup_frame_ms": 2365.73,
-        "steady_state_fps": 60.2,
-        "overall_fps": 37.5,
-        "tracker_mean_ms": 38.95,
-        "tracker_p50_ms": 37.68,
-        "tracker_p95_ms": 46.74,
-        "verifier_mean_ms": 1.85,
-        "verifier_p50_ms": 1.58,
-        "verifier_p95_ms": 1.91,
-        "inferred_frame_mean_ms": 44.2,
-        "inferred_frame_p50_ms": 42.81,
-        "inferred_frame_p95_ms": 52.94,
-        "skipped_frame_mean_ms": 2.66
+        "warmup_frame_ms": 2232.47,
+        "steady_state_fps": 53.3,
+        "overall_fps": 35.4,
+        "tracker_mean_ms": 47.02,
+        "tracker_p50_ms": 40.65,
+        "tracker_p95_ms": 76.32,
+        "verifier_mean_ms": 1.86,
+        "verifier_p50_ms": 1.54,
+        "verifier_p95_ms": 1.98,
+        "inferred_frame_mean_ms": 51.68,
+        "inferred_frame_p50_ms": 45.52,
+        "inferred_frame_p95_ms": 81.18,
+        "skipped_frame_mean_ms": 2.25
       },
-      "tracks_count": 7,
+      "tracks_count": 6,
       "confirmed_count": 4,
       "suspected_count": 1,
-      "normal_count": 2,
+      "normal_count": 1,
       "tracks": [
         {
           "track_id": 1,
@@ -994,26 +994,18 @@
         {
           "track_id": 5,
           "detections": 80,
-          "avg_conf": 0.596,
-          "avg_overlap": 22.3,
+          "avg_conf": 0.605,
+          "avg_overlap": 20.3,
           "status": "NORMAL",
           "best_crop_path": "reports/video_eval_crops\\video_test\\track_5_conf68.jpg"
         },
         {
           "track_id": 6,
-          "detections": 39,
-          "avg_conf": 0.5,
-          "avg_overlap": 9.4,
-          "status": "NORMAL",
-          "best_crop_path": "reports/video_eval_crops\\video_test\\track_6_conf57.jpg"
-        },
-        {
-          "track_id": 7,
           "detections": 1,
           "avg_conf": 0.615,
           "avg_overlap": 100.0,
           "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\video_test\\track_7_conf61.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test\\track_6_conf61.jpg"
         }
       ]
     },
@@ -1025,25 +1017,25 @@
       "roi_sha256": "79933d29cf75b569e929dbc1b04ecfd9694b8ff06cab3122b5da89599bbd8263",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 55.4,
+      "fps_throughput": 42.4,
       "latency_stats": {
-        "warmup_frame_ms": 140.05,
-        "steady_state_fps": 57.4,
-        "overall_fps": 55.4,
-        "tracker_mean_ms": 42.81,
-        "tracker_p50_ms": 38.65,
-        "tracker_p95_ms": 62.17,
-        "verifier_mean_ms": 1.0,
-        "verifier_p50_ms": 0.97,
-        "verifier_p95_ms": 1.29,
-        "inferred_frame_mean_ms": 47.14,
-        "inferred_frame_p50_ms": 43.3,
-        "inferred_frame_p95_ms": 66.61,
-        "skipped_frame_mean_ms": 2.51
+        "warmup_frame_ms": 236.97,
+        "steady_state_fps": 44.4,
+        "overall_fps": 42.4,
+        "tracker_mean_ms": 58.43,
+        "tracker_p50_ms": 46.93,
+        "tracker_p95_ms": 103.73,
+        "verifier_mean_ms": 1.21,
+        "verifier_p50_ms": 1.09,
+        "verifier_p95_ms": 1.71,
+        "inferred_frame_mean_ms": 62.82,
+        "inferred_frame_p50_ms": 51.38,
+        "inferred_frame_p95_ms": 107.88,
+        "skipped_frame_mean_ms": 2.42
       },
-      "tracks_count": 5,
+      "tracks_count": 4,
       "confirmed_count": 3,
-      "suspected_count": 2,
+      "suspected_count": 1,
       "normal_count": 0,
       "tracks": [
         {
@@ -1071,20 +1063,12 @@
           "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_3_conf68.jpg"
         },
         {
-          "track_id": 23,
+          "track_id": 20,
           "detections": 19,
           "avg_conf": 0.307,
           "avg_overlap": 91.9,
           "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_23_conf37.jpg"
-        },
-        {
-          "track_id": 33,
-          "detections": 1,
-          "avg_conf": 0.369,
-          "avg_overlap": 100.0,
-          "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_33_conf36.jpg"
+          "best_crop_path": "reports/video_eval_crops\\videotesst2\\track_20_conf37.jpg"
         }
       ]
     },
@@ -1096,25 +1080,25 @@
       "roi_sha256": "529ee774742c5d8b5f6a7730dec484f85f0a72755f323e3f9e626b5ae00b9fd9",
       "total_frames": 240,
       "duration_sec": 10.0,
-      "fps_throughput": 43.7,
+      "fps_throughput": 43.9,
       "latency_stats": {
-        "warmup_frame_ms": 195.4,
+        "warmup_frame_ms": 163.4,
         "steady_state_fps": 45.4,
-        "overall_fps": 43.7,
-        "tracker_mean_ms": 54.23,
-        "tracker_p50_ms": 48.59,
-        "tracker_p95_ms": 88.15,
-        "verifier_mean_ms": 2.32,
-        "verifier_p50_ms": 2.25,
-        "verifier_p95_ms": 2.85,
-        "inferred_frame_mean_ms": 60.15,
-        "inferred_frame_p50_ms": 54.34,
-        "inferred_frame_p95_ms": 93.98,
-        "skipped_frame_mean_ms": 2.68
+        "overall_fps": 43.9,
+        "tracker_mean_ms": 55.11,
+        "tracker_p50_ms": 48.72,
+        "tracker_p95_ms": 88.3,
+        "verifier_mean_ms": 2.6,
+        "verifier_p50_ms": 2.55,
+        "verifier_p95_ms": 3.09,
+        "inferred_frame_mean_ms": 60.86,
+        "inferred_frame_p50_ms": 55.32,
+        "inferred_frame_p95_ms": 93.65,
+        "skipped_frame_mean_ms": 2.35
       },
-      "tracks_count": 11,
+      "tracks_count": 10,
       "confirmed_count": 7,
-      "suspected_count": 3,
+      "suspected_count": 2,
       "normal_count": 1,
       "tracks": [
         {
@@ -1190,20 +1174,12 @@
           "best_crop_path": "reports/video_eval_crops\\video_test3\\track_9_conf34.jpg"
         },
         {
-          "track_id": 15,
-          "detections": 12,
-          "avg_conf": 0.449,
-          "avg_overlap": 100.0,
-          "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_15_conf54.jpg"
-        },
-        {
-          "track_id": 18,
+          "track_id": 10,
           "detections": 4,
           "avg_conf": 0.313,
           "avg_overlap": 100.0,
           "status": "SUSPECTED",
-          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_18_conf33.jpg"
+          "best_crop_path": "reports/video_eval_crops\\video_test3\\track_10_conf33.jpg"
         }
       ]
     }

@@ -52,6 +52,7 @@ class TemporalVerifier:
         stationary_window_seconds: float = 1.0,
         spatial_cooldown_radius: float = 50.0,
         adaptive_perspective_scale: bool = True,
+        min_stationary_seconds: float = None,
     ):
         """
         Args:
@@ -67,6 +68,7 @@ class TemporalVerifier:
             stationary_window_seconds: Độ rộng cửa sổ trượt kiểm tra đứng yên (mặc định 1.0s).
             spatial_cooldown_radius:   Bán kính không gian (pixels) khử trùng lặp khi nhảy ID.
             adaptive_perspective_scale: Tự động co ngưỡng dịch chuyển theo kích thước BBox ở xa.
+            min_stationary_seconds:    Thời gian đứng yên liên tục tối thiểu (giây) để CONFIRMED.
         """
         self.confirm_frames = confirm_frames
         self.confirm_seconds = confirm_seconds
@@ -82,6 +84,7 @@ class TemporalVerifier:
         self.max_displacement_pixels = max_displacement_pixels
         self.stationary_window_seconds = stationary_window_seconds
         self.adaptive_perspective_scale = adaptive_perspective_scale
+        self.min_stationary_seconds = min_stationary_seconds if min_stationary_seconds is not None else min(2.0, self.confirm_seconds)
 
         # Spatial deduplication khi track_id bị đổi
         self.spatial_cooldown_radius = spatial_cooldown_radius
@@ -118,7 +121,10 @@ class TemporalVerifier:
         cutoff = now - self.stationary_window_seconds
         recent = [item for item in window if item[0] >= cutoff]
         if len(recent) < 2:
-            return True
+            # Nếu trong cửa sổ gần nhất có < 2 frame, so với frame gần nhất trước đó trong lịch sử
+            recent = list(window)[-2:] if len(window) >= 2 else []
+            if len(recent) < 2:
+                return True
 
         xs = [p[1] for p in recent]
         ys = [p[2] for p in recent]
@@ -220,6 +226,7 @@ class TemporalVerifier:
                     "last_seen": self.current_frame_index,
                     "last_alert_time": None,
                     "non_viol_streak": 0,
+                    "stationary_since": None,
                     "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
                     "pos_window": deque(maxlen=200),   # deque lưu (timestamp, cx, cy, box_diag)
                 }
@@ -235,6 +242,14 @@ class TemporalVerifier:
             suspect_reason = ""
 
             if is_spatial_viol:
+                # Cập nhật trạng thái đứng yên liên tục
+                is_stationary = self._is_stationary(record, current_timestamp)
+                if is_stationary:
+                    if record.get("stationary_since") is None:
+                        record["stationary_since"] = current_timestamp
+                else:
+                    record["stationary_since"] = None
+
                 # Kiểm tra gián đoạn chuỗi vi phạm (gap lớn hơn dung sai liên tục)
                 frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
                 max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval)
@@ -246,6 +261,7 @@ class TemporalVerifier:
                         record["viol_start_time"] = current_timestamp
                         record["count"] = 0
                         record["status"] = TrackState.SUSPECTED
+                        record["stationary_since"] = None
 
                 if record["viol_start_time"] is None:
                     record["viol_start_time"] = current_timestamp
@@ -261,13 +277,14 @@ class TemporalVerifier:
 
                 # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
                 if self._confirm_threshold_reached(record, current_timestamp):
-                    # Kiểm tra đứng yên (sliding window) - áp dụng cho cả track mới và track đã CONFIRMED
-                    is_stationary = self._is_stationary(record, current_timestamp)
+                    # Kiểm tra đứng yên liên tục đủ thời lượng (loại trừ người đi bộ bê biển)
+                    stationary_dur = (current_timestamp - record["stationary_since"]) if record.get("stationary_since") is not None else 0.0
+                    is_stationary_long_enough = is_stationary and (stationary_dur >= self.min_stationary_seconds if self.require_stationary else True)
 
-                    if not is_stationary:
+                    if not is_stationary_long_enough:
                         # Đang di chuyển -> người bê biển đi ngang hoặc di dời biển, chuyển về SUSPECTED
                         record["status"] = TrackState.SUSPECTED
-                        suspect_reason = "DI CHUYEN"
+                        suspect_reason = f"DI CHUYEN ({stationary_dur:.1f}s<{self.min_stationary_seconds:.1f}s)"
                     elif avg_conf < self.min_avg_confidence:
                         # Confidence TB quá thấp -> giữ SUSPECTED
                         record["status"] = TrackState.SUSPECTED

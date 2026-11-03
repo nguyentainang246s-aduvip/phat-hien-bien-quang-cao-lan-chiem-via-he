@@ -31,8 +31,10 @@ TASK: 27 - Xây dựng Module camera/stream_reader.py tự động kết nối l
 
 import os
 import time
+import math
 import threading
 import cv2
+import numpy as np
 
 
 class StreamReader:
@@ -98,19 +100,22 @@ class StreamReader:
     def _stop_worker_thread(self):
         """Dừng an toàn luồng đọc nền trước khi giải phóng VideoCapture."""
         self._stop_event.set()
-        if self._thread is not None and self._thread.is_alive():
-            if threading.current_thread() != self._thread:
+        old_thread = self._thread
+        if old_thread is not None and old_thread.is_alive():
+            if threading.current_thread() != old_thread:
                 # Chờ timeout 3.5s (> timeout 2.0s của FFmpeg) để worker thread thoát an toàn khỏi cap.read()
-                self._thread.join(timeout=3.5)
+                old_thread.join(timeout=3.5)
         self._thread = None
+        return old_thread
 
     def _connect(self) -> bool:
         """Tạo kết nối tới nguồn camera an toàn đa luồng."""
-        self._stop_worker_thread()
+        old_thread = self._stop_worker_thread()
 
         with self._cap_lock:
-            # Kiểm tra nếu worker thread cũ vẫn còn sống thì detach tham chiếu thay vì release đồng thời (chống Segfault)
-            if self._thread is not None and self._thread.is_alive():
+            # Nếu worker thread cũ vẫn còn sống sau timeout, detach tham chiếu thay vì release() đồng thời (chống Segfault C++)
+            if old_thread is not None and old_thread.is_alive():
+                print("[CẢNH BÁO] Worker thread cũ vẫn đang bị kẹt trong cap.read(). Detach VideoCapture để tránh Segfault C++.")
                 self.cap = None
             elif self.cap is not None:
                 try:
@@ -130,10 +135,14 @@ class StreamReader:
                 print(f"[CẢNH BÁO] Không thể mở nguồn camera: {self.source}")
                 return False
 
-            # Lấy thông số luồng
+            # Lấy thông số luồng kèm kiểm tra FPS hợp lệ [5, 120] (chống lỗi time-base 90000 của RTSP FFmpeg)
             self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280
             self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 720
-            self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
+            raw_fps = self.cap.get(cv2.CAP_PROP_FPS)
+            if raw_fps is None or raw_fps < 5.0 or raw_fps > 120.0 or np.isnan(raw_fps):
+                self.fps = 24.0
+            else:
+                self.fps = float(raw_fps)
             print(f"[+] Kết nối camera thành công ({self.width}x{self.height}, {self.fps:.1f} FPS)")
         
         # Nếu là live stream / RTSP: Kích hoạt background thread để flush buffer liên tục
@@ -1164,6 +1173,7 @@ class SystemBenchmark:
             confirm_frames=20,
             confirm_seconds=3.0,
             cooldown_seconds=60.0,
+            min_stationary_seconds=2.0,
             source_fps=reader.fps
         )
 
