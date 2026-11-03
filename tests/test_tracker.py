@@ -25,8 +25,23 @@ def test_object_tracker():
     tracker = ObjectTracker(model_path=model_path, conf_threshold=0.20)
 
     # Đọc ảnh test
-    img_path = "data/images/Duck-ai-image-2026-09-14-09-20 (1).jpeg"
-    if not os.path.exists(img_path):
+    candidates = [
+        "data/images/Duck-ai-image-2026-09-14-09-20 (1).jpeg",
+        "data/images/Gemini_Generated_Image_137eek137eek137e.png",
+        "data/images/Screenshot 2026-09-30 214856.png"
+    ]
+    img_path = None
+    for c in candidates:
+        if os.path.exists(c):
+            img_path = c
+            break
+            
+    if not img_path:
+        images_dir = list(Path("data/images").glob("*.png")) + list(Path("data/images").glob("*.jpg"))
+        if images_dir:
+            img_path = str(images_dir[0])
+
+    if not img_path or not os.path.exists(img_path):
         print("[LỖI] Không tìm thấy ảnh kiểm thử!")
         return False
 

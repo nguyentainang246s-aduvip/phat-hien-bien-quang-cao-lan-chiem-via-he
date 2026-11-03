@@ -16,6 +16,8 @@ import urllib.parse
 from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 import cv2
 import threading
+import math
+import numpy as np
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -2435,10 +2437,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
 
+        function getTodayStrLocal() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
         async function loadDatesList() {
             try {
                 const res = await fetch('/api/dates');
-                allAvailableDates = await res.json();
+                allAvailableDates = await res.json() || [];
+
+                const todayStr = getTodayStrLocal();
+                const todayItem = allAvailableDates.find(item => item.date === todayStr);
+                if (!todayItem) {
+                    allAvailableDates.unshift({ date: todayStr, count: 0 });
+                }
 
                 // Nếu ngày mặc định chưa có dữ liệu và danh sách có ngày khác, chọn ngày mới nhất
                 if (allAvailableDates && allAvailableDates.length > 0) {
@@ -2463,13 +2479,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
 
-            const pillsHtml = allAvailableDates.slice(0, 5).map(item => {
+            const todayStr = getTodayStrLocal();
+            const pillsHtml = allAvailableDates.slice(0, 6).map(item => {
                 const isAct = (currentDateFilter === item.date) ? 'active' : '';
                 const safeDate = escapeHtml(item.date || '');
-                const label = escapeHtml(formatDateVN(item.date));
+                const isToday = (item.date === todayStr);
+                const label = isToday ? `Hôm nay (${formatDateVN(item.date)})` : formatDateVN(item.date);
+                const icon = isToday ? 'fa-solid fa-star' : 'fa-solid fa-calendar-day';
+                const todayStyle = isToday ? 'style="border-color: rgba(59, 130, 246, 0.6); font-weight: 700; background: rgba(59, 130, 246, 0.15);"' : '';
                 return `
-                    <button class="date-pill-btn ${isAct}" onclick="filterByDate('${safeDate}')" title="Chỉ xem hồ sơ ngày ${safeDate}">
-                        <i class="fa-solid fa-calendar-day"></i> ${label}
+                    <button class="date-pill-btn ${isAct}" ${todayStyle} onclick="filterByDate('${safeDate}')" title="Chỉ xem hồ sơ ngày ${safeDate}">
+                        <i class="${icon}" style="${isToday ? 'color: #f59e0b;' : ''}"></i> ${label}
                         <span class="date-pill-count">${parseInt(item.count, 10) || 0}</span>
                     </button>
                 `;
@@ -4405,7 +4425,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         cap = cv2.VideoCapture(video_path)
         raw_fps = cap.get(cv2.CAP_PROP_FPS)
-        fps_source = float(raw_fps) if (raw_fps and 5.0 <= raw_fps <= 120.0 and not np.isnan(raw_fps)) else 24.0
+        try:
+            fps_source = float(raw_fps) if (raw_fps and 5.0 <= float(raw_fps) <= 120.0 and not math.isnan(float(raw_fps))) else 24.0
+        except Exception:
+            fps_source = 24.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
         frame_delay = 1.0 / max(10.0, fps_source)
 

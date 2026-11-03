@@ -141,6 +141,7 @@ def test_violation_database():
 
     print("\n[OK] 100% CSDL SQLITE HOẠT ĐỘNG HOÀN HẢO THEO CHUẨN ĐỒ ÁN!")
     print("=" * 65)
+    return True
 
 
 if __name__ == "__main__":

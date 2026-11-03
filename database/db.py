@@ -156,7 +156,7 @@ class ViolationDatabase:
                   AND ABS(bbox_x2 - ?) <= ?
                   AND ABS(bbox_y2 - ?) <= ?
                   AND (
-                      status IN ('pending', 'confirmed')
+                      (status IN ('pending', 'confirmed') AND DATE(timestamp) = DATE('now', 'localtime'))
                       OR (status = 'dismissed' AND COALESCE(reviewed_at, timestamp) >= datetime('now', 'localtime', ?))
                   )
             """, (
