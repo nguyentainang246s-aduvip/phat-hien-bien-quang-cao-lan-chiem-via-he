@@ -4,9 +4,9 @@
 # ==============================================================================
 
 tracker_type: bytetrack       # Thuật toán theo vết: bytetrack
-track_high_thresh: 0.25       # Ngưỡng tin cậy vòng 1 (đối tượng rõ nét, match trước)
-track_low_thresh: 0.10        # Ngưỡng tin cậy vòng 2 (phục hồi vết khi bị che khuất tạm thời)
-new_track_thresh: 0.25        # Ngưỡng khởi tạo track ID mới (tránh sinh track rác từ nhiễu)
-track_buffer: 30              # Số frames duy trì trạng thái Kalman Filter khi mất dấu (~1.0s - 3.0s)
+track_high_thresh: 0.20       # Ngưỡng tin cậy vòng 1 (đối tượng rõ nét, match trước)
+track_low_thresh: 0.08        # Ngưỡng tin cậy vòng 2 (phục hồi vết khi bị che khuất tạm thời)
+new_track_thresh: 0.20        # Ngưỡng khởi tạo track ID mới (tránh sinh track rác từ nhiễu)
+track_buffer: 60              # Số frames duy trì trạng thái Kalman Filter khi mất dấu (~2.5s ở 24FPS)
 match_thresh: 0.80            # Ngưỡng tương đồng IoU liên tiếp giữa các khung hình
 fuse_score: True              # Kết hợp điểm tin cậy detection với chi phí chuyển động Kalman

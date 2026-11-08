@@ -18,11 +18,13 @@ def draw_fps_badge(frame, fps_value: float, video_fps: float = None):
 def draw_detection(frame, box, label, is_violation=False, track_id=None, status=None):
     x1, y1, x2, y2 = box
     
-    # Xác định màu sắc theo 3 cấp độ: ĐỎ (Confirmed) | VÀNG CAM (Suspected) | XANH (Normal)
+    # Xác định màu sắc theo các cấp độ: ĐỎ (Confirmed) | CAM (Suspected) | CYAN (Moving) | XANH (Normal)
     if status == "CONFIRMED" or (status is None and is_violation):
         color = (0, 0, 255)       # Đỏ: Đã xác nhận vi phạm
     elif status == "SUSPECTED":
-        color = (0, 165, 255)     # Vàng cam: Đang nghi vấn (chờ đủ N frames)
+        color = (0, 165, 255)     # Vàng cam: Đang nghi vấn (chờ đủ thời gian đứng yên)
+    elif status == "MOVING":
+        color = (255, 215, 0)     # Xanh lơ / Vàng chanh: Vật thể di chuyển (loại trừ, không phạt)
     else:
         color = (0, 255, 0)       # Xanh lá: Hợp lệ / Bình thường
     

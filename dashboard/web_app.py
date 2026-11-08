@@ -26,6 +26,16 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 sys.path.insert(0, os.path.abspath("."))
 
+# Tự động kích hoạt môi trường ảo .venv nếu chạy ngoài venv
+_venv_py = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".venv", "Scripts", "python.exe"))
+if os.path.exists(_venv_py) and os.path.normcase(sys.executable) != os.path.normcase(_venv_py):
+    try:
+        import ultralytics
+    except ImportError:
+        import subprocess
+        result = subprocess.run([_venv_py] + sys.argv)
+        sys.exit(result.returncode)
+
 from database import ViolationDatabase
 from roi import ROIManager
 
@@ -3514,7 +3524,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function onPlayerSkipChange() {
             const select = document.getElementById('player-skip-select');
             if (select) {
-                currentFrameSkip = parseInt(select.value) || 1;
+                const val = parseInt(select.value, 10);
+                currentFrameSkip = isNaN(val) ? 1 : val;
                 if (currentStreamVideo && currentPlayerMode === 'ai') {
                     currentStreamToken = Date.now();
                     updatePlayerSource();
@@ -4451,7 +4462,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             source_fps=effective_fps,
             min_avg_confidence=0.40,
             require_stationary=True,
-            max_displacement_pixels=50.0
+            max_displacement_pixels=40.0,
+            max_velocity_pixels_per_sec=35.0,
+            min_stationary_seconds=2.0,
+            tolerance_frames=5,
+            max_missing_frames=45
         )
         fps_tracker = FPSTracker(alpha=0.15)
         tracker = get_shared_tracker(conf_threshold=conf, imgsz=imgsz)
@@ -4495,7 +4510,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
                 if is_infer:
                     with _TRACKER_INFER_LOCK:
-                        tracked_objs = tracker.track(frame, conf=conf, imgsz=imgsz)
+                        # Kỹ thuật 1 & 3: Hysteresis Thresholding & Spatial Adaptive Thresholding theo ROI
+                        tracked_objs = tracker.track(frame, conf=conf, imgsz=imgsz, roi_polygons=roi_manager.polygons)
                     sim_ts = frame_idx / fps_source
                     last_results = verifier.process_frame(
                         tracked_objs, checker, roi_manager.polygons, current_timestamp=sim_ts
@@ -4508,6 +4524,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         stat = obj["temporal_status"]
                         sp = obj["spatial_res"]
                         box = obj["box"]
+                        is_mov = obj.get("is_moving", False)
+
                         if stat == TrackState.CONFIRMED:
                             viol_count += 1
                             confirmed_ids.add(tid)
@@ -4535,6 +4553,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                         sidewalk_index=sw_idx
                                     )
                                     print(f"   [WEB LIVE AI] Đã lưu bằng chứng & hồ sơ vi phạm #{rec_id} cho Track #{tid} ({camera_clean_id})")
+                        elif is_mov or stat == TrackState.MOVING:
+                            # Kỹ thuật 2: Đang di chuyển (xe cộ / người bê biển) -> Loại trừ khỏi vi phạm
+                            reason = obj.get("suspect_reason", "DI CHUYEN")
+                            events.append({"track_id": tid, "status": "MOVING", "overlap": sp["overlap_pct"], "reason": reason})
                         elif stat == TrackState.SUSPECTED:
                             events.append({"track_id": tid, "status": "SUSPECTED", "overlap": sp["overlap_pct"]})
                         else:
@@ -4560,13 +4582,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         stat = obj["temporal_status"]
                         sp = obj["spatial_res"]
                         ov_pct = sp["overlap_pct"]
+                        is_mov = obj.get("is_moving", False)
+
                         if stat == TrackState.CONFIRMED:
                             lbl = f"ID #{tid} VI PHAM {ov_pct:.0f}%"
+                            draw_stat = TrackState.CONFIRMED
+                        elif is_mov or stat == TrackState.MOVING:
+                            reason = obj.get("suspect_reason", "DI CHUYEN")
+                            lbl = f"ID #{tid} [BO QUA] {reason}"
+                            draw_stat = "MOVING"
                         elif stat == TrackState.SUSPECTED:
                             lbl = f"ID #{tid} NGHI VAN {ov_pct:.0f}%"
+                            draw_stat = TrackState.SUSPECTED
                         else:
                             lbl = f"ID #{tid} HOP LE {ov_pct:.0f}%"
-                        draw_detection(frame, box, lbl, is_violation=(stat == TrackState.CONFIRMED), track_id=tid, status=stat)
+                            draw_stat = TrackState.NORMAL
+
+                        draw_detection(frame, box, lbl, is_violation=(stat == TrackState.CONFIRMED), track_id=tid, status=draw_stat)
 
                     draw_fps_badge(frame, curr_fps)
                     hud_title = f"{video_name} | Khung {frame_idx}/{total_frames} | Vi pham: {len(confirmed_ids)}"

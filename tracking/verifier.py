@@ -3,19 +3,16 @@
 ĐỒ ÁN TỐT NGHIỆP: PHÁT HIỆN BIỂN HIỆU/BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
 Chủ đề: Temporal Reasoning & False Positive Elimination
 TASK: 22 - Xây dựng Module tracking/verifier.py (Bộ lọc xác nhận theo thời gian)
-
-v2.2 – Nâng cấp hoàn thiện bảo vệ ĐATN:
-  - Chuyển từ displacement-from-origin sang cửa sổ trượt (sliding window 1.0s)
-    để không từ chối biển được đặt xuống rồi đứng yên.
-  - Bổ sung cơ chế Perspective-Adaptive Stationary Check (chuẩn hóa ngưỡng dịch
-    chuyển theo kích thước đường chéo hộp giới hạn kết hợp trần max_displacement_pixels).
-  - Tính thời gian vi phạm bằng giây thực (time.time() / simulated_ts) thay vì
-    số frame, bất biến với frame_skip và biến thiên FPS.
+Tích hợp:
+  (2) Motion Filter (Bộ lọc chuyển động và vận tốc dịch chuyển)
+  - Phân loại rõ ràng biển tĩnh với xe cộ/người đi bộ (TrackState.MOVING).
+  - Perspective-Adaptive Scale theo đường chéo Bounding Box.
 ==============================================================================
 """
 
 import time
 from collections import deque
+from .motion_filter import MotionFilter
 
 
 class TrackState:
@@ -23,6 +20,7 @@ class TrackState:
     NORMAL = "NORMAL"          # Biển hợp lệ, không lấn chiếm vỉa hè
     SUSPECTED = "SUSPECTED"    # Nghi vấn vi phạm (< N giây liên tiếp, chưa phạt)
     CONFIRMED = "CONFIRMED"    # ĐÃ XÁC NHẬN VI PHẠM (>= N giây liên tiếp)
+    MOVING = "MOVING"          # Đối tượng đang di chuyển (xe cộ, người bê biển - loại trừ)
 
 
 class TemporalVerifier:
@@ -30,10 +28,10 @@ class TemporalVerifier:
     Bộ lọc xác nhận vi phạm theo chuỗi thời gian (Temporal Verification).
 
     Nguyên lý: Chỉ kết luận và phát cảnh báo vi phạm khi một đối tượng (track_id)
-    duy trì hành vi lấn chiếm vỉa hè liên tục trong tối thiểu N GIÂY THỰC.
+    duy trì hành vi lấn chiếm vỉa hè liên tục trong tối thiểu N GIÂY THỰC và ở trạng thái TĨNH.
 
     Cơ chế sàng lọc:
-      - Người đi bộ bê biển đi ngang qua vỉa hè (sliding window displacement).
+      - Loại bỏ phương tiện giao thông gắn quảng cáo và người bưng bê biển (Motion Filter).
       - Xe cộ vô tình che khuất chớp nhoáng (Flickering) với tolerance_frames.
       - Cảnh báo trùng lặp (Spam Alert) nhờ cơ chế Cooldown Timer & Spatial Radius.
     """
@@ -43,12 +41,13 @@ class TemporalVerifier:
         confirm_frames: int = 20,
         confirm_seconds: float = 3.0,
         cooldown_seconds: float = 60.0,
-        max_missing_frames: int = 30,
-        tolerance_frames: int = 2,
+        max_missing_frames: int = 45,
+        tolerance_frames: int = 4,
         source_fps: float = None,
         min_avg_confidence: float = 0.40,
         require_stationary: bool = True,
-        max_displacement_pixels: float = 50.0,
+        max_displacement_pixels: float = 40.0,
+        max_velocity_pixels_per_sec: float = 35.0,
         stationary_window_seconds: float = 1.0,
         spatial_cooldown_radius: float = 50.0,
         adaptive_perspective_scale: bool = True,
@@ -65,6 +64,7 @@ class TemporalVerifier:
             min_avg_confidence:        Ngưỡng confidence TB tối thiểu để CONFIRMED.
             require_stationary:        Bật/tắt bộ lọc yêu cầu vật thể đứng yên.
             max_displacement_pixels:   Độ dời tối đa (trần) trong cửa sổ để coi là đứng yên.
+            max_velocity_pixels_per_sec: Vận tốc di chuyển tối đa (px/s) để coi là đứng yên.
             stationary_window_seconds: Độ rộng cửa sổ trượt kiểm tra đứng yên (mặc định 1.0s).
             spatial_cooldown_radius:   Bán kính không gian (pixels) khử trùng lặp khi nhảy ID.
             adaptive_perspective_scale: Tự động co ngưỡng dịch chuyển theo kích thước BBox ở xa.
@@ -76,15 +76,24 @@ class TemporalVerifier:
         self.max_missing_frames = max_missing_frames
         self.tolerance_frames = tolerance_frames
         self.source_fps = source_fps
-
         self.min_avg_confidence = min_avg_confidence
 
-        # --- Stationary check (sliding window + perspective-adaptive) ---
+        # --- Motion Filter config ---
         self.require_stationary = require_stationary
         self.max_displacement_pixels = max_displacement_pixels
+        self.max_velocity_pixels_per_sec = max_velocity_pixels_per_sec
         self.stationary_window_seconds = stationary_window_seconds
         self.adaptive_perspective_scale = adaptive_perspective_scale
         self.min_stationary_seconds = min_stationary_seconds if min_stationary_seconds is not None else min(2.0, self.confirm_seconds)
+
+        # Khởi tạo bộ lọc chuyển động độc lập (MotionFilter)
+        self.motion_filter = MotionFilter(
+            max_displacement_pixels=self.max_displacement_pixels,
+            max_velocity_pixels_per_sec=self.max_velocity_pixels_per_sec,
+            window_seconds=self.stationary_window_seconds,
+            min_stationary_seconds=self.min_stationary_seconds,
+            adaptive_perspective_scale=self.adaptive_perspective_scale,
+        )
 
         # Spatial deduplication khi track_id bị đổi
         self.spatial_cooldown_radius = spatial_cooldown_radius
@@ -104,46 +113,14 @@ class TemporalVerifier:
         return max(0.0, now - record["viol_start_time"])
 
     def _is_stationary(self, record: dict, now: float) -> bool:
-        """
-        Kiểm tra cửa sổ trượt: lấy tất cả vị trí trong `stationary_window_seconds`
-        gần nhất, tính khoảng cách cực đại giữa các vị trí trong cửa sổ.
-        Nếu bật `adaptive_perspective_scale`, ngưỡng dịch chuyển tối đa được chuẩn hóa
-        theo đường chéo trung bình của Bounding Box (50% đường chéo, tối thiểu 15px,
-        tối đa `max_displacement_pixels`), giúp chống sai lệch phối cảnh ở cự ly xa.
-        """
+        """Kiểm tra xem đối tượng có đang đứng yên không (tương thích ngược)."""
         if not self.require_stationary:
             return True
-
-        window = record.get("pos_window")
-        if window is None or len(window) < 2:
-            return True  # Không đủ dữ liệu -> giả định đứng yên
-
-        cutoff = now - self.stationary_window_seconds
-        recent = [item for item in window if item[0] >= cutoff]
-        if len(recent) < 2:
-            # Nếu trong cửa sổ gần nhất có < 2 frame, so với frame gần nhất trước đó trong lịch sử
-            recent = list(window)[-2:] if len(window) >= 2 else []
-            if len(recent) < 2:
-                return True
-
-        xs = [p[1] for p in recent]
-        ys = [p[2] for p in recent]
-        max_d = max(
-            ((xs[i] - xs[j]) ** 2 + (ys[i] - ys[j]) ** 2) ** 0.5
-            for i in range(len(recent))
-            for j in range(i + 1, len(recent))
-        )
-
-        effective_threshold = self.max_displacement_pixels
-        if self.adaptive_perspective_scale and len(recent[-1]) >= 4:
-            avg_diag = sum(p[3] for p in recent) / len(recent)
-            if avg_diag > 0:
-                effective_threshold = min(
-                    self.max_displacement_pixels,
-                    max(15.0, avg_diag * 0.50)
-                )
-
-        return max_d <= effective_threshold
+        track_id = record.get("track_id")
+        if track_id is not None:
+            res = self.motion_filter.estimate_motion(track_id, now)
+            return not res["is_moving"]
+        return True
 
     def _confirm_threshold_reached(self, record: dict, now: float) -> bool:
         """
@@ -199,17 +176,33 @@ class TemporalVerifier:
             # Tính tọa độ tâm và đường chéo hộp giới hạn
             cx = (box[0] + box[2]) / 2.0
             cy = (box[1] + box[3]) / 2.0
-            box_diag = ((box[2] - box[0]) ** 2 + (box[3] - box[1]) ** 2) ** 0.5
+
+            # Cập nhật và đánh giá chuyển động qua MotionFilter
+            if track_id > 0 and self.require_stationary:
+                motion_res = self.motion_filter.update(track_id, box, current_timestamp)
+                is_moving = motion_res["is_moving"]
+                is_stationary_long_enough = motion_res["is_stationary"]
+                velocity = motion_res["velocity_px_s"]
+                stationary_dur = motion_res["stationary_duration"]
+            else:
+                is_moving = False
+                is_stationary_long_enough = True
+                velocity = 0.0
+                stationary_dur = 0.0
 
             # Vật thể chưa có track_id hợp lệ (frame đầu tiên xuất hiện)
             if track_id <= 0:
+                initial_status = TrackState.SUSPECTED if is_spatial_viol else TrackState.NORMAL
                 enriched_results.append({
                     "track_id": track_id,
                     "box": box,
                     "conf": conf,
                     "spatial_res": spatial_res,
-                    "temporal_status": TrackState.SUSPECTED if is_spatial_viol else TrackState.NORMAL,
+                    "temporal_status": initial_status,
+                    "suspect_reason": "",
                     "violation_frames": 1 if is_spatial_viol else 0,
+                    "violation_seconds": 0.0,
+                    "velocity_px_s": 0.0,
                     "is_new_alert": False,
                 })
                 continue
@@ -219,6 +212,7 @@ class TemporalVerifier:
             # 2. Khởi tạo bản ghi nếu là ID mới
             if track_id not in self.track_records:
                 self.track_records[track_id] = {
+                    "track_id": track_id,
                     "count": 0,
                     "viol_start_time": None,
                     "last_viol_timestamp": None,
@@ -227,103 +221,94 @@ class TemporalVerifier:
                     "last_alert_time": None,
                     "alerted": False,
                     "non_viol_streak": 0,
-                    "stationary_since": None,
-                    "viol_confs": deque(maxlen=200),   # deque lưu (timestamp, conf)
-                    "pos_window": deque(maxlen=200),   # deque lưu (timestamp, cx, cy, box_diag)
+                    "viol_confs": deque(maxlen=200),
                 }
 
             record = self.track_records[track_id]
             record["last_seen"] = self.current_frame_index
 
-            # Cập nhật sliding window vị trí kèm đường chéo BBox
-            record["pos_window"].append((current_timestamp, cx, cy, box_diag))
-
-            # 3. Cập nhật bộ đếm thời gian
+            # 3. Cập nhật bộ đếm thời gian & phân tích trạng thái
             is_new_alert = False
             suspect_reason = ""
 
             if is_spatial_viol:
-                # Cập nhật trạng thái đứng yên liên tục
-                is_stationary = self._is_stationary(record, current_timestamp)
-                if is_stationary:
-                    if record.get("stationary_since") is None:
-                        record["stationary_since"] = current_timestamp
+                if is_moving:
+                    # KỸ THUẬT 2: ĐỐI TƯỢNG ĐANG DI CHUYỂN TRÊN VỈA HÈ (Xe buýt, người bê biển)
+                    # Giữ ở diện nghi vấn SUSPECTED với lý do DI CHUYEN, loại trừ hoàn toàn khỏi CONFIRMED
+                    record["status"] = TrackState.SUSPECTED
+                    suspect_reason = f"DI CHUYEN ({velocity:.0f}px/s)"
+                    record["viol_confs"].clear()
+                    record["count"] = 0
+                    record["viol_start_time"] = None
+                    record["last_viol_timestamp"] = current_timestamp
+
                 else:
-                    record["stationary_since"] = None
+                    # Đối tượng đang ở vị trí vi phạm và TĨNH (không di chuyển nhanh)
+                    frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
+                    max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval)
+                    if record["last_viol_timestamp"] is not None:
+                        gap = current_timestamp - record["last_viol_timestamp"]
+                        if gap > max_allowed_gap:
+                            record["viol_confs"].clear()
+                            record["viol_start_time"] = current_timestamp
+                            record["count"] = 0
+                            record["status"] = TrackState.SUSPECTED
 
-                # Kiểm tra gián đoạn chuỗi vi phạm (gap lớn hơn dung sai liên tục)
-                frame_interval = (1.0 / self.source_fps) if self.source_fps else 0.04
-                max_allowed_gap = max(0.6, (self.tolerance_frames + 2) * frame_interval)
-                if record["last_viol_timestamp"] is not None:
-                    gap = current_timestamp - record["last_viol_timestamp"]
-                    if gap > max_allowed_gap:
-                        # Gián đoạn quá lâu -> reset chuỗi quan sát liên tục và hạ trạng thái về SUSPECTED
-                        record["viol_confs"].clear()
+                    if record["viol_start_time"] is None:
                         record["viol_start_time"] = current_timestamp
-                        record["count"] = 0
-                        record["status"] = TrackState.SUSPECTED
-                        record["stationary_since"] = None
 
-                if record["viol_start_time"] is None:
-                    record["viol_start_time"] = current_timestamp
+                    record["last_viol_timestamp"] = current_timestamp
+                    record["viol_confs"].append((current_timestamp, conf))
+                    record["count"] = len(record["viol_confs"])
+                    record["non_viol_streak"] = 0
 
-                record["last_viol_timestamp"] = current_timestamp
-                record["viol_confs"].append((current_timestamp, conf))
-                record["count"] = len(record["viol_confs"])
-                record["non_viol_streak"] = 0
+                    # Tính confidence trung bình trên chuỗi quan sát
+                    confs = [c for t, c in record["viol_confs"]]
+                    avg_conf = (sum(confs) / len(confs)) if confs else 0.0
 
-                # Tính confidence trung bình trên chuỗi quan sát thực tế (không bị thổi phồng khi decay)
-                confs = [c for t, c in record["viol_confs"]]
-                avg_conf = (sum(confs) / len(confs)) if confs else 0.0
+                    # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
+                    if self._confirm_threshold_reached(record, current_timestamp):
+                        if not is_stationary_long_enough and self.require_stationary:
+                            # Vừa mới dừng lại, chưa đủ thời gian đứng yên tối thiểu
+                            record["status"] = TrackState.SUSPECTED
+                            suspect_reason = f"CHO TINH ({stationary_dur:.1f}s<{self.min_stationary_seconds:.1f}s)"
+                        elif avg_conf < self.min_avg_confidence:
+                            record["status"] = TrackState.SUSPECTED
+                            suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
+                        else:
+                            record["status"] = TrackState.CONFIRMED
+                            suspect_reason = ""
 
-                # Kiểm tra đã đạt ngưỡng thời gian/frame chưa
-                if self._confirm_threshold_reached(record, current_timestamp):
-                    # Kiểm tra đứng yên liên tục đủ thời lượng (loại trừ người đi bộ bê biển)
-                    stationary_dur = (current_timestamp - record["stationary_since"]) if record.get("stationary_since") is not None else 0.0
-                    is_stationary_long_enough = is_stationary and (stationary_dur >= self.min_stationary_seconds if self.require_stationary else True)
-
-                    if not is_stationary_long_enough:
-                        # Đang di chuyển -> người bê biển đi ngang hoặc di dời biển, chuyển về SUSPECTED
-                        record["status"] = TrackState.SUSPECTED
-                        suspect_reason = f"DI CHUYEN ({stationary_dur:.1f}s<{self.min_stationary_seconds:.1f}s)"
-                    elif avg_conf < self.min_avg_confidence:
-                        # Confidence TB quá thấp -> giữ SUSPECTED
-                        record["status"] = TrackState.SUSPECTED
-                        suspect_reason = f"CONF {int(avg_conf * 100)}%<{int(self.min_avg_confidence * 100)}%"
+                        # Khử trùng lặp cảnh báo (Deduplication)
+                        if record["status"] == TrackState.CONFIRMED:
+                            if not record.get("alerted", False):
+                                is_spatially_cooldown = any(
+                                    ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
+                                    and (current_timestamp - c["time"]) < self.cooldown_seconds
+                                    for c in self.confirmed_locations
+                                )
+                                if not is_spatially_cooldown:
+                                    is_new_alert = True
+                                    record["alerted"] = True
+                                    record["last_alert_time"] = current_timestamp
+                                    self.confirmed_locations.append({
+                                        "cx": cx,
+                                        "cy": cy,
+                                        "time": current_timestamp,
+                                        "track_id": track_id,
+                                    })
+                                    # Dọn dẹp mốc cũ
+                                    self.confirmed_locations = [
+                                        c for c in self.confirmed_locations
+                                        if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
+                                    ]
                     else:
-                        record["status"] = TrackState.CONFIRMED
+                        if record["status"] != TrackState.CONFIRMED:
+                            record["status"] = TrackState.SUSPECTED
                         suspect_reason = ""
 
-                    # Spatial & temporal deduplication (khử trùng lặp theo vụ việc/incident)
-                    if record["status"] == TrackState.CONFIRMED:
-                        if not record.get("alerted", False):
-                            is_spatially_cooldown = any(
-                                ((cx - c["cx"]) ** 2 + (cy - c["cy"]) ** 2) ** 0.5 <= self.spatial_cooldown_radius
-                                and (current_timestamp - c["time"]) < self.cooldown_seconds
-                                for c in self.confirmed_locations
-                            )
-                            if not is_spatially_cooldown:
-                                is_new_alert = True
-                                record["alerted"] = True
-                                record["last_alert_time"] = current_timestamp
-                                self.confirmed_locations.append({
-                                    "cx": cx,
-                                    "cy": cy,
-                                    "time": current_timestamp,
-                                    "track_id": track_id,
-                                })
-                                # Dọn dẹp mốc cũ
-                                self.confirmed_locations = [
-                                    c for c in self.confirmed_locations
-                                    if (current_timestamp - c["time"]) <= self.cooldown_seconds * 2
-                                ]
-                else:
-                    if record["status"] != TrackState.CONFIRMED:
-                        record["status"] = TrackState.SUSPECTED
-                    suspect_reason = ""
-
             else:
-                # Không vi phạm ở frame này
+                # Không vi phạm ở khung hình này (hợp lệ hoặc nằm ngoài vỉa hè)
                 record["non_viol_streak"] += 1
                 tolerance_time = (self.tolerance_frames / self.source_fps) if (self.source_fps and self.source_fps > 0) else None
                 if tolerance_time is not None and record["last_viol_timestamp"] is not None:
@@ -332,7 +317,6 @@ class TemporalVerifier:
                     streak_exceeded = record["non_viol_streak"] > self.tolerance_frames
 
                 if streak_exceeded:
-                    # Vượt ngưỡng dung sai -> reset hoàn toàn
                     record["count"] = 0
                     record["viol_confs"].clear()
                     record["viol_start_time"] = None
@@ -340,7 +324,6 @@ class TemporalVerifier:
                     record["status"] = TrackState.NORMAL
                     record["alerted"] = False
                 else:
-                    # Trong ngưỡng dung sai (1-2 frame flicker): trừ conf tương ứng khi decay
                     if record["viol_confs"]:
                         record["viol_confs"].popleft()
                     record["count"] = len(record["viol_confs"])
@@ -359,8 +342,10 @@ class TemporalVerifier:
                 "spatial_res": spatial_res,
                 "temporal_status": record["status"],
                 "suspect_reason": suspect_reason,
+                "is_moving": is_moving,
                 "violation_frames": record["count"],
                 "violation_seconds": round(self._elapsed_viol_seconds(record, current_timestamp), 2),
+                "velocity_px_s": round(velocity, 1),
                 "is_new_alert": is_new_alert,
             })
 
@@ -384,7 +369,7 @@ class TemporalVerifier:
                         r["last_viol_timestamp"] = None
                     else:
                         if r["viol_confs"]:
-                            r["viol_confs"].popleft()  # Trừ conf tương ứng khi decay
+                            r["viol_confs"].popleft()
                         r["count"] = len(r["viol_confs"])
                         if r["count"] == 0:
                             r["viol_start_time"] = None
@@ -392,7 +377,6 @@ class TemporalVerifier:
                             r["status"] = TrackState.NORMAL
                         else:
                             r["viol_start_time"] = r["viol_confs"][0][0]
-                            # Nếu thời gian vi phạm hoặc số frame tụt dưới ngưỡng xác nhận, hạ từ CONFIRMED về SUSPECTED
                             if r["status"] == TrackState.CONFIRMED and not self._confirm_threshold_reached(r, current_timestamp):
                                 r["status"] = TrackState.SUSPECTED
 
@@ -403,6 +387,7 @@ class TemporalVerifier:
         ]
         for tid in stale_ids:
             del self.track_records[tid]
+            self.motion_filter.reset(tid)
 
         return enriched_results
 
@@ -411,3 +396,5 @@ class TemporalVerifier:
         self.track_records.clear()
         self.confirmed_locations.clear()
         self.current_frame_index = 0
+        if hasattr(self, 'motion_filter'):
+            self.motion_filter.reset()

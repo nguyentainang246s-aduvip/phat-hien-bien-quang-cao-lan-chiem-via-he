@@ -30,10 +30,10 @@ performance:
 
 tracking:
   tracker_config: "configs/bytetrack_custom.yaml" # File cấu hình ByteTrack chuẩn Ultralytics
-  track_high_thresh: 0.25      # Ngưỡng tin cậy vòng 1 (đối tượng rõ nét)
-  track_low_thresh: 0.10       # Ngưỡng tin cậy vòng 2 (phục hồi vết khi bị che khuất)
-  new_track_thresh: 0.25       # Ngưỡng khởi tạo track mới
-  track_buffer: 30             # Số frames duy trì trạng thái Kalman khi mất dấu
+  track_high_thresh: 0.20      # Ngưỡng tin cậy vòng 1 (đối tượng rõ nét)
+  track_low_thresh: 0.08       # Ngưỡng tin cậy vòng 2 (phục hồi vết khi bị che khuất)
+  new_track_thresh: 0.20       # Ngưỡng khởi tạo track mới
+  track_buffer: 60             # Số frames duy trì trạng thái Kalman khi mất dấu (~2.5s)
   match_thresh: 0.80           # Ngưỡng ghép cặp IoU liên tiếp
   fuse_score: true             # Kết hợp điểm tin cậy và chuyển động
 
@@ -47,12 +47,40 @@ temporal:
   confirm_seconds: 3.0         # Thời gian vi phạm tối thiểu quy ra giây (3.0s - 10.0s trên camera thật)
   min_stationary_seconds: 2.0  # Thời gian đứng yên liên tục tối thiểu (giây) để loại trừ người bê biển
   cooldown_seconds: 60.0       # Thời gian chờ (giây) chống gửi cảnh báo trùng lặp
-  max_missing_frames: 30       # Xóa track khỏi RAM nếu mất dấu quá 30 frames (~1s)
-  tolerance_frames: 2          # Dung sai 1-2 frames rung lắc/flicker trước khi reset
+  max_missing_frames: 45       # Xóa track khỏi RAM nếu mất dấu quá 45 frames (~1.5s - 2s)
+  tolerance_frames: 5          # Dung sai frames rung lắc/flicker/che khuất ngắn trước khi reset
   min_avg_confidence: 0.40     # Ngưỡng confidence trung bình tối thiểu để CONFIRMED
   require_stationary: true     # Bật bộ lọc vật thể đứng yên (loại bỏ người bê biển đi ngang)
   max_displacement_pixels: 50.0 # Độ dời tâm tối đa (pixels) trong cửa sổ quan sát
   spatial_cooldown_radius: 50.0 # Bán kính không gian (pixels) để khử trùng khi nhảy ID
+
+# ==============================================================================
+# BỘ 3 KỸ THUẬT NÂNG CAO ĐỘ CHÍNH XÁC KHÔNG CẦN RETRAIN (TỐI ƯU EDGE AI)
+# ==============================================================================
+enhancements:
+  # Kỹ thuật 1: Hysteresis Thresholding (Ngưỡng trễ kép kích hoạt & duy trì ByteTrack)
+  hysteresis_tracking:
+    enabled: true
+    activation_conf: 0.22      # Ngưỡng tối thiểu kích hoạt track mới (lọc bỏ nhiễu ban đầu)
+    retention_conf: 0.08       # Ngưỡng tối thiểu duy trì track đã bám vết (chống đứt vết khi che khuất)
+    enable_coasting: true      # Duy trì hiển thị box khi bị che khuất ngắn (chống chớp tắt 100%)
+    max_coast_frames: 16       # Số frames giữ hiển thị khi mất dấu (~0.7s at 24fps, ~2.0s at skip=2)
+    enable_stitching: true     # Hàn gắn lại ID cũ nếu biển tĩnh xuất hiện lại sau che khuất dài
+
+  # Kỹ thuật 2: Motion Filter (Bộ lọc vận tốc & loại trừ phương tiện/người di chuyển)
+  motion_filter:
+    enabled: true
+    max_displacement_pixels: 40.0   # Độ dời tâm tối đa cho phép trong cửa sổ trượt (pixels)
+    max_velocity_pixels_per_sec: 35.0 # Vận tốc dịch chuyển tối đa (px/s) để coi là biển tĩnh
+    stationary_window_seconds: 1.0  # Độ dài cửa sổ trượt tính vận tốc & độ dời (giây)
+    min_stationary_seconds: 2.0     # Thời gian đứng yên liên tục tối thiểu để chuyển sang diện nghi vấn
+    adaptive_perspective_scale: true # Co giãn ngưỡng dịch chuyển theo kích thước BBox ở xa
+
+  # Kỹ thuật 3: Spatial Adaptive Thresholding (Ngưỡng tự thích ứng không gian theo ROI)
+  spatial_adaptive:
+    enabled: true
+    conf_inside_roi: 0.20      # Ngưỡng nhạy cao trong ROI vỉa hè (tối đa hóa Recall, bắt trọn biển mờ)
+    conf_outside_roi: 0.45     # Ngưỡng khắt khe ngoài ROI (tối đa hóa Precision, triệt tiêu báo động giả)
 
 evidence:
   base_dir: "evidence"

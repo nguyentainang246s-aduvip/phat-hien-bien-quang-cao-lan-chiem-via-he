@@ -14,6 +14,19 @@ Hỗ trợ 4 chế độ hoạt động chính:
 
 import os
 import sys
+
+# ==============================================================================
+# TỰ ĐỘNG CHUYỂN SANG MÔI TRƯỜNG ẢO .venv NẾU CHẠY BẰNG PYTHON HỆ THỐNG
+# ==============================================================================
+_venv_py = os.path.abspath(os.path.join(os.path.dirname(__file__), ".venv", "Scripts", "python.exe"))
+if os.path.exists(_venv_py) and os.path.normcase(sys.executable) != os.path.normcase(_venv_py):
+    try:
+        import ultralytics
+    except ImportError:
+        import subprocess
+        result = subprocess.run([_venv_py] + sys.argv)
+        sys.exit(result.returncode)
+
 import argparse
 import time
 import cv2
@@ -129,6 +142,10 @@ def run_monitor_mode(args):
     cfg_spatial = cfg.get("spatial", {})
     cfg_perf = cfg.get("performance", {})
     cfg_tracking = cfg.get("tracking", {})
+    cfg_enh = cfg.get("enhancements", {})
+    cfg_hyst = cfg_enh.get("hysteresis_tracking", {})
+    cfg_motion = cfg_enh.get("motion_filter", {})
+    cfg_spatial_adapt = cfg_enh.get("spatial_adaptive", {})
 
     is_edge_mode = getattr(args, "edge", False)
 
@@ -169,11 +186,20 @@ def run_monitor_mode(args):
     cooldown_sec = args.cooldown if args.cooldown is not None else float(cfg_temporal.get("cooldown_seconds", 60.0))
     spatial_cooldown_rad = float(cfg_temporal.get("spatial_cooldown_radius", 50.0))
 
+    # Kỹ thuật 1 & 3: Hysteresis Thresholding & Spatial Adaptive Thresholding
+    activation_conf = float(cfg_hyst.get("activation_conf", conf_thres))
+    retention_conf = float(cfg_hyst.get("retention_conf", cfg_tracking.get("track_low_thresh", 0.12)))
+    spatial_adaptive_enabled = bool(cfg_spatial_adapt.get("enabled", True))
+    conf_inside = float(cfg_spatial_adapt.get("conf_inside_roi", 0.20))
+    conf_outside = float(cfg_spatial_adapt.get("conf_outside_roi", 0.45))
+
     print(f"[*] Nguồn cấp dữ liệu : {mask_source_url(source)}")
     print(f"[*] Cấu hình Vỉa hè   : {config_path} ({len(roi_manager.polygons)} vùng vỉa hè, {total_pts} đỉnh)")
     print(f"[*] Model AI Detector : {model_path} (Imgsz: {imgsz})")
     print(f"[*] Cấu hình Edge AI  : Engine: {engine_name} | Frame Skip: {frame_skip} | Playback: {sync_str}")
-    print(f"[*] Ngưỡng tin cậy AI : {conf_thres * 100:.0f}%")
+    print(f"[*] Ngưỡng tin cậy AI : {conf_thres * 100:.0f}% (Kích hoạt: {activation_conf*100:.0f}%, Duy trì: {retention_conf*100:.0f}%)")
+    if spatial_adaptive_enabled:
+        print(f"[*] Thích ứng không gian: Trong ROI: {conf_inside*100:.0f}% | Ngoài ROI: {conf_outside*100:.0f}%")
     print(f"[*] Ngưỡng đè vỉa hè  : {overlap_thres * 100:.0f}%")
     print(f"[*] Bộ lọc thời gian  : Xác nhận sau {confirm_seconds}s ({confirm_frames} frames) | Cooldown {cooldown_sec}s")
     print("-" * 78)
@@ -186,17 +212,25 @@ def run_monitor_mode(args):
         tracker_type=tracker_cfg_path,
         conf_threshold=conf_thres,
         track_low_thresh=track_low_th,
+        activation_conf=activation_conf,
+        retention_conf=retention_conf,
+        spatial_adaptive=spatial_adaptive_enabled,
+        conf_inside_roi=conf_inside,
+        conf_outside_roi=conf_outside,
+        roi_polygons=roi_manager.polygons,
         iou=iou_th,
         imgsz=imgsz
     )
     ground_rule = bool(cfg_spatial.get("ground_contact_rule", True))
     checker = ViolationChecker(threshold=overlap_thres, ground_contact_rule=ground_rule)
     allow_moving = getattr(args, "allow_moving", False)
-    require_stationary = False if allow_moving else cfg_temporal.get("require_stationary", True)
-    max_disp = args.max_displacement if getattr(args, "max_displacement", None) is not None else float(cfg_temporal.get("max_displacement_pixels", 50.0))
+    require_stationary = False if allow_moving else cfg_motion.get("enabled", cfg_temporal.get("require_stationary", True))
+    max_disp = args.max_displacement if getattr(args, "max_displacement", None) is not None else float(cfg_motion.get("max_displacement_pixels", cfg_temporal.get("max_displacement_pixels", 40.0)))
+    max_vel = float(cfg_motion.get("max_velocity_pixels_per_sec", 35.0))
+    stat_win = float(cfg_motion.get("stationary_window_seconds", 1.0))
+    adapt_persp = bool(cfg_motion.get("adaptive_perspective_scale", True))
+    min_stat_sec = float(cfg_motion.get("min_stationary_seconds", cfg_temporal.get("min_stationary_seconds", 2.0)))
     min_avg_conf = args.min_avg_conf if getattr(args, "min_avg_conf", None) is not None else float(cfg_temporal.get("min_avg_confidence", 0.40))
-
-    min_stat_sec = float(cfg_temporal.get("min_stationary_seconds", 2.0))
 
     verifier = TemporalVerifier(
         confirm_frames=confirm_frames,
@@ -207,6 +241,9 @@ def run_monitor_mode(args):
         min_avg_confidence=min_avg_conf,
         require_stationary=require_stationary,
         max_displacement_pixels=max_disp,
+        max_velocity_pixels_per_sec=max_vel,
+        stationary_window_seconds=stat_win,
+        adaptive_perspective_scale=adapt_persp,
         min_stationary_seconds=min_stat_sec,
         spatial_cooldown_radius=spatial_cooldown_rad,
     )
@@ -374,6 +411,7 @@ def run_monitor_mode(args):
 
                 current_frame_confirmed = 0
                 current_frame_suspected = 0
+                current_frame_moving = 0
                 last_verified_render = []
 
                 for item in verified_objects:
@@ -425,6 +463,10 @@ def run_monitor_mode(args):
                             label = f"NGHI VAN [{reason}] ({v_count}/{verifier.confirm_frames})"
                         else:
                             label = f"NGHI VAN ({v_count}/{verifier.confirm_frames})"
+                    elif temporal_status == TrackState.MOVING:
+                        current_frame_moving += 1
+                        reason = item.get("suspect_reason", "DI CHUYEN")
+                        label = f"[BO QUA] {reason}"
                     else:
                         label = f"HOP LE ({sp['overlap_pct']}%)"
 
@@ -433,6 +475,7 @@ def run_monitor_mode(args):
 
                 last_confirmed_count = current_frame_confirmed
                 last_suspected_count = current_frame_suspected
+                last_moving_count = current_frame_moving
                 last_object_count = len(verified_objects)
 
             else:
@@ -441,14 +484,15 @@ def run_monitor_mode(args):
                     draw_detection(frame, box, label, track_id=track_id, status=temporal_status)
                 current_frame_confirmed = last_confirmed_count
                 current_frame_suspected = last_suspected_count
+                current_frame_moving = getattr(locals(), 'last_moving_count', 0)
 
             draw_fps_badge(frame, fps_val, reader.fps)
 
             obj_cnt = len(verified_objects) if is_infer_frame else last_object_count
-            hud_text = f"Bien: {obj_cnt} | Nghi van: {current_frame_suspected} | VI PHAM: {current_frame_confirmed}"
+            hud_text = f"Bien: {obj_cnt} | Nghi van: {current_frame_suspected} | Di chuyen: {current_frame_moving} | VI PHAM: {current_frame_confirmed}"
             hud_color = (0, 0, 255) if current_frame_confirmed > 0 else ((0, 165, 255) if current_frame_suspected > 0 else (0, 255, 0))
-            cv2.putText(frame, hud_text, (max(10, reader.width - 480), 32),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, hud_color, 2, cv2.LINE_AA)
+            cv2.putText(frame, hud_text, (max(10, reader.width - 560), 32),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.60, hud_color, 2, cv2.LINE_AA)
 
             if args.max_frames and frame_count >= args.max_frames:
                 print(f"[INFO] Đã đạt giới hạn {args.max_frames} frames chỉ định. Dừng giám sát.")

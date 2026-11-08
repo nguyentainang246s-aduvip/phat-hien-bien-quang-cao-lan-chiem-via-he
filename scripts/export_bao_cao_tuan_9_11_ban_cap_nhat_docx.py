@@ -3,7 +3,7 @@
 ĐỒ ÁN TỐT NGHIỆP: PHÁT HIỆN BIỂN HIỆU/BIỂN QUẢNG CÁO LẤN CHIẾM VỈA HÈ QUA CCTV
 Script xuất Báo cáo tiến độ Tuần 9 - 11 (BẢN CẬP NHẬT CHÍNH THỨC) ra file .docx
 Tích hợp 100% kết quả huấn luyện mới nhất từ Google Colab GPU Tesla T4 (v13_clean)
-và kiểm thử độc lập trên tập test 267 ảnh (0% rò rỉ dữ liệu).
+và kiểm thử độc lập trên tập test 267 ảnh.
 Đảm bảo tính nhất quán toán học, có thể truy vết trên 14 Bảng kết quả thực nghiệm.
 Sinh viên thực hiện: Nguyễn Đức Tài Năng - MSSV: 20224083
 ==============================================================================
@@ -293,7 +293,7 @@ def build_updated_tuan_9_11_report():
         ("Đơn vị đào tạo:", "Đại học Bách Khoa Hà Nội"),
         ("Thời gian thực hiện:", "Giai đoạn Tuần 9 – 11 (Kế hoạch thực hiện ĐATN 17 tuần khóa 2026.1)"),
         ("Mục tiêu tuần 9 - 11 theo Đề cương:", "• Huấn luyện mô hình YOLOv8n trên dữ liệu tự thu thập.\n• Đánh giá, tinh chỉnh mô hình (Precision, Recall, mAP), bổ sung dữ liệu nếu cần.\n• Đo đạc thực nghiệm toàn diện theo hệ thống bảng kết quả đề xuất trên dữ liệu và video CCTV thực tế."),
-        ("Sản phẩm nghiệm thu tuần:", "• Dataset sạch v13_clean: 2,674 ảnh (8,097 BBoxes), tỷ lệ rò rỉ 0.00% (cách ly train/val/test 80/10/10).\n• Trọng số mô hình đã train: models/best.pt (6.64 MB) & models/best.onnx (12.87 MB - Dynamic Shape).\n• Bảng số liệu kiểm thử độc lập: Val mAP@50 = 89.20%, Test mAP@50 = 90.44% (đo trên 267 ảnh test độc lập).")
+        ("Sản phẩm nghiệm thu tuần:", "• Dataset sạch v13_clean: 2,674 ảnh (8,097 BBoxes), phân chia Train/Val/Test tỷ lệ 80/10/10 theo quy tắc tiền tố tên tệp (filename prefix grouping: tách đuôi Roboflow .rf.<hash>, gom chuỗi ảnh CCTV và ảnh AI theo scripts/reorganize_dataset.py) nhằm hạn chế phân tán các ảnh cùng chuỗi chụp giữa các tập; lưu ý quy tắc này dựa trên tiền tố tên tệp và chưa tiến hành kiểm định độc lập về mức độ cách ly tuyệt đối góc quay giữa các split.\n• Trọng số mô hình đã train: models/best.pt (6.64 MB, chốt tại Epoch 42 theo Fitness = 0.645195) & models/best.onnx (12.87 MB - Dynamic Shape).\n• Bảng số liệu kiểm thử: Val mAP@50 = 89.22%, Test mAP@50 = 90.44% (đo trên 267 ảnh test độc lập, 718 nhãn ground truth).")
     ]
     
     for i, (k, v) in enumerate(meta_data):
@@ -331,37 +331,37 @@ def build_updated_tuan_9_11_report():
 
     add_body_paragraph(
         doc,
-        "Đã tiến hành kiểm toán tự động toàn diện trên bộ dữ liệu ảnh thu thập được. Phát hiện và xử lý dứt điểm hiện tượng rò rỉ dữ liệu (Data Leakage) — loại bỏ hoàn toàn 56 ảnh trùng lặp/cận kề giữa các tập train-val-test. Chuẩn hóa 99.52% nhãn dạng đa giác phân đoạn (polygon segmentation) về định dạng chuẩn YOLO Bounding Box 5 cột. Đóng gói thành công tập dữ liệu sạch v13_clean gồm 2,674 ảnh (8,097 BBoxes), phân chia theo tỷ lệ chuẩn 80% Train (2,140 ảnh) / 10% Validation (267 ảnh) / 10% Test (267 ảnh) với tỷ lệ rò rỉ dữ liệu đạt 0.00%.",
+        "Đã tiến hành kiểm toán và tái cấu trúc toàn diện trên bộ dữ liệu ảnh thu thập được. Áp dụng phương pháp phân chia dựa trên quy tắc tiền tố tên tệp (filename prefix grouping: loại bỏ phần mã băm Roboflow .rf.<hash>, gom nhóm chuỗi ảnh CCTV liên tiếp và nhóm ảnh AI theo mô tả tại datasets/v13_clean/README.txt và scripts/reorganize_dataset.py). Phương pháp này giúp gom các biến thể tăng cường và các ảnh thuộc cùng chuỗi chụp vào chung một tập split (Train, Validation hoặc Test), hạn chế việc ảnh tương đồng rơi rải rác giữa các tập so với phân chia ngẫu nhiên từng ảnh. Tuy nhiên, cách chia này dựa thuần túy trên quy ước đặt tên tệp, chưa thực hiện kiểm tra chuyên biệt về mức độ cô lập tuyệt đối mọi góc quay hay bối cảnh thực địa giữa các tập. Chuẩn hóa các nhãn đa giác phân đoạn (polygon segmentation) về định dạng chuẩn YOLO Bounding Box 5 cột. Đóng gói thành công tập dữ liệu sạch v13_clean gồm 2,674 ảnh (8,097 BBoxes), phân chia theo tỷ lệ chuẩn 80% Train (2,140 ảnh / 6,655 bboxes) / 10% Validation (267 ảnh / 724 bboxes) / 10% Test (267 ảnh / 718 bboxes).",
         bold_prefix="1. Kiểm toán và Chuẩn hóa Dữ liệu (Dataset Audit): "
     )
 
     add_body_paragraph(
         doc,
-        "Huấn luyện thành công mô hình YOLOv8n trên Google Colab với phần cứng GPU NVIDIA Tesla T4 (14,913 MiB VRAM). Mô hình được cấu hình độ phân giải cao imgsz=1280, batch=8, tối ưu hóa bằng thuật toán AdamW với cơ chế EarlyStopping (patience=20). Tổng thời gian huấn luyện là 1.785 giờ (~107 phút), hoàn thành 62 epochs. Thuật toán tự động kích hoạt dừng sớm tại epoch 62 và chốt trọng số tối ưu nhất tại Epoch 42, lưu trữ thành models/best.pt (6.64 MB) và xuất bản tối ưu models/best.onnx (12.87 MB).",
+        "Huấn luyện thành công mô hình YOLOv8n trên Google Colab với phần cứng GPU NVIDIA Tesla T4 (14,913 MiB VRAM). Mô hình được cấu hình độ phân giải cao imgsz=1280, batch=8, tối ưu hóa bằng thuật toán AdamW với cơ chế EarlyStopping (patience=20). Tổng thời gian huấn luyện là 1.785 giờ (~107 phút, 6,425.09 giây), hoàn thành 62 epochs theo tệp log gốc results.csv. Thuật toán tự động dừng sớm tại epoch 62 và chốt trọng số tối ưu nhất tại bản ghi Epoch 42 theo hàm mục tiêu Fitness của Ultralytics (Fitness = 0.645195 = 0.1*mAP50 + 0.9*mAP50-95), lưu trữ thành models/best.pt (6.64 MB) và xuất bản tối ưu models/best.onnx (12.87 MB).",
         bold_prefix="2. Huấn luyện Mô hình YOLOv8n Mới trên GPU Cloud: "
     )
 
     add_body_paragraph(
         doc,
-        "Đánh giá độc lập trên tập Validation (267 ảnh, 724 biển hiệu) đạt Precision = 88.70%, Recall = 81.80%, mAP@50 = 89.20%, mAP@50-95 = 61.80%. Đánh giá kiểm thử độc lập 100% trên tập Test (267 ảnh, 718 biển hiệu) đạt Precision = 88.03%, Recall = 81.62%, mAP@50 = 90.44%, mAP@50-95 = 63.37%. Sai lệch giữa hai tập cực nhỏ (< 1.6%), minh chứng mô hình có năng lực tổng quát hóa xuất sắc và không bị hiện tượng quá khớp (Overfitting).",
-        bold_prefix="3. Đánh giá Độc lập Tuyệt đối giữa Validation và Test: "
+        "Đánh giá trên tập Validation (267 ảnh, 724 biển hiệu) tại Epoch 42 đạt Precision = 88.48%, Recall = 81.69%, mAP@50 = 89.22%, mAP@50-95 = 61.78% (khớp chính xác với results.csv). Đánh giá kiểm thử độc lập trên tập Test (267 ảnh, 718 biển hiệu) đạt Precision = 88.03%, Recall = 81.62%, mAP@50 = 90.44%, mAP@50-95 = 63.37% (đối chiếu nhật ký lưu trữ tại reports/test_eval_v13_clean.log). Các chỉ số trên hai tập gần nhau trong lần đánh giá này (độ lệch < 1.6%); nhóm nghiên cứu ghi nhận kết quả này trong giới hạn của bộ dữ liệu và quy trình chia tập hiện tại, tiếp tục kiểm chứng thêm trên các bối cảnh camera đa dạng ở giai đoạn tiếp theo.",
+        bold_prefix="3. Đánh giá Mẫu Kiểm định và Kiểm thử Độc lập: "
     )
 
     add_body_paragraph(
         doc,
-        "Thực nghiệm toàn diện trên 3 đoạn video CCTV thực tế tại các tuyến phố Hà Nội (Hàng Bạc, Bạch Mai, Trần Đại Nghĩa - tổng 720 frames) đối chiếu với Ground Truth 16 đối tượng vi phạm thực địa. Hệ thống đạt System Precision = 85.71% – 100.00%, System Recall = 78.57% – 85.71%, System F1-score = 85.71% – 88.00%. Khử báo động giả/spam đạt 97.7% nhờ cơ chế xác minh chuỗi thời gian (Temporal Verifier) và thuật toán bám vết ByteTrack.",
+        "Thực nghiệm toàn diện trên 3 đoạn video CCTV thực tế tại Hà Nội (Camera 1: Phố Huế / Hàng Bài; Camera 2: Phố Bạch Mai; Camera 3: Phố Trần Đại Nghĩa - tổng 720 frames) với tổng số 18 track được hệ thống đánh giá — bao gồm 16 đối tượng trong Ground Truth (14 vi phạm thực tế, 2 biển hiệu hợp lệ) và 2 track cảnh báo sai ngoài Ground Truth theo reports/ground_truth_events_cctv.csv và reports/system_eval_results.json. Cấu hình ROI chính thức (Phiên bản B) đạt: 12 TP, 2 FP, 2 FN, 2 TN; tương ứng System Precision = 85.71%, System Recall = 85.71%, System F1-score = 85.71% (vượt trội so với Phiên bản A ban đầu: 11 TP, 2 FP, 3 FN; P=84.62%, R=78.57%, F1=81.48%). Căn cứ thực nghiệm bóc tách tại reports/benchmark_report.md, cơ chế lọc chuỗi thời gian kết hợp cooldown giúp chuyển đổi từ 87 frame cảnh báo tức thời bị kích hoạt lặp liên tục xuống còn 2 sự kiện vi phạm ổn định chốt lưu DB, tương ứng giảm 97.7% số lượng cảnh báo dư thừa ((87-2)/87 = 97.7%), đồng thời triệt tiêu hoàn toàn hiện tượng gửi cảnh báo liên tiếp cho cùng một đối tượng vi phạm tĩnh (Alert Fatigue).",
         bold_prefix="4. Kiểm thử Pipeline End-to-End trên Video CCTV Thực tế: "
     )
 
     add_body_paragraph(
         doc,
-        "Hệ thống đạt tốc độ xử lý 22.2 FPS với PyTorch (độ trễ 44.98 ms) và 31.3 – 39.2 FPS với ONNX Runtime trực tiếp trên CPU phổ thông Intel Core i5 (không dùng GPU rời), đáp ứng tiêu chuẩn giám sát thời gian thực (>= 15 FPS). Kế hoạch thử nghiệm trên thiết bị biên (Edge Device) được giữ đúng theo Đề cương tại Tuần 16.",
+        "Đo đạc hiệu năng pipeline (suy luận + bám vết + xác thực thời gian, chưa bao gồm I/O ghi đĩa lưu ảnh bằng chứng và lệnh INSERT SQLite): Trên môi trường PyTorch CPU đo trên video thử nghiệm 50 frames ở chế độ xử lý từng frame liên tục (frame_skip=1) đạt độ trễ toàn phần 44.98 ms ± 5.63 ms, tương ứng throughput trung bình 22.2 FPS theo reports/benchmark_report.md. Khi chuyển giao sang mô hình tối ưu ONNX Runtime (CPU AVX2) áp dụng cơ chế suy luận cách frame (frame_skip=2) trên 3 video CCTV thực tế (720 frames) theo reports/system_eval_results.json: thời gian xử lý thực tế trên các khung hình có suy luận AI (inferred frames) là 50.1 – 57.9 ms/frame (trung bình 53.2 ms), trong khi trên các khung hình bỏ qua suy luận (skipped frames) duy trì bám vết chỉ mất ~2.2 ms/frame; nhờ đó throughput toàn luồng đạt 36.1 – 51.2 FPS (trung bình 44.3 FPS), tương ứng nhịp chu trình trung bình toàn luồng là 19.5 – 27.7 ms/frame luồng (nghịch đảo 1000/FPS). Cần phân biệt rõ nhịp chu trình trung bình toàn luồng (19.5 – 27.7 ms) với độ trễ suy luận AI thực tế mỗi frame (50 – 58 ms). Kế hoạch thử nghiệm trên thiết bị biên (Edge Device) được giữ đúng theo Đề cương tại Tuần 16.",
         bold_prefix="5. Benchmark Phần cứng và Nền tảng Thực thi: "
     )
 
     add_callout_box(
         doc,
-        "Mô hình YOLOv8n huấn luyện trên tập dữ liệu sạch v13_clean đạt độ chính xác mAP@50 = 90.44% trên tập test độc lập, vượt xa chỉ tiêu tối thiểu của Đề cương (>80%). Hệ thống vận hành thời gian thực mượt mà trên CPU với tốc độ >22 FPS, sẵn sàng chuyển giao sang giai đoạn Tuần 12-13 để hoàn thiện logic vi phạm và cơ sở dữ liệu SQLite.",
+        "Mô hình YOLOv8n huấn luyện trên tập dữ liệu sạch v13_clean đạt độ chính xác mAP@50 = 90.44% trên tập test độc lập. Toàn bộ pipeline phán quyết vi phạm đạt F1-score = 85.71% trên tổng số 18 track được đánh giá (đối chiếu với 16 đối tượng Ground Truth gồm 14 vi phạm thực tế và 2 biển hiệu hợp lệ), vận hành đạt throughput trung bình 44.3 FPS (36.1 – 51.2 FPS) trên CPU với ONNX Runtime, sẵn sàng chuyển giao sang giai đoạn Tuần 12-13 để hoàn thiện logic vi phạm đa luồng và cơ sở dữ liệu SQLite.",
         title="KẾT LUẬN TIẾN ĐỘ TUẦN 9–11",
         box_type="success"
     )
@@ -385,26 +385,27 @@ def build_updated_tuan_9_11_report():
     format_table_header(trace_tbl.rows[0], trace_headers, trace_widths)
     
     trace_rows = [
-        ("Quy mô Dataset v13_clean", "2,674 ảnh (8,097 bboxes)", "datasets/v13_clean/data.yaml", "v13_clean (80/10/10)", "Đã xác minh 100%"),
-        ("Tỷ lệ rò rỉ dữ liệu (Leakage)", "0.00% (0 ảnh trùng lặp)", "scripts/validate_leakage.py", "Perceptual Hash (Hamming <= 6)", "Đã xác minh 100%"),
-        ("Số epoch thực chạy", "62 / 100 epochs", "reports/train_v13_clean/.../results.csv", "YOLOv8n trên Tesla T4", "Đã xác minh 100%"),
-        ("Thời gian huấn luyện", "1.785 giờ (~107 phút)", "Console log Colab (train_v13_clean)", "Tesla T4 GPU (14,913 MiB)", "Đã xác minh 100%"),
-        ("Checkpoint tối ưu nhất", "Epoch 42 (Fitness: 0.64519)", "EarlyStopping trigger tại epoch 62", "models/best.pt (6.64 MB)", "Đã xác minh 100%"),
-        ("Validation mAP@50 (Epoch 42)", "89.20% (0.892)", "results.csv dòng 42 & console log", "YOLOv8n (v13_clean val)", "Đã xác minh 100%"),
-        ("Validation mAP@50-95", "61.80% (0.618)", "results.csv dòng 42 & console log", "YOLOv8n (v13_clean val)", "Đã xác minh 100%"),
-        ("Test Precision (Độc lập)", "88.03%", "task-13235.log (split='test')", "YOLOv8n (267 ảnh test)", "Đã xác minh 100%"),
-        ("Test Recall (Độc lập)", "81.62%", "task-13235.log (split='test')", "YOLOv8n (718 nhãn test)", "Đã xác minh 100%"),
-        ("Test mAP@50 (Độc lập)", "90.44%", "task-13235.log (split='test')", "YOLOv8n (267 ảnh test)", "Đã xác minh 100%"),
-        ("Test mAP@50-95 (Độc lập)", "63.37%", "task-13235.log (split='test')", "YOLOv8n (267 ảnh test)", "Đã xác minh 100%"),
-        ("Độ trễ suy luận T4 GPU", "12.8 ms (78.1 FPS infer)", "Console log Colab (best.pt val)", "Tesla T4 GPU FP16", "Đã xác minh 100%"),
-        ("Độ trễ toàn phần Detector T4", "17.1 ms (58.5 FPS E2E)", "Pre: 1.6ms, Infer: 12.8ms, Post: 2.7ms", "Tesla T4 GPU E2E", "Đã xác minh 100%"),
-        ("Độ trễ Pipeline trên CPU", "44.98 ms ± 5.63 ms (22.2 FPS)", "reports/benchmark_report.md", "PyTorch CPU Intel Core i5", "Đã xác minh 100%"),
-        ("Throughput ONNX trên CPU", "31.3 – 39.2 FPS", "reports/system_eval_report.md", "ONNX Runtime CPU AVX2", "Đã xác minh 100%"),
-        ("System Precision (Video thật)", "85.71% – 100.00%", "reports/system_eval_report.md", "3 video CCTV Hà Nội (720 frames)", "Đã xác minh 100%"),
-        ("System Recall (Video thật)", "78.57% – 85.71%", "reports/system_eval_report.md", "3 video CCTV Hà Nội (720 frames)", "Đã xác minh 100%"),
+        ("Quy mô Dataset v13_clean", "2,674 ảnh (8,097 bboxes)", "datasets/v13_clean/data.yaml", "v13_clean (80/10/10)", "Đã đối chiếu tệp nhãn & YAML"),
+        ("Phương pháp phân chia Split", "Filename prefix grouping (80/10/10)", "datasets/v13_clean/README.txt", "Phân nhóm theo tiền tố tên tệp", "Đã đối chiếu quy trình"),
+        ("Số epoch thực chạy", "62 / 100 epochs", "reports/train_v13_clean/.../results.csv", "YOLOv8n trên Tesla T4", "Đã đối chiếu CSV Colab"),
+        ("Thời gian huấn luyện", "1.785 giờ (6,425.09 giây)", "reports/train_v13_clean/.../results.csv", "YOLOv8n Tesla T4", "Đã đối chiếu CSV Colab"),
+        ("Checkpoint tối ưu nhất", "Epoch 42 (Fitness: 0.645195)", "Ultralytics: 0.1*mAP50 + 0.9*mAP50-95", "models/best.pt (6.64 MB)", "Đã đối chiếu CSV Colab"),
+        ("Validation mAP@50 (Epoch 42)", "89.22% (0.89220)", "results.csv bản ghi epoch=42", "YOLOv8n (v13_clean val)", "Đã đối chiếu CSV Colab"),
+        ("Validation mAP@50-95 (Epoch 42)", "61.78% (0.61775)", "results.csv bản ghi epoch=42", "YOLOv8n (v13_clean val)", "Đã đối chiếu CSV Colab"),
+        ("Validation Precision (Epoch 42)", "88.48% (0.88481)", "results.csv bản ghi epoch=42", "YOLOv8n (v13_clean val)", "Đã đối chiếu CSV Colab"),
+        ("Validation Recall (Epoch 42)", "81.69% (0.81690)", "results.csv bản ghi epoch=42", "YOLOv8n (v13_clean val)", "Đã đối chiếu CSV Colab"),
+        ("Test Precision (Độc lập)", "88.03%", "reports/test_eval_v13_clean.log (split='test')", "YOLOv8n (267 ảnh test)", "Đã đối chiếu log test"),
+        ("Test Recall (Độc lập)", "81.62%", "reports/test_eval_v13_clean.log (split='test')", "YOLOv8n (718 nhãn test)", "Đã đối chiếu log test"),
+        ("Test mAP@50 (Độc lập)", "90.44%", "reports/test_eval_v13_clean.log (split='test')", "YOLOv8n (267 ảnh test)", "Đã đối chiếu log test"),
+        ("Test mAP@50-95 (Độc lập)", "63.37%", "reports/test_eval_v13_clean.log (split='test')", "YOLOv8n (267 ảnh test)", "Đã đối chiếu log test"),
+        ("Độ trễ suy luận T4 GPU", "12.8 ms (78.1 FPS infer)", "Console log Colab (best.pt val)", "Tesla T4 GPU FP16", "Đã đối chiếu log Colab"),
+        ("Độ trễ toàn phần Detector T4", "17.1 ms (58.5 FPS E2E)", "Pre: 1.6ms, Infer: 12.8ms, Post: 2.7ms", "Tesla T4 GPU E2E", "Đã đối chiếu log Colab"),
+        ("Độ trễ Pipeline trên CPU", "44.98 ms ± 5.63 ms (22.2 FPS)", "reports/benchmark_report.md", "PyTorch CPU Intel Core i5 (50 frames)", "Đã đối chiếu báo cáo"),
+        ("Hiệu năng ONNX CPU (frame_skip=2)", "36.1–51.2 FPS toàn luồng; 50–58 ms/frame suy luận", "reports/system_eval_results.json & system_eval_report.md", "ONNX Runtime AVX2 (53.2 ms infer, 2.2 ms skip)", "Đã đối chiếu JSON thực nghiệm"),
+        ("System Eval - Bản B chính thức", "P = 85.71%, R = 85.71%, F1 = 85.71%", "reports/ground_truth_events_cctv.csv & system_eval_results.json", "18 tracks đánh giá (16 GT: 12 TP, 2 FN, 2 TN; 2 FP ngoài GT)", "Đã đối chiếu CSV/JSON GT"),
+        ("System Eval - Bản A baseline", "P = 84.62%, R = 78.57%, F1 = 81.48%", "reports/system_eval_results.json", "Trước mở rộng ROI (11 TP, 2 FP, 3 FN)", "Đã đối chiếu JSON GT"),
         ("Benchmark trên Edge Device", "Chưa đo", "Kế hoạch Tuần 16 theo Đề cương", "Jetson Nano / Raspberry Pi 4", "Chưa đo (Kế hoạch T16)")
     ]
-    
     for row_data in trace_rows:
         row = trace_tbl.add_row()
         for j, val in enumerate(row_data):
@@ -426,7 +427,7 @@ def build_updated_tuan_9_11_report():
             if j == 0:
                 r.font.bold = True
                 r.font.color.rgb = COLOR_DARK
-            elif j == 4 and "100%" in val:
+            elif j == 4 and "Đã đối chiếu" in val:
                 r.font.bold = True
                 r.font.color.rgb = COLOR_GREEN
             elif j == 4:
@@ -449,7 +450,7 @@ def build_updated_tuan_9_11_report():
     
     add_body_paragraph(
         doc,
-        "Qua quá trình kiểm toán tự động bằng thuật toán băm cảm nhận Perceptual Hash (pHash) trên toàn bộ kho ảnh, nhóm nghiên cứu đã phát hiện 56 cặp ảnh bị rò rỉ chéo giữa tập train và tập test trong bản phân chia cũ từ Roboflow. Đồng thời, 99.52% tệp nhãn gốc được gắn dưới dạng đa giác phân đoạn nhiều đỉnh (polygon segmentation). Nhóm đã tiến hành tái cấu trúc triệt để thành bộ dữ liệu v13_clean:",
+        "Quy trình tổ chức và làm sạch dữ liệu: Dữ liệu được tái cấu trúc theo quy tắc gom nhóm tiền tố tên tệp (filename prefix grouping: trích xuất khóa nhóm Group Key bằng cách bỏ đuôi băm Roboflow .rf.<hash>, gom chuỗi ảnh CCTV và ảnh AI theo scripts/reorganize_dataset.py và datasets/v13_clean/README.txt). Quy trình này đảm bảo các biến thể tăng cường và các ảnh thuộc cùng một chuỗi chụp được giữ trọn vẹn trong một tập con (Train, Validation hoặc Test), giúp hạn chế nguy cơ rò rỉ dữ liệu so với chia ngẫu nhiên từng ảnh. Cần lưu ý đây là quy tắc phân nhóm theo tên tệp mã hóa, dự án chưa tiến hành kiểm định độc lập để khẳng định loại trừ tuyệt đối mọi rò rỉ góc máy. Toàn bộ các nhãn đa giác phân đoạn đã được chuẩn hóa về định dạng chuẩn YOLO Bounding Box 5 cột. Bộ dữ liệu sạch v13_clean được đóng gói như sau:",
         bold_prefix="Quy trình làm sạch dữ liệu: "
     )
 
@@ -497,7 +498,7 @@ def build_updated_tuan_9_11_report():
 
     add_callout_box(
         doc,
-        "Tập test độc lập 267 ảnh hoàn toàn không có ảnh trùng lặp với tập train (0% leakage). Toàn bộ 8,097 nhãn đã được chuyển đổi chính xác sang tọa độ Bounding Box 5 cột chuẩn (class_id x_center y_center width height), chấm dứt hoàn toàn tình trạng nhãn đa giác gây cảnh báo và mất mát dữ liệu khi nạp vào mạng YOLOv8.",
+        "Tập test độc lập 267 ảnh được phân chia theo quy tắc tiền tố tên tệp (filename prefix grouping) nhằm hạn chế trùng lặp ảnh cùng chuỗi chụp với tập huấn luyện. Toàn bộ 8,097 nhãn đã được chuẩn hóa sang tọa độ Bounding Box 5 cột chuẩn (class_id x_center y_center width height), đảm bảo tính tương thích và định dạng đồng nhất khi nạp vào mạng YOLOv8.",
         title="KẾT QUẢ KIỂM TOÁN DỮ LIỆU (DATA AUDIT VERDICT)",
         box_type="info"
     )
@@ -509,7 +510,7 @@ def build_updated_tuan_9_11_report():
     
     add_body_paragraph(
         doc,
-        "Mô hình YOLOv8n được khởi tạo từ trọng số pretrained chính thức của Ultralytics (yolov8n.pt - 129 layers, 3,011,043 tham số, 8.2 GFLOPs). Quá trình huấn luyện diễn ra trên máy chủ ảo Google Colab trang bị GPU NVIDIA Tesla T4:"
+        "Mô hình nhận diện được khởi tạo từ trọng số pretrained chính thức của Ultralytics (tệp 'yolov8n.pt' trong workspace — kiến trúc gốc COCO 80 lớp gồm 129 layers chưa fuse, 3,157,200 tham số, 0 gradients và 8.9 GFLOPs; sau khi fuse đạt 72 layers, 3,151,904 tham số và 8.7 GFLOPs). Nguồn gốc của số liệu 3,011,043 tham số trước đây trong một số tài liệu là số tham số lý thuyết khi khởi tạo kiến trúc YOLOv8n từ tệp cấu hình 'yolov8n.yaml' với 1 lớp đối tượng (nc=1) từ đầu (train-from-scratch, kênh ẩn nhánh phân loại cv3 là 16 thay vì 80). Khi áp dụng kỹ thuật Transfer Learning từ checkpoint 'yolov8n.pt' cho bài toán nhận diện 1 lớp biển hiệu ('bien-quang-cao'), Ultralytics giữ nguyên kênh ẩn 80 của nhánh cv3 và chỉ thay thế 3 lớp tích chập phân loại cuối cùng (cv3.*.2 từ 80x80 xuống 1x80), giảm 19,197 tham số xuống còn 3,138,003 tham số (130 layers chưa fuse). Sau khi huấn luyện, checkpoint tối ưu 'models/best.pt' khi nạp ở chế độ kiểm định/kiểm thử (Validation & Test mode với cơ chế tự động gộp lớp Conv+BatchNorm / Layer Fusing trên thư viện Ultralytics 8.4.152 tại độ phân giải kiểm thử imgsz=1280) triệt tiêu các trọng số BatchNorm dư thừa, ghi nhận chính xác: 73 layers (fused), 3,132,707 tham số, 0 gradients và 8.6 GFLOPs theo đúng nhật ký kiểm thử chính thức reports/test_eval_v13_clean.log. Quá trình huấn luyện diễn ra trên máy chủ ảo Google Colab trang bị GPU NVIDIA Tesla T4:"
     )
 
     cfg_tbl = doc.add_table(rows=1, cols=4)
@@ -524,7 +525,7 @@ def build_updated_tuan_9_11_report():
         ("Độ phân giải (imgsz)", "1280 x 1280", "Tăng khả năng phát hiện biển hiệu nhỏ ở xa camera", "imgsz: 1280"),
         ("Kích thước Batch (batch)", "8", "Tối ưu hóa dung lượng VRAM GPU Tesla T4 (~5.16 GB)", "batch: 8"),
         ("Bộ tối ưu (Optimizer)", "AdamW", "Tốc độ hội tụ nhanh và ổn định với tập dữ liệu tùy biến", "optimizer: AdamW"),
-        ("Tốc độ học cơ sở (lr0 / lrf)", "0.002 / 0.01", "Học sâu có điều hòa Cosine và 3 epoch Warmup", "lr0: 0.002, lrf: 0.01"),
+        ("Tốc độ học cơ sở (lr0 / lrf)", "0.002 / 0.01", "Học sâu với 3 epoch Warmup và suy giảm tỷ lệ (cos_lr: false)", "lr0: 0.002, lrf: 0.01"),
         ("Động lượng & Suy giảm trọng số", "momentum: 0.937", "weight_decay = 0.0005 chống quá khớp", "momentum: 0.937"),
         ("Tăng cường dữ liệu (Augmentation)", "Mosaic: 1.0, Erasing: 0.4", "Tăng khả năng chịu đựng che khuất một phần (Occlusion)", "mosaic: 1.0, erasing: 0.4"),
         ("Tắt Mosaic ở cuối (Close Mosaic)", "10 epochs cuối", "Khôi phục hình dạng hộp bao chân thực không bị ghép", "close_mosaic: 10"),
@@ -572,7 +573,7 @@ def build_updated_tuan_9_11_report():
 
     add_body_paragraph(
         doc,
-        "Phân tích động thái huấn luyện: Quá trình huấn luyện diễn ra trong 1.785 giờ. Trong 15 epochs đầu, mô hình tăng trưởng rất nhanh về mAP. Từ epoch 20 đến epoch 42, mô hình tiếp tục tinh chỉnh độ khít của bounding box, đưa mAP@50-95 đạt đỉnh 61.78% tại Epoch 42 với điểm Fitness tổng hợp đạt cực đại 0.64519. Sau epoch 42, hàm mất mát validation có xu hướng đi ngang và chớm tăng nhẹ (1.058 lên 1.061). Cơ chế EarlyStopping đã kích hoạt chính xác tại Epoch 62 (sau đúng 20 epoch kiên nhẫn), lưu giữ hoàn hảo trạng thái tốt nhất tại Epoch 42 và ngăn chặn hiện tượng Overfitting."
+        "Phân tích động thái huấn luyện: Quá trình huấn luyện diễn ra trong 1.785 giờ. Trong 15 epochs đầu, mô hình tăng trưởng rất nhanh về mAP. Từ epoch 20 đến epoch 42, mô hình tiếp tục tinh chỉnh độ khít của bounding box, đưa mAP@50-95 đạt đỉnh 61.78% tại Epoch 42 với điểm Fitness tổng hợp đạt cực đại 0.64519. Sau epoch 42, hàm mất mát validation có xu hướng đi ngang và chớm tăng nhẹ (1.058 lên 1.061). Cơ chế EarlyStopping đã dừng phiên huấn luyện tại Epoch 62 (sau 20 epoch kiên nhẫn khi điểm Fitness kiểm định không tiếp tục cải thiện) và lưu giữ checkpoint tốt nhất tại Epoch 42."
     )
 
     # =========================================================================
@@ -600,7 +601,7 @@ def build_updated_tuan_9_11_report():
     t1_rows = [
         ("YOLOv8n Pretrained (COCO baseline)", "COCO val2017", "64.0%", "53.0%", "52.5%", "37.3%"),
         ("YOLOv8n Checkpoint cơ sở (974 ảnh ban đầu)", "Val sơ khởi ban đầu", "80.12%", "77.40%", "79.15%", "52.30%"),
-        ("YOLOv8n Best Checkpoint (v13_clean - Epoch 42)", "Validation (267 ảnh)", "88.70%", "81.80%", "89.20%", "61.80%"),
+        ("YOLOv8n Best Checkpoint (v13_clean - Epoch 42)", "Validation (267 ảnh)", "88.48%", "81.69%", "89.22%", "61.78%"),
         ("YOLOv8n Best Checkpoint (v13_clean - Độc lập)", "Tập Test (267 ảnh)", "88.03%", "81.62%", "90.44%", "63.37%")
     ]
     
@@ -644,21 +645,24 @@ def build_updated_tuan_9_11_report():
 
     # BẢNG 2
     style_section_heading(doc, "Bảng 2 (PDF). Kết quả theo kích thước biển quảng cáo/biển hiệu", level=2)
-    add_body_paragraph(doc, "Phân loại theo tiêu chuẩn diện tích COCO Area trên tập test độc lập (Small: < 32^2 pixels; Medium: 32^2 - 96^2 px; Large: >= 96^2 px):")
+    add_body_paragraph(
+        doc,
+        "Thống kê phân loại theo tiêu chuẩn diện tích COCO Area trên toàn bộ 718 nhãn ground truth của tập test độc lập v13_clean (267 ảnh) tại độ phân giải chuẩn hóa 640x640: Small (< 32^2 px), Medium (32^2 - 96^2 px), Large (>= 96^2 px). Dữ liệu chi tiết từng bounding box được lưu minh chứng tại tệp: reports/test_subset_breakdown_v13_clean.csv:"
+    )
     
-    tbl2 = doc.add_table(rows=1, cols=6)
+    tbl2 = doc.add_table(rows=1, cols=5)
     tbl2.alignment = WD_TABLE_ALIGNMENT.CENTER
     set_table_borders(tbl2)
     
-    t2_headers = ["Kích thước đối tượng", "Số lượng mẫu test", "Precision", "Recall", "F1-score", "mAP@0.5"]
-    t2_widths = [Inches(2.0), Inches(1.1), Inches(0.9), Inches(0.9), Inches(0.9), Inches(0.9)]
+    t2_headers = ["Phân nhóm kích thước (COCO Area)", "Số lượng BBox Ground Truth", "Tỷ lệ (%)", "Diện tích pixel (640x640)", "Trạng thái kiểm chứng"]
+    t2_widths = [Inches(2.2), Inches(1.3), Inches(0.8), Inches(1.2), Inches(1.5)]
     format_table_header(tbl2.rows[0], t2_headers, t2_widths)
     
     t2_rows = [
-        ("Small (Diện tích < 32^2 px)", "103", "81.60%", "74.80%", "78.05%", "79.20%"),
-        ("Medium (32^2 <= Diện tích < 96^2 px)", "246", "88.50%", "87.00%", "87.74%", "91.40%"),
-        ("Large (Diện tích >= 96^2 px)", "68", "92.40%", "91.20%", "91.80%", "94.60%"),
-        ("TỔNG HỢP TOÀN TẬP TEST", "417 có nhãn", "87.70%", "85.40%", "86.53%", "89.60%")
+        ("Small (Diện tích < 32^2 px)", "189", "26.3%", "< 1,024 px^2", "Đã kiểm toán GT (Đang lập ma trận nhầm lẫn riêng)"),
+        ("Medium (32^2 <= Diện tích < 96^2 px)", "382", "53.2%", "1,024 – 9,216 px^2", "Đã kiểm toán GT (Đang lập ma trận nhầm lẫn riêng)"),
+        ("Large (Diện tích >= 96^2 px)", "147", "20.5%", ">= 9,216 px^2", "Đã kiểm toán GT (Đang lập ma trận nhầm lẫn riêng)"),
+        ("TỔNG HỢP TOÀN TẬP TEST", "718 nhãn BBox", "100.0%", "267 ảnh test", "mAP@50 = 90.44% (Đã đối chiếu log test)")
     ]
     
     for row_data in t2_rows:
@@ -670,8 +674,10 @@ def build_updated_tuan_9_11_report():
             p = cell.paragraphs[0]
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(0)
-            if j >= 1:
+            if j in [1, 2]:
                 p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            elif j == 3:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             else:
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             r = p.add_run(val)
@@ -686,6 +692,12 @@ def build_updated_tuan_9_11_report():
 
     doc.add_paragraph()
 
+    add_body_paragraph(
+        doc,
+        "Ghi chú khoa học về nguồn số liệu Bảng 2: Số lượng mẫu theo kích thước (189 Small, 382 Medium, 147 Large) được trích xuất và đối chiếu chính xác 100% từ hình học ground truth của toàn bộ 718 bounding boxes thuộc 267 ảnh test (reports/test_subset_breakdown_v13_clean.csv). Để đảm bảo tính trung thực khoa học, các ước lượng mAP sơ bộ theo từng kích thước đã được lược bỏ khỏi bảng cho đến khi hoàn tất script chạy ma trận nhầm lẫn riêng biệt cho từng nhóm; kết quả toàn diện trên toàn bộ tập test độc lập được xác thực đầy đủ tại reports/test_eval_v13_clean.log với mAP@50 = 90.44%, Precision = 88.03%, Recall = 81.62% và mAP@50-95 = 63.37%."
+    )
+    doc.add_paragraph()
+
     # BẢNG 4
     style_section_heading(doc, "Bảng 4 (PDF). Đánh giá thuật toán xác định vi phạm (Ablation Pipeline)", level=2)
     add_body_paragraph(
@@ -693,19 +705,20 @@ def build_updated_tuan_9_11_report():
         "Đánh giá trực tiếp nhiệm vụ cuối cùng: xác định đúng trường hợp biển quảng cáo/biển hiệu lấn chiếm vùng vỉa hè qua từng bước xử lý. (Lưu ý: Không dùng Accuracy vì số lượng True Negatives của khung hình video không xác định được ranh giới rõ ràng)."
     )
 
-    tbl4 = doc.add_table(rows=1, cols=6)
+    tbl4 = doc.add_table(rows=1, cols=7)
     tbl4.alignment = WD_TABLE_ALIGNMENT.CENTER
     set_table_borders(tbl4)
     
-    t4_headers = ["Phương pháp tiếp cận", "Precision vi phạm", "Recall vi phạm", "F1-score", "Báo động giả (FP)", "Bỏ sót (FN)"]
-    t4_widths = [Inches(2.4), Inches(1.0), Inches(0.9), Inches(0.9), Inches(0.8), Inches(0.7)]
+    t4_headers = ["Phương pháp tiếp cận", "Precision vi phạm", "Recall vi phạm", "F1-score", "Báo động giả (FP)", "Bỏ sót (FN)", "Ghi chú & Trạng thái"]
+    t4_widths = [Inches(2.2), Inches(0.9), Inches(0.8), Inches(0.8), Inches(0.7), Inches(0.6), Inches(1.5)]
     format_table_header(tbl4.rows[0], t4_headers, t4_widths)
     
     t4_rows = [
-        ("1. Detection đơn thuần (Không ROI)", "46.15%", "85.71%", "60.00%", "14 vụ", "2 vụ"),
-        ("2. Detection + Đa giác ROI vỉa hè", "66.67%", "85.71%", "75.00%", "6 vụ", "2 vụ"),
-        ("3. Detection + ROI + Ngưỡng Overlap >=30%", "80.00%", "85.71%", "82.76%", "3 vụ", "2 vụ"),
-        ("4. Full Pipeline (+ Temporal 3.0s + ByteTrack)", "85.71% – 100%", "78.57% – 85.71%", "85.71% – 88%", "0 – 2 vụ", "2 – 3 vụ")
+        ("1. Detection đơn thuần (Không ROI)", "—", "—", "—", "—", "—", "Mô hình hóa minh họa (Chưa có log thô)"),
+        ("2. Detection + Đa giác ROI vỉa hè", "—", "—", "—", "—", "—", "Mô hình hóa minh họa (Chưa có log thô)"),
+        ("3. Detection + ROI + Ngưỡng Overlap >=30%", "—", "—", "—", "—", "—", "Mô hình hóa minh họa (Chưa có log thô)"),
+        ("4. Full Pipeline (Phiên bản A - ROI Baseline)", "84.62%", "78.57%", "81.48%", "2 vụ", "3 vụ", "Thực nghiệm đã kiểm chứng GT (system_eval_results.json)"),
+        ("5. Full Pipeline (Phiên bản B - ROI Chính thức)", "85.71%", "85.71%", "85.71%", "2 vụ", "2 vụ", "Thực nghiệm đã kiểm chứng GT (ground_truth_events_cctv.csv)")
     ]
     
     for row_data in t4_rows:
@@ -725,7 +738,7 @@ def build_updated_tuan_9_11_report():
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             r = p.add_run(val)
             r.font.name = "Arial"
-            r.font.size = Pt(9.0)
+            r.font.size = Pt(8.5)
             if "Full Pipeline" in row_data[0]:
                 r.font.bold = True
                 set_cell_background(cell, HEX_SUCCESS_BG)
@@ -735,24 +748,34 @@ def build_updated_tuan_9_11_report():
 
     doc.add_paragraph()
 
+    add_body_paragraph(
+        doc,
+        "Ghi chú khoa học về nguồn số liệu Bảng 4: Nhằm tuân thủ tuyệt đối nguyên tắc liêm chính học thuật, các ô số liệu định lượng (Precision, Recall, F1, FP, FN) của các cấu hình 1, 2, 3 được thể hiện bằng dấu '—' do trong workspace không lưu vết tệp log/CSV thực nghiệm thô cho các lần chạy bóc tách đơn lẻ này; tránh tuyệt đối việc đưa vào các ước lượng giả định làm người đọc hiểu nhầm là kết quả đo đạc thực nghiệm. Chỉ riêng Cấu hình 4 (Phiên bản A) và Cấu hình 5 (Phiên bản B) là kết quả thực nghiệm hoàn chỉnh có đầy đủ biên bản đối chiếu, kiểm chứng chi tiết từng sự kiện vi phạm với tệp Ground Truth chính thức (reports/ground_truth_events_cctv.csv và reports/system_eval_results.json)."
+    )
+    doc.add_paragraph()
+
     # BẢNG 5
     style_section_heading(doc, "Bảng 5 (PDF). Khảo sát ngưỡng diện tích giao nhau với ROI (Overlap Threshold)", level=2)
-    add_body_paragraph(doc, "Định nghĩa tỷ lệ giao nhau: Overlap Ratio = Area(BBox ∩ ROI) / Area(BBox). Khảo sát bước nhảy từ 10% đến 50%:")
+    add_body_paragraph(
+        doc,
+        "Định nghĩa tỷ lệ giao nhau: Overlap Ratio = Area(BBox ∩ ROI) / Area(BBox). Khảo sát trên tập mẫu kiểm chuẩn gồm 7 đối tượng (4 vi phạm, 3 hợp lệ) theo đúng báo cáo thí nghiệm reports/threshold_sweep_report.md:"
+    )
     
-    tbl5 = doc.add_table(rows=1, cols=6)
+    tbl5 = doc.add_table(rows=1, cols=7)
     tbl5.alignment = WD_TABLE_ALIGNMENT.CENTER
     set_table_borders(tbl5)
     
-    t5_headers = ["Ngưỡng Overlap", "Precision vi phạm", "Recall vi phạm", "F1-score", "Báo động giả (FP)", "Bỏ sót (FN)"]
-    t5_widths = [Inches(1.5), Inches(1.2), Inches(1.1), Inches(1.1), Inches(0.9), Inches(0.9)]
+    t5_headers = ["Ngưỡng Overlap", "Số biển VP", "Số biển hợp lệ", "Precision", "Recall", "F1-Score", "Đánh giá & Khuyến nghị"]
+    t5_widths = [Inches(1.5), Inches(0.8), Inches(0.9), Inches(0.9), Inches(0.8), Inches(0.9), Inches(1.4)]
     format_table_header(tbl5.rows[0], t5_headers, t5_widths)
     
     t5_rows = [
-        ("10%", "68.42%", "92.86%", "78.79%", "6 vụ", "1 vụ"),
-        ("20%", "75.00%", "85.71%", "80.00%", "4 vụ", "2 vụ"),
-        ("30% (Ngưỡng chọn)", "85.71%", "85.71%", "85.71%", "2 vụ", "2 vụ"),
-        ("40%", "88.89%", "57.14%", "69.57%", "1 vụ", "6 vụ"),
-        ("50%", "100.00%", "35.71%", "52.63%", "0 vụ", "9 vụ")
+        ("10%", "4", "3", "75.0%", "75.0%", "75.0%", "Quá nhạy (nhiều báo động sai)"),
+        ("20%", "4", "3", "75.0%", "75.0%", "75.0%", "Chấp nhận được"),
+        ("30% (Ngưỡng chọn)", "3", "4", "100.0%", "75.0%", "85.7%", "Biên dưới dải tối ưu (Khuyến nghị)"),
+        ("40%", "3", "4", "100.0%", "75.0%", "85.7%", "Đồng hạng tối ưu (Vùng plateau)"),
+        ("50%", "3", "4", "100.0%", "75.0%", "85.7%", "Đồng hạng tối ưu (Vùng plateau)"),
+        ("60%", "3", "4", "100.0%", "75.0%", "85.7%", "Biên trên dải tối ưu (Nguy cơ sót)")
     ]
     
     for row_data in t5_rows:
@@ -764,16 +787,16 @@ def build_updated_tuan_9_11_report():
             p = cell.paragraphs[0]
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(0)
-            if j in [1, 2, 3]:
+            if j in [3, 4, 5]:
                 p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            elif j in [4, 5]:
+            elif j in [1, 2]:
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             else:
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             r = p.add_run(val)
             r.font.name = "Arial"
             r.font.size = Pt(9.0)
-            if "30%" in row_data[0]:
+            if "Ngưỡng chọn" in row_data[0]:
                 r.font.bold = True
                 set_cell_background(cell, HEX_SUCCESS_BG)
                 r.font.color.rgb = COLOR_GREEN
@@ -782,24 +805,27 @@ def build_updated_tuan_9_11_report():
 
     doc.add_paragraph()
 
+    add_body_paragraph(
+        doc,
+        "Ghi chú khoa học về nguồn số liệu Bảng 5: Dữ liệu được trích xuất trực tiếp từ báo cáo quét ngưỡng reports/threshold_sweep_report.md trên tập mẫu kiểm chuẩn gồm 7 đối tượng. Thực nghiệm quét ngưỡng từ 10% đến 60% cho thấy một dải tối ưu bằng phẳng (plateau) trải dài từ 30% đến 60%, tại đó các ngưỡng đều đạt đồng hạng Precision 100.0%, Recall 75.0% và F1-Score 85.7%. Ngưỡng 30% không phải là điểm tối ưu duy nhất, mà là biên dưới (lower bound) của vùng tối ưu; việc lựa chọn 30% làm ngưỡng mặc định nhằm tối đa hóa độ nhạy phát hiện các hành vi chớm lấn chiếm vỉa hè (tránh bỏ sót khi biển hiệu chỉ chìa một phần), đồng thời loại bỏ triệt để hiện tượng báo động giả do tiếp xúc mép ngẫu nhiên (<30%)."
+    )
+    doc.add_paragraph()
+
     # BẢNG 6
     style_section_heading(doc, "Bảng 6 (PDF). Ảnh hưởng của số frame / thời gian xác nhận vi phạm (Temporal Filter)", level=2)
     add_body_paragraph(doc, "Phân tích sự đánh đổi giữa việc loại bỏ cảnh báo giả và độ trễ phát hiện hệ thống (Detection Delay):")
     
-    tbl6 = doc.add_table(rows=1, cols=6)
+    tbl6 = doc.add_table(rows=1, cols=7)
     tbl6.alignment = WD_TABLE_ALIGNMENT.CENTER
     set_table_borders(tbl6)
     
-    t6_headers = ["Thời gian xác nhận", "Precision vi phạm", "Recall vi phạm", "F1-score", "Tỷ lệ giảm báo rác", "Độ trễ phát hiện"]
-    t6_widths = [Inches(1.8), Inches(1.1), Inches(1.1), Inches(1.0), Inches(1.1), Inches(1.0)]
+    t6_headers = ["Kịch bản đánh giá (Temporal Verification)", "Số lượng cảnh báo / Sự kiện", "Tỷ lệ giảm cảnh báo dư thừa", "Precision vi phạm", "Recall vi phạm", "F1-score", "Độ trễ phát hiện"]
+    t6_widths = [Inches(1.8), Inches(1.2), Inches(0.9), Inches(0.7), Inches(0.7), Inches(0.7), Inches(0.8)]
     format_table_header(tbl6.rows[0], t6_headers, t6_widths)
     
     t6_rows = [
-        ("1 frame (Tức thời)", "42.10%", "85.71%", "56.47%", "0.0% (Spam 87 vụ)", "0.04 giây"),
-        ("3 frames (~0.12s)", "55.60%", "85.71%", "67.50%", "45.2% (Spam 48 vụ)", "0.12 giây"),
-        ("5 frames (~0.20s)", "68.20%", "85.71%", "75.95%", "72.4% (Spam 24 vụ)", "0.20 giây"),
-        ("15 frames (~0.60s)", "85.71%", "85.71%", "85.71%", "94.8% (Chỉ còn 4 vụ)", "0.60 giây"),
-        ("Cửa sổ trượt 3.0 giây", "100.00%", "78.57%", "88.00%", "97.7% (Chỉ còn 2 sự kiện)", "3.00 giây")
+        ("Kịch bản cơ sở (Baseline - Từng frame đơn lẻ / Không Temporal Verifier)", "87 frame cảnh báo (spam liên tục mỗi frame)", "0.0%", "—", "—", "—", "0.04 giây (tức thời)"),
+        ("Kịch bản đề xuất (Proposed - Bộ lọc 15 frames + Cooldown 60s / Bản B)", "2 sự kiện DB (đã khử spam & chốt lưu)", "97.7%", "85.71%", "85.71%", "85.71%", "3.00 giây (chuẩn hóa sự kiện)")
     ]
     
     for row_data in t6_rows:
@@ -811,16 +837,16 @@ def build_updated_tuan_9_11_report():
             p = cell.paragraphs[0]
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(0)
-            if j in [1, 2, 3]:
+            if j in [3, 4, 5]:
                 p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            elif j in [4, 5]:
+            elif j in [1, 2, 6]:
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             else:
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             r = p.add_run(val)
             r.font.name = "Arial"
-            r.font.size = Pt(9.0)
-            if "3.0 giây" in row_data[0]:
+            r.font.size = Pt(8.5)
+            if "Proposed" in row_data[0]:
                 r.font.bold = True
                 set_cell_background(cell, HEX_SUCCESS_BG)
                 r.font.color.rgb = COLOR_GREEN
@@ -829,23 +855,30 @@ def build_updated_tuan_9_11_report():
 
     doc.add_paragraph()
 
+    add_body_paragraph(
+        doc,
+        "Ghi chú khoa học về nguồn số liệu Bảng 6: Bảng thể hiện thực nghiệm đối chiếu trực tiếp giữa kịch bản cơ sở (Baseline phán quyết tức thời từng frame) và kịch bản đề xuất (Proposed tích hợp máy trạng thái 15 frames và Cooldown 60s) theo đúng số liệu thực nghiệm tại Bảng 7.3 của reports/benchmark_report.md. Các cấu hình trung gian (3, 5, 15 frames đơn lẻ) đã được lược bỏ khỏi bảng do không lưu vết log thực nghiệm độc lập trong workspace, đảm bảo tính trung thực khoa học. Thực nghiệm đối chiếu xác nhận: việc tích hợp bộ lọc thời gian giúp giảm 97.7% số lượng cảnh báo dư thừa (từ 87 cảnh báo tức thời xuống 2 sự kiện chốt lưu DB), đồng thời toàn hệ thống đạt Precision = 85.71%, Recall = 85.71%, F1 = 85.71% trên các video CCTV thực tế (reports/system_eval_results.json)."
+    )
+    doc.add_paragraph()
+
     # BẢNG 7
     style_section_heading(doc, "Bảng 7 (PDF). Ablation Study cho toàn bộ Pipeline", level=2)
     add_body_paragraph(doc, "Minh chứng định lượng vai trò đóng góp của từng module chức năng:")
     
-    tbl7 = doc.add_table(rows=1, cols=7)
+    tbl7 = doc.add_table(rows=1, cols=9)
     tbl7.alignment = WD_TABLE_ALIGNMENT.CENTER
     set_table_borders(tbl7)
     
-    t7_headers = ["Cấu hình", "Detection (AI)", "Đa giác ROI", "Tracking (ByteTrack)", "Xác thực chuỗi thời gian", "Precision", "Recall"]
-    t7_widths = [Inches(0.9), Inches(1.1), Inches(1.0), Inches(1.2), Inches(1.4), Inches(0.8), Inches(0.8)]
+    t7_headers = ["Cấu hình", "Detection (AI)", "Đa giác ROI", "Tracking (ByteTrack)", "Xác thực chuỗi thời gian", "TP / FP / FN", "Precision", "Recall", "Ghi chú & Trạng thái"]
+    t7_widths = [Inches(1.1), Inches(0.65), Inches(0.65), Inches(0.75), Inches(0.8), Inches(0.8), Inches(0.65), Inches(0.65), Inches(1.3)]
     format_table_header(tbl7.rows[0], t7_headers, t7_widths)
     
     t7_rows = [
-        ("A", "✓", "—", "—", "—", "46.15%", "85.71%"),
-        ("B", "✓", "✓", "—", "—", "66.67%", "85.71%"),
-        ("C", "✓", "✓", "✓", "—", "75.00%", "85.71%"),
-        ("D (Full)", "✓", "✓", "✓", "✓", "85.71% – 100%", "78.57% – 85.71%")
+        ("A (Detection)", "✓", "—", "—", "—", "—", "—", "—", "Mô hình hóa minh họa (Chưa có log thô)"),
+        ("B (+ ROI)", "✓", "✓", "—", "—", "—", "—", "—", "Mô hình hóa minh họa (Chưa có log thô)"),
+        ("C (+ ByteTrack)", "✓", "✓", "✓", "—", "—", "—", "—", "Mô hình hóa minh họa (Chưa có log thô)"),
+        ("D1 (Bản A - Baseline)", "✓", "✓", "✓", "✓", "11 / 2 / 3", "84.62%", "78.57%", "Thực nghiệm đã kiểm chứng GT (JSON)"),
+        ("D2 (Bản B - Chính thức)", "✓", "✓", "✓", "✓", "12 / 2 / 2", "85.71%", "85.71%", "Thực nghiệm đã kiểm chứng GT (CSV/JSON)")
     ]
     
     for row_data in t7_rows:
@@ -857,16 +890,16 @@ def build_updated_tuan_9_11_report():
             p = cell.paragraphs[0]
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(0)
-            if j in [5, 6]:
+            if j in [6, 7]:
                 p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            elif j in [1, 2, 3, 4]:
+            elif j in [1, 2, 3, 4, 5]:
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             else:
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             r = p.add_run(val)
             r.font.name = "Arial"
-            r.font.size = Pt(9.0)
-            if "D (Full)" in row_data[0]:
+            r.font.size = Pt(8.5)
+            if "D2" in row_data[0]:
                 r.font.bold = True
                 set_cell_background(cell, HEX_SUCCESS_BG)
                 r.font.color.rgb = COLOR_GREEN
@@ -875,9 +908,18 @@ def build_updated_tuan_9_11_report():
 
     doc.add_paragraph()
 
+    add_body_paragraph(
+        doc,
+        "Ghi chú khoa học về nghiên cứu Ablation Bảng 7: Các ô chỉ số TP / FP / FN, Precision và Recall tại các cấu hình trung gian A, B, C được thể hiện bằng dấu '—' do không có tệp kết quả thực nghiệm thô lưu trong workspace, tránh việc các số liệu giả định minh họa bị hiểu nhầm là kết quả đo đạc chính thức. Cấu hình D1 (Phiên bản A) và D2 (Phiên bản B) là kết quả đánh giá hệ thống thực nghiệm hoàn chỉnh đã được đối chiếu, kiểm chứng đầy đủ từng sự kiện vi phạm theo báo cáo nghiệm thu thực địa (reports/ground_truth_events_cctv.csv và reports/system_eval_results.json)."
+    )
+    doc.add_paragraph()
+
     # BẢNG 9
     style_section_heading(doc, "Bảng 9 (PDF). Kết quả End-to-End trên từng Video / Camera Thực địa", level=2)
-    add_body_paragraph(doc, "Đánh giá theo sự kiện vi phạm thực tế (Event-based) trên 3 đoạn video CCTV đường phố Hà Nội (720 frames, 30.0 giây):")
+    add_body_paragraph(
+        doc,
+        "Đánh giá theo sự kiện vi phạm thực tế (Event-based) trên 3 đoạn video CCTV đường phố Hà Nội (720 frames, 30.0 giây) với 16 đối tượng trong Ground Truth (14 vi phạm thực tế, 2 biển hiệu hợp lệ) và 2 track cảnh báo sai ngoài Ground Truth (tổng số 18 track được hệ thống đánh giá) theo reports/ground_truth_events_cctv.csv và reports/system_eval_results.json:"
+    )
     
     tbl9 = doc.add_table(rows=1, cols=7)
     tbl9.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -888,10 +930,11 @@ def build_updated_tuan_9_11_report():
     format_table_header(tbl9.rows[0], t9_headers, t9_widths)
     
     t9_rows = [
-        ("Camera 1: Phố Hàng Bạc (video test.mp4)", "4 vụ", "4 vụ", "0 vụ", "0 vụ", "100.0%", "100.0%"),
-        ("Camera 2: Phố Bạch Mai (videotesst2.mp4)", "4 vụ", "3 vụ", "0 vụ", "1 vụ", "100.0%", "75.0%"),
-        ("Camera 3: Phố Trần Đại Nghĩa (video test3.mp4)", "6 vụ", "4 – 5 vụ", "0 – 2 vụ", "1 – 2 vụ", "71.4% – 100%", "66.7% – 83.3%"),
-        ("TỔNG HỢP TOÀN HỆ THỐNG", "14 vụ", "11 – 12 vụ", "0 – 2 vụ", "2 – 3 vụ", "85.71% – 100%", "78.57% – 85.71%")
+        ("Camera 1: Phố Huế / Hàng Bài (video test.mp4)", "4 vụ", "4 vụ", "0 vụ", "0 vụ", "100.0%", "100.0%"),
+        ("Camera 2: Phố Bạch Mai (videotesst2.mp4)", "5 vụ", "3 vụ", "0 vụ", "2 vụ", "100.0%", "60.00%"),
+        ("Camera 3: Phố Trần Đại Nghĩa (video test3.mp4)", "5 vụ", "5 vụ", "2 vụ", "0 vụ", "71.43%", "100.0%"),
+        ("TỔNG HỢP - Phiên bản B (Chính thức)", "14 vụ", "12 vụ", "2 vụ", "2 vụ", "85.71%", "85.71%"),
+        ("TỔNG HỢP - Phiên bản A (Baseline ROI)", "14 vụ", "11 vụ", "2 vụ", "3 vụ", "84.62%", "78.57%")
     ]
     
     for row_data in t9_rows:
@@ -912,7 +955,11 @@ def build_updated_tuan_9_11_report():
             r = p.add_run(val)
             r.font.name = "Arial"
             r.font.size = Pt(9.0)
-            if "TỔNG" in row_data[0]:
+            if "Phiên bản B" in row_data[0]:
+                r.font.bold = True
+                set_cell_background(cell, HEX_SUCCESS_BG)
+                r.font.color.rgb = COLOR_GREEN
+            elif "TỔNG" in row_data[0]:
                 r.font.bold = True
                 set_cell_background(cell, HEX_BG_LIGHT)
                 r.font.color.rgb = COLOR_PRIMARY
@@ -921,12 +968,17 @@ def build_updated_tuan_9_11_report():
 
     doc.add_paragraph()
 
+    add_body_paragraph(
+        doc,
+        "Ghi chú khoa học về kết quả Bảng 9: Số liệu đối chiếu chuẩn xác 100% theo reports/ground_truth_events_cctv.csv và reports/system_eval_results.json. Tổng cộng hệ thống đánh giá 18 track trên 3 camera (bao gồm 16 đối tượng trong Ground Truth: 14 vi phạm thực tế, 2 hợp lệ [TN]; cùng 2 track cảnh báo sai ngoài GT [FP]). Ở Camera 2, có 2 trường hợp vi phạm bị bỏ sót (FN) do cự ly xa, độ tin cậy thấp (30.7% và 36.9%) nên hệ thống chỉ xếp vào diện SUSPECTED mà chưa đủ điều kiện 3.0s CONFIRMED. Ở Camera 3, có 2 đối tượng ngoài danh mục GT bị kết luận vi phạm (FP). Kết quả toàn hệ thống ở cấu hình chính thức Phiên bản B đạt Precision = 85.71%, Recall = 85.71%, F1-score = 85.71%."
+    )
+
     # Chèn ảnh minh chứng hiện trường video trích xuất thực tế từ Camera 1 với mô hình v13_clean mới nhất
     fig_v1 = os.path.join(str(ROOT_DIR), "data", "images", "output_v13_clean", "cctv_camera1_video_test_clean.jpg")
     add_image_with_caption(
         doc,
         fig_v1,
-        "Hình 3. Kết quả nhận diện và phán quyết vi phạm vỉa hè thực tế trên khung hình CCTV Camera 1 (video test.mp4) bằng mô hình YOLOv8n mới nhất (v13_clean)",
+        "Hình 3. Kết quả nhận diện và phán quyết vi phạm vỉa hè thực tế trên khung hình CCTV Camera 1 (Phố Huế / Hàng Bài - video test.mp4) bằng mô hình YOLOv8n mới nhất (v13_clean)",
         asset_path="data/images/output_v13_clean/cctv_camera1_video_test_clean.jpg",
         width=Inches(5.8)
     )
@@ -937,10 +989,11 @@ def build_updated_tuan_9_11_report():
         add_image_with_caption(
             doc,
             fig_v2,
-            "Hình 4. Khả năng nhận diện biển hiệu trong điều kiện ánh sáng phức tạp ban đêm bằng mô hình YOLOv8n mới nhất (v13_clean - Phát hiện 8 biển hiệu)",
+            "Hình 4. Khảo sát nhận diện biển hiệu trong điều kiện ánh sáng phức tạp ban đêm trên ảnh tổng hợp minh họa (Synthetic Image do AI tạo nhằm kiểm thử độ bền vững ngoại cảnh) bằng mô hình YOLOv8n (v13_clean)",
             asset_path="data/images/output_v13_clean/clean_detected_ChatGPT Image Sep 30, 2026, 09_49_42 PM.png",
             width=Inches(5.8)
         )
+    doc.add_paragraph()
 
     # BẢNG 12
     style_section_heading(doc, "Bảng 12 (PDF). Benchmark Nền tảng Thực thi (PC và Thiết bị Biên)", level=2)
@@ -960,7 +1013,7 @@ def build_updated_tuan_9_11_report():
     t12_rows = [
         ("PC GPU (Google Colab Cloud)", "YOLOv8n PyTorch (FP16)", "58.5 FPS (78.1 raw)", "17.1 ms (12.8 ms infer)", "5.16 GB VRAM", "Đã đo thực nghiệm"),
         ("PC CPU (Intel Core i5-10300H)", "YOLOv8n PyTorch (FP32)", "22.2 FPS", "44.98 ms ± 5.63 ms", "150 MB RAM", "Đã đo thực nghiệm"),
-        ("PC CPU (Intel Core i5-10300H)", "YOLOv8n ONNX (AVX2 FP32)", "31.3 – 39.2 FPS", "25.5 – 31.9 ms", "120 MB RAM", "Đã đo thực nghiệm"),
+        ("PC CPU (Intel Core i5-10300H)", "YOLOv8n ONNX (AVX2 FP32, frame_skip=2)", "36.1 – 51.2 FPS toàn luồng (TB: 44.3)", "50.1 – 57.9 ms (frame suy luận) | 19.5 – 27.7 ms (nhịp luồng TB)", "120 MB RAM", "Đã đo thực nghiệm"),
         ("Edge Device (Jetson Nano)", "ONNX / TensorRT FP16", "— (chưa đo)", "— (chưa đo)", "— (chưa đo)", "Kế hoạch Tuần 16"),
         ("Edge Device (Raspberry Pi 4)", "NCNN / TFLite INT8", "— (chưa đo)", "— (chưa đo)", "— (chưa đo)", "Kế hoạch Tuần 16")
     ]
@@ -993,6 +1046,11 @@ def build_updated_tuan_9_11_report():
                 r.font.color.rgb = COLOR_DARK
 
     doc.add_paragraph()
+
+    add_body_paragraph(
+        doc,
+        "Ghi chú khoa học về phạm vi đo Benchmark và đối chiếu thông số: Phép đo trên CPU PyTorch (44.98 ms ± 5.63 ms, tương ứng throughput trung bình 22.2 FPS, dao động từ 14.2 đến 25.0 FPS) được thực hiện trên 50 khung hình video thử nghiệm ở chế độ xử lý liên tục từng frame (frame_skip=1) theo reports/benchmark_report.md (giải mã: 2.31 ms, YOLO infer: 39.59 ms, ByteTrack: 0.47 ms, ROI: 0.02 ms, vẽ: 2.59 ms; chưa bao gồm ghi đĩa và INSERT DB). Đối với mô hình ONNX Runtime trên CPU (AVX2) áp dụng cơ chế suy luận cách frame (frame_skip=2) trên 3 video CCTV thực tế theo reports/system_eval_results.json: thời gian xử lý thực tế trên các khung hình có suy luận AI (inferred frames) là 50.14 – 57.92 ms/frame (trung bình 53.22 ms gồm ONNX infer và cập nhật tracker), các khung hình bỏ qua suy luận (skipped frames) chỉ mất ~2.15 – 2.26 ms/frame; nhờ đó throughput toàn luồng đạt 36.1 – 51.2 FPS (trung bình 44.3 FPS). Giá trị 19.5 – 27.7 ms là nghịch đảo toán học của throughput (1000/FPS), phản ánh nhịp thời gian trung bình phân bổ trên mỗi frame luồng khi bỏ cách frame, không phải là thời gian chạy suy luận của mô hình AI. Cần phân định rõ ràng giữa nhịp chu trình trung bình toàn luồng (19.5 – 27.7 ms) và độ trễ suy luận AI thực tế mỗi frame (50 – 58 ms)."
+    )
 
     # =========================================================================
     # PHẦN 5: PHÂN TÍCH LỖI VÀ CÁC GIỚI HẠN THỰC NGHIỆM
@@ -1084,12 +1142,14 @@ def build_updated_tuan_9_11_report():
     sources = [
         "Đề cương Đồ án Tốt nghiệp khóa 2026.1: 'Phát hiện biển quảng cáo/biển hiệu lấn chiếm vỉa hè qua camera an ninh CCTV cố định' — Sinh viên Nguyễn Đức Tài Năng & Đinh Văn Tuấn.",
         "Hệ thống Bảng kết quả thực nghiệm đề xuất ĐATN CCTV: Bang_ket_qua_de_xuat_DATN_CCTV.pdf (5 trang, 14 Bảng kết quả).",
-        "Bộ dữ liệu huấn luyện sạch v13_clean: datasets/v13_clean/data.yaml (2,674 ảnh, 8,097 bboxes, 0% leakage).",
+        "Bộ dữ liệu huấn luyện sạch v13_clean: datasets/v13_clean/data.yaml (2,674 ảnh, 8,097 bboxes; group-based split theo quy tắc tên tệp; chưa kiểm định độc lập rò rỉ hình ảnh).",
         "Tệp tham số cấu hình hệ thống: configs/settings.yaml (v13.0 Final).",
         "Trọng số mô hình đã huấn luyện: models/best.pt (6.64 MB, Epoch 42) & models/best.onnx (12.87 MB).",
         "Báo cáo đo đạc hiệu năng CPU thời gian thực: reports/benchmark_report.md (Intel Core i5-10300H, 22.2 FPS).",
-        "Báo cáo đánh giá hệ thống trên video CCTV thực tế: reports/system_eval_report.md (720 frames, 3 video CCTV Hà Nội).",
-        "Sổ bộ dữ liệu Ground Truth sự kiện vi phạm: reports/ground_truth_events_cctv.csv (16 tracks, 14 vi phạm).",
+        "Báo cáo đánh giá hệ thống trên video CCTV thực tế: reports/system_eval_report.md (720 frames, 3 video CCTV Hà Nội, Phiên bản B).",
+        "Sổ bộ dữ liệu Ground Truth sự kiện vi phạm: reports/ground_truth_events_cctv.csv (18 tracks: 14 vi phạm thực tế, 2 bình thường, 2 FP ngoài GT).",
+        "Nhật ký đánh giá mô hình trên tập test độc lập: reports/test_eval_v13_clean.log (267 ảnh, 718 nhãn, mAP@50 = 90.44%).",
+        "Báo cáo khảo sát ngưỡng diện tích giao cắt Overlap: reports/threshold_sweep_report.md (7 đối tượng kiểm chuẩn, ngưỡng chọn 30%).",
         "Ultralytics YOLOv8 Documentation: Ultralytics YOLOv8 Architecture, Training & Validation Protocols (2024)."
     ]
     
@@ -1105,16 +1165,17 @@ def build_updated_tuan_9_11_report():
         r_s.font.size = Pt(9.0)
         r_s.font.color.rgb = COLOR_DARK
 
-    try:
-        doc.save(OUTPUT_FILE)
-        print(f"[✓] Đã tạo thành công file Word Báo cáo tiến độ Tuần 9-11 cập nhật tại: {OUTPUT_FILE}")
-    except PermissionError:
-        alt_file = str(OUTPUT_DIR / "Bao_cao_tien_do_Tuan_9_11_DATN_20224083_v13_clean_chuan.docx")
-        doc.save(alt_file)
-        print(f"[!] File {OUTPUT_FILE} đang được mở trong Microsoft Word.")
-        print(f"[✓] Đã lưu bản cập nhật mới nhất với hình ảnh v13_clean ra: {alt_file}")
+    for fpath in [
+        str(OUTPUT_DIR / "Bao_cao_tien_do_Tuan_9_11_DATN_20224083_v13_clean_chuan.docx"),
+        str(OUTPUT_DIR / "Bao_cao_tien_do_Tuan_9_11_DATN_20224083_ban_cap_nhat.docx"),
+        str(OUTPUT_DIR / "Bao_cao_tien_do_Tuan_9_11_DATN_20224083_v13_clean_chuan_hoan_thien.docx")
+    ]:
+        try:
+            doc.save(fpath)
+            print(f"[✓] Đã lưu thành công: {fpath}")
+        except PermissionError:
+            print(f"[!] File đang mở trong Word (bị khóa ghi): {fpath}")
 
 
 if __name__ == "__main__":
     build_updated_tuan_9_11_report()
-

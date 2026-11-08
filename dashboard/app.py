@@ -248,31 +248,42 @@ else:
                                 break
 
                             f_count += 1
-                            tracked = tracker.track(frame)
+                            tracked = tracker.track(frame, roi_polygons=roi_mgr.polygons)
                             roi_mgr.draw_overlay(frame, alpha=0.25)
                             verified = verifier.process_frame(tracked, checker, roi_mgr.polygons)
 
                             conf_cnt = 0
                             susp_cnt = 0
+                            moving_cnt = 0
 
                             for it in verified:
                                 st_val = it["temporal_status"]
                                 sp = it["spatial_res"]
+                                is_mov = it.get("is_moving", False)
+
                                 if st_val == TrackState.CONFIRMED:
                                     conf_cnt += 1
                                     lbl = f"VI PHAM ({sp['overlap_pct']}%)"
+                                    draw_st = TrackState.CONFIRMED
                                     if it["is_new_alert"]:
                                         ev_res = ev_saver.save_evidence(frame, it["box"], it["track_id"], camera_id=roi_mgr.camera_id, overlap_pct=sp["overlap_pct"])
                                         if ev_res is not None:
                                             db.insert_violation(roi_mgr.camera_id, it["track_id"], ev_res["timestamp"], it["conf"], sp["overlap_pct"], ev_res["full_path"], ev_res.get("crop_path", ""))
                                             log_placeholder.warning(f" [CẢNH BÁO VI PHẠM] ID #{it['track_id']} lấn chiếm vỉa hè ({sp['overlap_pct']}%) lúc {ev_res['timestamp']}!")
+                                elif is_mov or st_val == TrackState.MOVING:
+                                    moving_cnt += 1
+                                    reason = it.get("suspect_reason", "DI CHUYEN")
+                                    lbl = f"[BO QUA] {reason}"
+                                    draw_st = "MOVING"
                                 elif st_val == TrackState.SUSPECTED:
                                     susp_cnt += 1
                                     lbl = f"NGHI VAN {it['violation_frames']}/{confirm_n_frames}"
+                                    draw_st = TrackState.SUSPECTED
                                 else:
                                     lbl = f"HOP LE ({sp['overlap_pct']}%)"
+                                    draw_st = TrackState.NORMAL
 
-                                draw_detection(frame, it["box"], lbl, track_id=it["track_id"], status=st_val)
+                                draw_detection(frame, it["box"], lbl, track_id=it["track_id"], status=draw_st)
 
                             cur_fps = fps_track.update()
                             draw_fps_badge(frame, cur_fps, reader.fps)
@@ -280,7 +291,7 @@ else:
                             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                             frame_placeholder.image(frame_rgb, use_container_width=True)
 
-                            metrics_placeholder.markdown(f"**FPS:** `{cur_fps:.1f}` | **Tổng biển:** `{len(verified)}` | **Nghi vấn:** `{susp_cnt}` | **XÁC NHẬN VI PHẠM:** `{conf_cnt}`")
+                            metrics_placeholder.markdown(f"**FPS:** `{cur_fps:.1f}` | **Tổng biển:** `{len(verified)}` | **Nghi vấn:** `{susp_cnt}` | **Bỏ qua (Di chuyển):** `{moving_cnt}` | **XÁC NHẬN VI PHẠM:** `{conf_cnt}`")
                             time.sleep(0.01)
                     finally:
                         reader.release()
